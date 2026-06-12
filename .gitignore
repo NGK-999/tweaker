@@ -1,0 +1,17 @@
+bin/
+obj/
+.vs/
+.vscode/.vs/
+
+release/
+release-v2/
+
+*.user
+*.suo
+*.pdb
+*.log
+*.tmp
+CONVERSA_APEXTWEAKER.txt
+
+TestResults/
+*.nupkg
