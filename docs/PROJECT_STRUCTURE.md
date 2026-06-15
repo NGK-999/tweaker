@@ -1,6 +1,6 @@
 # Estrutura do projeto
 
-Este projeto e um aplicativo Windows Forms focado em ajustes seguros para VALORANT.
+Este projeto e um aplicativo Windows Forms focado em ajustes de performance, telemetria e estabilidade de frametime no Windows.
 
 ## Pastas principais
 
@@ -15,7 +15,8 @@ Este projeto e um aplicativo Windows Forms focado em ajustes seguros para VALORA
 - `src/Services`
   - Regras e acoes do tweaker.
   - `SystemDiagnosticsService.cs`: coleta informacoes do Windows.
-  - `TweakService.cs`: aplica e reverte tweaks seguros.
+  - `TweakService.cs`: aplica presets, reverte ajustes e expoe o catalogo validado.
+  - `TweakManager.cs`: camada de execucao segura com check-back imediato.
   - `ValorantLocator.cs`: procura o executavel do VALORANT.
   - `RegistryService.cs`: leitura e escrita no Registro do Windows.
 
@@ -26,10 +27,11 @@ Este projeto e um aplicativo Windows Forms focado em ajustes seguros para VALORA
 - `src/Models`
   - Tipos simples de dados.
   - `CommandResult.cs`: resultado de um comando executado.
+  - `TweakDefinition.cs`, `TweakExecutionResult.cs`, `TweakExecutionStatus.cs`, `TweakModule.cs`: modelos do motor validado.
 
-- `release`
+- `release-v2`
   - Pasta oficial de distribuicao.
-  - Contem o arquivo unico `ValorantTweaker.exe`.
+  - Contem o arquivo unico `ApexTweaker.exe`.
   - Esta e a pasta que deve ser usada para testar ou enviar o app.
 
 ## Pastas geradas pelo .NET

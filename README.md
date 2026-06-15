@@ -4,15 +4,11 @@ Windows Forms utility focused on Windows performance, frametime stability, telem
 
 ## Distribuicao
 
-Instalador para distribuir aos clientes:
-
-`release-v2/ApexTweaker-Setup-2.0.0.exe`
-
-O instalador copia o app para `Program Files\ApexTweaker`, cria atalho no Menu Iniciar e pede Administrador quando necessario.
-
-Executavel portatil mantido para testes locais:
+Executavel oficial para distribuir aos clientes:
 
 `release-v2/ApexTweaker.exe`
+
+Esse e o artefato correto de distribuicao. O app e executado diretamente como `.exe` e ja solicita privilegios administrativos pelo manifesto quando necessario.
 
 ## Fluxo recomendado
 
