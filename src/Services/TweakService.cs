@@ -48,6 +48,27 @@ internal sealed class TweakService
     private const string ProtectedRegistryWarning = "[AVISO] Chave bloqueada pela seguranca do Windows. Pulando etapa para garantir estabilidade.";
     private readonly CommandRunner commandRunner = new();
     private readonly OptimizationEngine optimizationEngine = new();
+    private readonly TweakManager validatedTweakManager = new();
+
+    public IReadOnlyList<TweakDefinition> GetValidatedTweakCatalog()
+    {
+        return validatedTweakManager.BuildCompleteCatalog();
+    }
+
+    public IReadOnlyList<TweakExecutionResult> ApplyValidatedModule(TweakModule module)
+    {
+        var tweaks = module switch
+        {
+            TweakModule.LatencyAndCpu => validatedTweakManager.BuildLatencyAndCpuCatalog(),
+            TweakModule.DebloatAndCleanup => validatedTweakManager.BuildDebloatAndCleanupCatalog(),
+            TweakModule.ClassicUxAndProductivity => validatedTweakManager.BuildClassicUxAndProductivityCatalog(),
+            TweakModule.ServicesAndTelemetry => validatedTweakManager.BuildServicesAndTelemetryCatalog(),
+            TweakModule.Hardcore => validatedTweakManager.BuildHardcoreCatalog(),
+            _ => []
+        };
+
+        return validatedTweakManager.ExecuteAll(tweaks);
+    }
 
     public IReadOnlyList<string> CreateRestorePoint()
     {
