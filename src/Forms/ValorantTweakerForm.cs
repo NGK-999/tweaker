@@ -49,15 +49,15 @@ internal sealed class ValorantTweakerForm : Form
         float? RamLoadPercent,
         float? RamUsedGb);
 
-    private static readonly Color Bg = Color.FromArgb(10, 15, 24);
-    private static readonly Color SidebarBg = Color.FromArgb(10, 13, 20);
-    private static readonly Color Panel = Color.FromArgb(17, 24, 39);
-    private static readonly Color PanelSoft = Color.FromArgb(26, 32, 53);
-    private static readonly Color Border = Color.FromArgb(45, 58, 80);
-    private static readonly Color NeonBlue = Color.FromArgb(0, 123, 255);
-    private static readonly Color TextMain = Color.FromArgb(243, 244, 246);
-    private static readonly Color TextMuted = Color.FromArgb(156, 163, 175);
-    private static readonly Color Accent = Color.FromArgb(34, 211, 238);
+    private static readonly Color Bg = Color.FromArgb(30, 30, 36);
+    private static readonly Color SidebarBg = Color.FromArgb(24, 24, 29);
+    private static readonly Color Panel = Color.FromArgb(36, 37, 45);
+    private static readonly Color PanelSoft = Color.FromArgb(44, 46, 56);
+    private static readonly Color Border = Color.FromArgb(62, 66, 78);
+    private static readonly Color NeonBlue = Color.FromArgb(56, 189, 248);
+    private static readonly Color TextMain = Color.FromArgb(245, 247, 250);
+    private static readonly Color TextMuted = Color.FromArgb(166, 175, 189);
+    private static readonly Color Accent = Color.FromArgb(103, 232, 249);
     private static readonly Color Primary = Color.FromArgb(37, 99, 235);
     private static readonly Color Danger = Color.FromArgb(220, 38, 38);
     private static readonly Color Success = Color.FromArgb(74, 222, 128);
@@ -142,6 +142,7 @@ internal sealed class ValorantTweakerForm : Form
 
     public ValorantTweakerForm()
     {
+        DoubleBuffered = true;
         SetStyle(
             ControlStyles.OptimizedDoubleBuffer |
             ControlStyles.AllPaintingInWmPaint |
@@ -209,6 +210,7 @@ internal sealed class ValorantTweakerForm : Form
 
         Controls.Add(rootLayout);
         ForceDoubleBuffering(rootLayout);
+        TrySetDoubleBuffered(performanceChart);
         AcceptButton = btnAutoOptimize;
         ShowPage(CreateDashboardPage(), dashboardTabButton);
     }
@@ -238,8 +240,8 @@ internal sealed class ValorantTweakerForm : Form
         btnAutoOptimize.Click += async (_, _) => await RunAutoOptimizeAsync();
         backupButton.Click += async (_, _) => await CreateGranularBackupAsync();
         restorePointButton.Click += async (_, _) => await CreateRestorePointAsync();
-        gpuProfileButton.Click += async (_, _) => await RunTweakAsync("GPU Windows", () => gpuOptimizationService.ApplyWindowsGpuProfile());
-        gpuRegistryButton.Click += async (_, _) => await RunTweakAsync("GPU regedit", () => gpuOptimizationService.ApplyDriverRegistryProfile());
+        gpuProfileButton.Click += async (_, _) => await RunTweakAsync("GPU Windows", () => tweakService.ApplyGpuWindowsProfile());
+        gpuRegistryButton.Click += async (_, _) => await RunTweakAsync("GPU regedit", () => tweakService.ApplyGpuDriverRegistryProfile());
         btnABTest.Click += async (_, _) => await ToggleHardwareTelemetryAsync();
         telemetryPulseTimer.Tick += (_, _) => PulseTelemetryButton();
         telemetryWatcherTimer.Tick += async (_, _) => await TickTelemetryWatcherAsync();
@@ -471,9 +473,10 @@ internal sealed class ValorantTweakerForm : Form
         var frame = new Panel
         {
             Dock = DockStyle.Fill,
-            BackColor = Color.FromArgb(13, 30, 55),
+            BackColor = Border,
             Padding = new Padding(1),
-            Margin = new Padding(0)
+            Margin = new Padding(0),
+            BorderStyle = BorderStyle.None
         };
 
         frame.Controls.Add(logBox);
@@ -523,7 +526,7 @@ internal sealed class ValorantTweakerForm : Form
         catch (Exception ex)
         {
             nativeHardwareStatusLabel.Text = $"Falha ao iniciar sensores: {ex.Message}";
-            WriteLine($"[AVISO] Monitor nativo de hardware nao iniciou: {ex.Message}");
+            WriteLine($"[AVISO] Monitor nativo de hardware não iniciou: {ex.Message}");
         }
     }
 
@@ -536,8 +539,24 @@ internal sealed class ValorantTweakerForm : Form
         }
 
         activeTabButton = tabButton;
-        activeTabButton.BackColor = Color.FromArgb(17, 22, 34);
+        activeTabButton.BackColor = Panel;
         activeTabButton.ForeColor = TextMain;
+    }
+
+    private void PostToUi(Action action)
+    {
+        if (IsDisposed || !IsHandleCreated)
+        {
+            return;
+        }
+
+        if (InvokeRequired)
+        {
+            BeginInvoke(action);
+            return;
+        }
+
+        action();
     }
 
     private static void ForceDoubleBuffering(Control control)
@@ -561,7 +580,7 @@ internal sealed class ValorantTweakerForm : Form
         }
         catch
         {
-            // Reflection aqui e apenas otimizaÃ§Ã£o visual; falha nao deve afetar a UI.
+            // Reflection aqui é apenas otimização visual; falha não deve afetar a UI.
         }
     }
 
@@ -573,7 +592,7 @@ internal sealed class ValorantTweakerForm : Form
         page.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
 
         page.Controls.Add(CreateCard("One-Click Auto-Tuning", CreateGlobalCommandPanel()), 0, 0);
-        page.Controls.Add(CreateCard("Seguranca do Sistema", CreateButtonGridFilled(1, 2, restorePointButton, backupButton)), 0, 1);
+        page.Controls.Add(CreateCard("Segurança do Sistema", CreateButtonGridFilled(1, 2, restorePointButton, backupButton)), 0, 1);
         page.Controls.Add(CreateCard("Resumo", CreateSummaryText()), 0, 2);
         return page;
     }
@@ -585,8 +604,8 @@ internal sealed class ValorantTweakerForm : Form
         page.RowStyles.Add(new RowStyle(SizeType.Percent, 33.33F));
         page.RowStyles.Add(new RowStyle(SizeType.Percent, 33.34F));
 
-        page.Controls.Add(CreateCard("Otimizacoes Core", CreateButtonGridFilled(1, 4, cpuSchedulerButton, gpuDisplayButton, powerButton, extremeLatencyButton)), 0, 0);
-        page.Controls.Add(CreateCard("Rede e Perifericos", CreateButtonGridFilled(1, 3, inputButton, networkButton, policyServicesButton)), 0, 1);
+        page.Controls.Add(CreateCard("Otimizações Core", CreateButtonGridFilled(1, 4, cpuSchedulerButton, gpuDisplayButton, powerButton, extremeLatencyButton)), 0, 0);
+        page.Controls.Add(CreateCard("Rede e Periféricos", CreateButtonGridFilled(1, 3, inputButton, networkButton, policyServicesButton)), 0, 1);
         page.Controls.Add(CreateCard("GPU e Background", CreateButtonGridFilled(1, 3, gpuProfileButton, gpuRegistryButton, backgroundButton)), 0, 2);
         return page;
     }
@@ -603,8 +622,8 @@ internal sealed class ValorantTweakerForm : Form
         abTestCard.MinimumSize = new Size(0, 96);
 
         page.Controls.Add(abTestCard, 0, 0);
-        page.Controls.Add(CreateCard("Grafico em tempo real", performanceChart, Color.FromArgb(13, 30, 55)), 0, 1);
-        page.Controls.Add(CreateCard("Console", CreateLogFrame(), Color.FromArgb(13, 30, 55)), 0, 2);
+        page.Controls.Add(CreateCard("Gráfico em tempo real", performanceChart, Border), 0, 1);
+        page.Controls.Add(CreateCard("Console", CreateLogFrame(), Border), 0, 2);
         return page;
     }
 
@@ -680,9 +699,9 @@ internal sealed class ValorantTweakerForm : Form
             Color.FromArgb(13, 30, 55)), 1, 0);
 
         grid.Controls.Add(CreateCard(
-            "Memoria",
+            "Memória",
             CreateMetricPanel(
-                ("Uso fisico", nativeRamLoadLabel),
+                ("Uso físico", nativeRamLoadLabel),
                 ("RAM usada", nativeRamUsedLabel)),
             Color.FromArgb(13, 30, 55)), 0, 1);
 
@@ -734,13 +753,16 @@ internal sealed class ValorantTweakerForm : Form
         {
             Dock = DockStyle.Fill,
             BackColor = Color.Transparent,
-            ColumnCount = 2,
+            ColumnCount = 4,
             RowCount = Math.Max(1, metrics.Length),
-            Padding = new Padding(8, 6, 8, 6)
+            Padding = new Padding(14, 10, 10, 10),
+            Margin = new Padding(0)
         };
 
-        grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 44F));
-        grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 56F));
+        grid.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        grid.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 12F));
+        grid.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 96F));
+        grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
 
         for (var row = 0; row < metrics.Length; row++)
         {
@@ -749,19 +771,23 @@ internal sealed class ValorantTweakerForm : Form
             var nameLabel = new Label
             {
                 Text = metrics[row].Name,
-                Dock = DockStyle.Fill,
+                AutoSize = true,
                 ForeColor = TextMuted,
                 Font = new Font("Segoe UI", 10F, FontStyle.Regular, GraphicsUnit.Point),
                 TextAlign = ContentAlignment.MiddleLeft,
-                AutoEllipsis = true
+                AutoEllipsis = true,
+                Anchor = AnchorStyles.Left,
+                Margin = new Padding(0)
             };
 
             metrics[row].ValueLabel.Dock = DockStyle.Fill;
-            metrics[row].ValueLabel.TextAlign = ContentAlignment.MiddleRight;
+            metrics[row].ValueLabel.TextAlign = ContentAlignment.MiddleLeft;
             metrics[row].ValueLabel.AutoEllipsis = true;
+            metrics[row].ValueLabel.Margin = new Padding(0);
+            metrics[row].ValueLabel.Padding = new Padding(0);
 
             grid.Controls.Add(nameLabel, 0, row);
-            grid.Controls.Add(metrics[row].ValueLabel, 1, row);
+            grid.Controls.Add(metrics[row].ValueLabel, 2, row);
         }
 
         return grid;
@@ -861,10 +887,10 @@ internal sealed class ValorantTweakerForm : Form
         panel.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
         panel.RowStyles.Add(new RowStyle(SizeType.Absolute, 38F));
 
-        panel.Controls.Add(CreateHeaderLabel("Controle de otimizacao", 13F, FontStyle.Bold, TextMain), 0, 0);
+        panel.Controls.Add(CreateHeaderLabel("Controle de otimização", 13F, FontStyle.Bold, TextMain), 0, 0);
         panel.Controls.Add(CreateHeaderLabel("Analise o hardware e aplique automaticamente o perfil mais agressivo suportado.", 9.2F, FontStyle.Regular, TextMuted), 0, 1);
         panel.Controls.Add(CreateGlobalCommandPanel(), 0, 2);
-        panel.Controls.Add(CreateHeaderLabel("Modulos por categoria", 10F, FontStyle.Bold, Accent), 0, 3);
+        panel.Controls.Add(CreateHeaderLabel("Módulos por categoria", 10F, FontStyle.Bold, Accent), 0, 3);
         panel.Controls.Add(CreateCategoryGrid(), 0, 4);
         panel.Controls.Add(CreateUtilityPanel(), 0, 5);
         return panel;
@@ -907,10 +933,10 @@ internal sealed class ValorantTweakerForm : Form
         grid.RowStyles.Add(new RowStyle(SizeType.Percent, 25F));
         grid.RowStyles.Add(new RowStyle(SizeType.Percent, 25F));
 
-        grid.Controls.Add(CreateCategoryPanel("Seguranca do Sistema", 2, restorePointButton, backupButton), 0, 0);
-        grid.Controls.Add(CreateCategoryPanel("Otimizacoes Core", 4, cpuSchedulerButton, gpuDisplayButton, powerButton, extremeLatencyButton), 0, 1);
-        grid.Controls.Add(CreateCategoryPanel("Rede e Perifericos", 3, inputButton, networkButton, policyServicesButton), 0, 2);
-        grid.Controls.Add(CreateCategoryPanel("Avancado / Especificos", 3, gpuProfileButton, gpuRegistryButton, backgroundButton, diagnoseButton), 0, 3);
+        grid.Controls.Add(CreateCategoryPanel("Segurança do Sistema", 2, restorePointButton, backupButton), 0, 0);
+        grid.Controls.Add(CreateCategoryPanel("Otimizações Core", 4, cpuSchedulerButton, gpuDisplayButton, powerButton, extremeLatencyButton), 0, 1);
+        grid.Controls.Add(CreateCategoryPanel("Rede e Periféricos", 3, inputButton, networkButton, policyServicesButton), 0, 2);
+        grid.Controls.Add(CreateCategoryPanel("Avançado / Específicos", 3, gpuProfileButton, gpuRegistryButton, backgroundButton, diagnoseButton), 0, 3);
 
         return grid;
     }
@@ -1061,7 +1087,8 @@ internal sealed class ValorantTweakerForm : Form
             ForeColor = TextMain,
             Font = new Font("Consolas", 12F, FontStyle.Bold, GraphicsUnit.Point),
             BackColor = Color.Transparent,
-            Padding = new Padding(0, 0, 4, 0)
+            Padding = new Padding(0),
+            Margin = new Padding(0)
         };
     }
 
@@ -1087,7 +1114,7 @@ internal sealed class ValorantTweakerForm : Form
             DetectUrls = false,
             WordWrap = false,
             ScrollBars = RichTextBoxScrollBars.Vertical,
-            BackColor = Color.FromArgb(5, 7, 10),
+            BackColor = Color.FromArgb(22, 23, 29),
             ForeColor = TerminalInfo,
             InnerPadding = 12,
             Font = CreateTerminalFont()
@@ -1233,7 +1260,7 @@ internal sealed class ValorantTweakerForm : Form
         {
             if (!ReferenceEquals(activeTabButton, button))
             {
-                button.BackColor = Color.FromArgb(17, 22, 34);
+                button.BackColor = Panel;
                 button.ForeColor = TextMain;
             }
         };
@@ -1320,12 +1347,12 @@ internal sealed class ValorantTweakerForm : Form
             var valorantExe = valorantLocator.FindExecutable();
             if (valorantExe is null)
             {
-                report.Add("Sub-modulo opcional de jogo Riot: executavel nao encontrado nos caminhos padrao.");
+                report.Add("Submódulo opcional de jogo Riot: executável não encontrado nos caminhos padrão.");
             }
             else
             {
-                report.Add($"Sub-modulo opcional de jogo Riot: executavel encontrado em {valorantExe}");
-                report.Add($"Sub-modulo opcional de jogo Riot: otimizacao de tela cheia desativada = {(tweakService.HasFullscreenOptimizationDisabled(valorantExe) ? "sim" : "nao")}");
+                report.Add($"Submódulo opcional de jogo Riot: executável encontrado em {valorantExe}");
+                report.Add($"Submódulo opcional de jogo Riot: otimização de tela cheia desativada = {(tweakService.HasFullscreenOptimizationDisabled(valorantExe) ? "sim" : "não")}");
             }
 
             return report;
@@ -1336,7 +1363,7 @@ internal sealed class ValorantTweakerForm : Form
             WriteLine(line);
         }
 
-        statusLabel.Text = "Pronto: revise CPU, GPU, RAM e latencias. Use competitivo como padrao e reinicie.";
+        statusLabel.Text = "Pronto: revise CPU, GPU, RAM e latências. Use competitivo como padrão e reinicie.";
     }
 
     private async System.Threading.Tasks.Task CreateGranularBackupAsync()
@@ -1370,14 +1397,12 @@ internal sealed class ValorantTweakerForm : Form
                 return;
             }
 
-            var backupLines = await System.Threading.Tasks.Task.Run(() => backupService.CreateBackup());
-            foreach (var line in backupLines)
+            var lines = await System.Threading.Tasks.Task.Run(() => tweakService.ApplyAutonomousOptimization(valorantLocator.FindExecutable()));
+            foreach (var line in lines)
             {
                 WriteLine(line);
             }
 
-            IProgress<string> progress = new Progress<string>(WriteLine);
-            await System.Threading.Tasks.Task.Run(() => optimizationEngine.RunAutonomousOptimization(progress.Report));
             statusLabel.Text = "Auto-Tuning aplicado. Reinicie o PC antes de medir.";
         }
         catch (UnauthorizedAccessException ex)
@@ -1563,8 +1588,8 @@ internal sealed class ValorantTweakerForm : Form
 
             var after = await MeasureNetworkLatencyAsync();
             WriteLine(after.HasValue
-                ? $"Ping 1.1.1.1 apos ajustes: {after.Value} ms."
-                : "Ping 1.1.1.1 apos ajustes: sem resposta.");
+                ? $"Ping 1.1.1.1 após ajustes: {after.Value} ms."
+                : "Ping 1.1.1.1 após ajustes: sem resposta.");
 
             statusLabel.Text = $"{section}: concluido. Veja o log.";
         }
@@ -1615,13 +1640,7 @@ internal sealed class ValorantTweakerForm : Form
     {
         await RunTweakAsync(
             "Revertendo tweaks",
-            () =>
-            {
-                var lines = new List<string>();
-                lines.AddRange(tweakService.RevertAdvancedTweaks(valorantLocator.FindExecutable()));
-                lines.AddRange(backupService.RestoreLatestBackup());
-                return lines;
-            },
+            () => tweakService.RevertAdvancedTweaks(valorantLocator.FindExecutable()),
             "Reversao solicitada. Reinicie o PC para fechar a reversao.");
     }
 
@@ -1637,11 +1656,13 @@ internal sealed class ValorantTweakerForm : Form
 
         try
         {
+            await ShutdownBackgroundServicesAsync();
+
             await System.Threading.Tasks.Task.Run(() =>
             {
                 try
                 {
-                    _ = backupService.RestoreLatestBackup();
+                    _ = tweakService.RevertLastAppliedState();
                 }
                 catch
                 {
@@ -1675,7 +1696,41 @@ internal sealed class ValorantTweakerForm : Form
         }
         finally
         {
-            Environment.Exit(0);
+            EndTweaking();
+            BeginInvoke(new Action(Close));
+        }
+    }
+
+    private async System.Threading.Tasks.Task ShutdownBackgroundServicesAsync()
+    {
+        telemetryWatcherTimer.Stop();
+        telemetryPulseTimer.Stop();
+
+        try
+        {
+            await etwFrameTracker.StopAsync();
+        }
+        catch
+        {
+            // ETW teardown is best-effort during emergency shutdown.
+        }
+
+        try
+        {
+            await hardwareTelemetryService.StopMonitoringAsync();
+        }
+        catch
+        {
+            // Telemetry shutdown must not block exit.
+        }
+
+        try
+        {
+            CloseNativeHardwareMonitor();
+        }
+        catch
+        {
+            // Sensor driver cleanup remains best-effort.
         }
     }
 
@@ -1684,11 +1739,6 @@ internal sealed class ValorantTweakerForm : Form
         WriteSection("Revertendo tweaks");
 
         foreach (var line in tweakService.RevertAdvancedTweaks(valorantLocator.FindExecutable()))
-        {
-            WriteLine(line);
-        }
-
-        foreach (var line in backupService.RestoreLatestBackup())
         {
             WriteLine(line);
         }
@@ -1718,14 +1768,14 @@ internal sealed class ValorantTweakerForm : Form
             WriteLine("[AVISO] Aguardando a inicialização de um jogo em tela cheia para iniciar a coleta ETW...");
         }
 
-        performanceChart.SetStatusText("Aguardando inÃ­cio do jogo...");
+        performanceChart.SetStatusText("Aguardando início do jogo...");
         telemetrySawTarget = false;
         telemetryStopInProgress = false;
         telemetryWatcherTimer.Start();
         SetTelemetryButtonState(TelemetryVisualState.Waiting);
         statusLabel.Text = "Telemetria ativa: foque o jogo/app que deseja monitorar.";
         WriteLine(GetBenchmarkStartMessage(activeBenchmarkCaptureState));
-        WriteLine("Telemetria de Hardware iniciada. O relatÃ³rio de causa raiz serÃ¡ gerado assim que o jogo em execuÃ§Ã£o for fechado ou o monitoramento for interrompido.");
+        WriteLine("Telemetria de Hardware iniciada. O relatório de causa raiz será gerado assim que o jogo em execução for fechado ou o monitoramento for interrompido.");
 
         WriteLine("ETW DxgKrnl ativo: capturando eventos Present/PresentMPO para frametime real.");
     }
@@ -1751,7 +1801,7 @@ internal sealed class ValorantTweakerForm : Form
         SetTelemetryButtonState(TelemetryVisualState.Stopped);
         telemetrySawTarget = false;
         telemetryStopInProgress = false;
-        statusLabel.Text = "Telemetria parada. Relatorio gerado no console.";
+        statusLabel.Text = "Telemetria parada. Relatório gerado no console.";
         WriteLine($"Sessao JSON salva em: {HardwareTelemetryService.CurrentSessionFilePath}");
         WriteBenchmarkCaptureResult(activeBenchmarkCaptureState);
         WriteTelemetryReport(hardwareTelemetryService.GenerateBottleneckReport());
@@ -1763,7 +1813,7 @@ internal sealed class ValorantTweakerForm : Form
         activeBenchmarkCaptureState = BenchmarkState.None;
     }
 
-    private void OnTelemetryPointRecorded(TelemetryHistoryPoint point)
+    private void OnTelemetryPointRecorded(object? sender, HardwareTelemetryService.TelemetryPointEventArgs e)
     {
         if (IsDisposed || !IsHandleCreated)
         {
@@ -1775,7 +1825,7 @@ internal sealed class ValorantTweakerForm : Form
             return;
         }
 
-        BeginInvoke(new Action(() => performanceChart.AddPoint(point)));
+        PostToUi(() => performanceChart.AddPoint(e.Point));
     }
 
     private static BenchmarkState GetNextBenchmarkCaptureState()
@@ -1790,15 +1840,15 @@ internal sealed class ValorantTweakerForm : Form
     private static string GetBenchmarkSectionTitle(BenchmarkState state)
     {
         return state == BenchmarkState.OptimizedPending
-            ? "Teste A/B - Depois da Otimizacao"
-            : "Teste A/B - Antes da Otimizacao";
+            ? "Teste A/B - Depois da Otimização"
+            : "Teste A/B - Antes da Otimização";
     }
 
     private static string GetBenchmarkStartMessage(BenchmarkState state)
     {
         return state == BenchmarkState.OptimizedPending
-            ? "Passo 3: capturando sessao apos otimizacao. Feche o jogo ou pare o monitoramento para gerar o comparativo."
-            : "Passo 1: capturando baseline antes da otimizacao. Jogue a mesma cena/mapa por alguns minutos para ter uma base limpa.";
+            ? "Passo 3: capturando sessão após otimização. Feche o jogo ou pare o monitoramento para gerar o comparativo."
+            : "Passo 1: capturando baseline antes da otimização. Jogue a mesma cena/mapa por alguns minutos para ter uma base limpa.";
     }
 
     private void WriteBenchmarkCaptureResult(BenchmarkState capturedState)
@@ -1810,7 +1860,7 @@ internal sealed class ValorantTweakerForm : Form
         }
 
         WriteLine($"Sessao Antes salva em: {HardwareTelemetryService.CurrentBaselineSessionFilePath}");
-        WriteLine("Passo 2: clique em \"\u26A1 OTIMIZAR SISTEMA AO MÁXIMO\", reinicie o PC e rode o teste apos a otimizacao.");
+        WriteLine("Passo 2: clique em \"\u26A1 OTIMIZAR SISTEMA AO MÁXIMO\", reinicie o PC e rode o teste após a otimização.");
     }
 
     private void WriteBenchmarkComparisonReport()
@@ -1864,24 +1914,24 @@ internal sealed class ValorantTweakerForm : Form
 
         if (!_isUiSuspended && !telemetryUiSuspended)
         {
-            BeginInvoke(new Action(() => WriteLine($"ETW DxgKrnl indisponivel: {message}")));
+            PostToUi(() => WriteLine($"ETW DxgKrnl indisponivel: {message}"));
         }
     }
 
-    private void OnTelemetryDiagnosticEventRecorded(string message)
+    private void OnTelemetryDiagnosticEventRecorded(object? sender, HardwareTelemetryService.TelemetryDiagnosticEventArgs e)
     {
         if (IsDisposed || !IsHandleCreated || _isUiSuspended || telemetryUiSuspended)
         {
             return;
         }
 
-        BeginInvoke(new Action(() => WriteLine(message)));
+        PostToUi(() => WriteLine(e.Message));
     }
 
     private void ShowSessionSummaryNotification(TelemetrySessionData session)
     {
         var score = session.CalculateStabilityScore();
-        var title = "ApexTweaker - sessao encerrada";
+        var title = "ApexTweaker - sessão encerrada";
         var text = $"Estabilidade {score}/100 | FPS {session.AverageFps:0} | 1% Low {session.OnePercentLowFps:0} | 0.1% Low {session.ZeroPointOnePercentLowFps:0}";
 
         try
@@ -2117,9 +2167,9 @@ internal sealed class ValorantTweakerForm : Form
     {
         return HardwareTelemetryService.BenchmarkState switch
         {
-            BenchmarkState.OptimizedPending => "Iniciar Teste (ApÃ³s OtimizaÃ§Ã£o)",
-            BenchmarkState.Finished => "Refazer Teste (Antes da OtimizaÃ§Ã£o)",
-            _ => "Iniciar Teste (Antes da OtimizaÃ§Ã£o)"
+            BenchmarkState.OptimizedPending => "Iniciar Teste (Após Otimização)",
+            BenchmarkState.Finished => "Refazer Teste (Antes da Otimização)",
+            _ => "Iniciar Teste (Antes da Otimização)"
         };
     }
 
@@ -2140,7 +2190,7 @@ internal sealed class ValorantTweakerForm : Form
 
     private void WriteTelemetryReport(string report)
     {
-        WriteSection("Relatorio de telemetria");
+        WriteSection("Relatório de telemetria");
 
         foreach (var line in report.Split([Environment.NewLine], StringSplitOptions.None))
         {
@@ -2153,7 +2203,7 @@ internal sealed class ValorantTweakerForm : Form
         var normalized = line.ToUpperInvariant();
 
         if (normalized.Contains("ANALISE CONCLUSIVA") ||
-            normalized.Contains("ANÃLISE CONCLUSIVA") ||
+            normalized.Contains("ANÁLISE CONCLUSIVA") ||
             normalized.Contains("MICRO-TRAVADA") ||
             (normalized.Contains("CPU") && normalized.Contains("ATINGIU")) ||
             (normalized.Contains("GPU") && normalized.Contains("HOTSPOT")) ||
@@ -2163,7 +2213,7 @@ internal sealed class ValorantTweakerForm : Form
         }
 
         if (normalized.Contains("SUGESTAO") ||
-            normalized.Contains("SUGESTÃƒO") ||
+            normalized.Contains("SUGESTÃO") ||
             normalized.Contains("APLICAR PRESET") ||
             normalized.Contains("MODULO") ||
             normalized.Contains("M\u00D3DULO") ||
@@ -2414,14 +2464,14 @@ internal sealed class ValorantTweakerForm : Form
             normalized.Contains("NEGADO") ||
             normalized.Contains("BLOQUEAD") ||
             normalized.Contains("NAO ENCONTR") ||
-            normalized.Contains("NÃƒO ENCONTR"))
+            normalized.Contains("NÃO ENCONTR"))
         {
             return LogType.Bottleneck;
         }
 
         if (normalized.Contains("AVISO") ||
             normalized.Contains("ATENCAO") ||
-            normalized.Contains("ATENÃ‡ÃƒO") ||
+            normalized.Contains("ATENÇÃO") ||
             normalized.Contains("REINICIE") ||
             normalized.Contains("TEMPERATURA") ||
             normalized.Contains("IGNORAD"))
@@ -2808,7 +2858,7 @@ internal sealed class ValorantTweakerForm : Form
 
     private static string FormatTemperature(float? value)
     {
-        return value.HasValue ? $"{value.Value:0} Â°C" : "--";
+        return value.HasValue ? $"{value.Value:0} °C" : "--";
     }
 
     private sealed class MutableNativeHardwareSnapshot
