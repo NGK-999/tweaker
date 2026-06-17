@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Drawing;
@@ -12,20 +12,20 @@ namespace Renomeador.Forms;
 internal sealed class PerformanceGamerChart : UserControl
 {
     private const int WindowSeconds = 60;
-    private static readonly Color ChartBack = Color.FromArgb(10, 13, 20);
-    private static readonly Color GridColor = Color.FromArgb(25, 35, 54);
-    private static readonly Color FpsColor = Color.FromArgb(34, 211, 238);
+    private static readonly Color ChartBack = Color.FromArgb(17, 22, 37);
+    private static readonly Color GridColor = Color.FromArgb(33, 40, 54);
+    private static readonly Color FpsColor = Color.FromArgb(0, 180, 216);
     private static readonly Color OnePercentLowColor = Color.FromArgb(74, 222, 128);
     private static readonly Color ZeroPointOnePercentLowColor = Color.FromArgb(250, 204, 21);
     private static readonly Color CpuColor = Color.FromArgb(0, 123, 255);
     private static readonly Color RamColor = Color.FromArgb(168, 85, 247);
     private static readonly Color TempColor = Color.FromArgb(248, 113, 113);
-    private static readonly Color TextColor = Color.FromArgb(209, 213, 219);
+    private static readonly Color TextColor = Color.FromArgb(255, 255, 255);
 
     private readonly object pointsSync = new();
     private readonly List<TelemetryHistoryPoint> points = [];
     private volatile bool suppressRendering;
-    private string statusText = "Aguardando início do jogo...";
+    private string statusText = "Aguardando in\u00EDcio do jogo...";
 
     public PerformanceGamerChart()
     {

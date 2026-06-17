@@ -12,6 +12,8 @@ using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using LibreHardwareMonitor.Hardware;
+using Microsoft.Diagnostics.Tracing.Parsers.Kernel;
+using Microsoft.Diagnostics.Tracing.Session;
 
 namespace Renomeador.Services;
 
@@ -51,7 +53,11 @@ internal sealed class HardwareTelemetryService : IDisposable
     private const float HighRamLoadPercent = 90F;
     private const float HighStorageActivityPercent = 85F;
     private const float MinimumGameplayGpuLoadPercent = 25F;
+    private const float BaseBoostDegradationTemperatureC = 85F;
+    private const float BoostDegradationConcernMhz = 200F;
+    private const double DpcLatencyConcernMicros = 500D;
     private static readonly TimeSpan StartupFilterWindow = TimeSpan.FromSeconds(20);
+    private static readonly TimeSpan BoostReferenceWindow = TimeSpan.FromMinutes(2);
 
     private readonly object sync = new();
     private readonly object sensorSync = new();
@@ -59,11 +65,14 @@ internal sealed class HardwareTelemetryService : IDisposable
     private readonly List<FrametimeCorrelationEvent> correlationEvents = [];
     private TelemetrySessionData sessionData = new();
     private readonly float cpuFactoryClockMhz;
+    private readonly CpuTopologyProfile cpuTopology;
 
     private Computer? computer;
+    private KernelLatencyTracker? kernelLatencyTracker;
     private CancellationTokenSource? monitorCancellation;
     private Task? monitorTask;
     private string[] monitoredProcessNames = [];
+    private int monitoredProcessId;
     private bool detectForegroundProcess;
     private string monitoredProcessDisplayName = "processo dinamico";
     private DateTime lastHistoryPointUtc = DateTime.MinValue;
@@ -71,24 +80,39 @@ internal sealed class HardwareTelemetryService : IDisposable
     private double frametimeSumMs;
     private double maxFrametimeMs;
     private int frametimeSampleCount;
+    private float boostReferenceClockMhz;
+    private float peakBoostDropMhz;
+    private string telemetryStatusMessage = "Telemetria parcial - aguardando monitoramento.";
     private bool disposed;
 
     public HardwareTelemetryService()
     {
         cpuFactoryClockMhz = ReadCpuFactoryClockMhz();
+        var hardwareEnvironment = HardwareEnvironmentDetector.Detect();
+        cpuTopology = CpuTopologyProfile.Read(hardwareEnvironment);
+        if (!string.IsNullOrWhiteSpace(hardwareEnvironment.DiagnosticMessage))
+        {
+            telemetryStatusMessage = hardwareEnvironment.DiagnosticMessage;
+        }
     }
 
     public bool IsMonitoring => monitorTask is { IsCompleted: false };
 
     public string MonitoredProcessDescription => monitoredProcessDisplayName;
 
-    public bool HasMonitoredProcess => monitoredProcessNames.Length > 0;
+    public int MonitoredProcessId => Volatile.Read(ref monitoredProcessId);
 
-    public bool IsMonitoredProcessRunning => monitoredProcessNames.Length > 0 && IsAnyMonitoredProcessRunning();
+    public bool HasMonitoredProcess => MonitoredProcessId > 0 || monitoredProcessNames.Length > 0;
 
-    public event Action<TelemetryHistoryPoint>? TelemetryPointRecorded;
+    public bool IsMonitoredProcessRunning => MonitoredProcessId > 0
+        ? IsProcessRunning(MonitoredProcessId)
+        : monitoredProcessNames.Length > 0 && IsAnyMonitoredProcessRunning();
 
-    public event Action<string>? DiagnosticEventRecorded;
+    public event EventHandler<TelemetryPointEventArgs>? TelemetryPointRecorded;
+
+    public event EventHandler<TelemetryMetricsUpdatedEventArgs>? MetricsSnapshotUpdated;
+
+    public event EventHandler<TelemetryDiagnosticEventArgs>? DiagnosticEventRecorded;
 
     public static string CurrentSessionFilePath => SessionFilePath;
 
@@ -347,25 +371,43 @@ internal sealed class HardwareTelemetryService : IDisposable
             frametimeSumMs = 0;
             maxFrametimeMs = 0;
             frametimeSampleCount = 0;
+            boostReferenceClockMhz = 0F;
+            peakBoostDropMhz = 0F;
         }
 
         monitoredProcessNames = NormalizeProcessNames(processNames);
+        Volatile.Write(ref monitoredProcessId, 0);
         detectForegroundProcess = monitoredProcessNames.Length == 0;
         monitoredProcessDisplayName = monitoredProcessNames.Length > 0
             ? string.Join(", ", monitoredProcessNames.Select(name => $"{name}.exe"))
             : "aguardando jogo/app em primeiro plano";
         sessionData.TargetProcess = monitoredProcessDisplayName;
+        UpdateTelemetryStatus("Telemetria parcial - inicializando sensores e ETW.");
 
         if (detectForegroundProcess)
         {
             TryBindForegroundProcess();
         }
 
+        if (cpuTopology.IsHybrid && cpuTopology.PerformanceCoreCount > 0)
+        {
+            UpdateTelemetryStatus($"CPU hibrida detectada. {cpuTopology.PerformanceCoreCount} P-Cores isolados para o calculo de boost.");
+            DiagnosticEventRecorded?.Invoke(
+                this,
+                new TelemetryDiagnosticEventArgs(
+                    $"Telemetria hibrida ativa: isolando {cpuTopology.PerformanceCoreCount} P-Cores via EfficiencyClass para medir P-Core Boost Drop."));
+        }
+        else
+        {
+            UpdateTelemetryStatus("Telemetria universal ativa. Boost sera calculado com os nucleos relevantes expostos pelo hardware.");
+        }
+
         OpenComputer();
+        StartKernelLatencyTracker();
 
         monitorCancellation = new CancellationTokenSource();
         monitorTask = Task.Run(
-            () => MonitorLoopAsync(monitorCancellation.Token),
+            async () => await MonitorLoopAsync(monitorCancellation.Token).ConfigureAwait(false),
             monitorCancellation.Token);
     }
 
@@ -394,7 +436,9 @@ internal sealed class HardwareTelemetryService : IDisposable
         monitorCancellation = null;
         monitorTask = null;
         await SaveCurrentSessionAsync();
+        StopKernelLatencyTracker();
         CloseComputer();
+        UpdateTelemetryStatus("Telemetria encerrada.");
     }
 
     public void RegisterFrametimeSample(double ms)
@@ -415,11 +459,10 @@ internal sealed class HardwareTelemetryService : IDisposable
             return;
         }
 
-        var snapshot = CaptureSnapshot() with { FrametimeMs = ms };
-        lock (sync)
-        {
-            AnalyzeStutterEvent(snapshot);
-        }
+        var snapshot = CaptureSnapshot();
+        ApplyDerivedTelemetry(ref snapshot, consumeWindowDpcPeak: false);
+        snapshot = snapshot with { FrametimeMs = ms };
+        AnalyzeStutterEvent(snapshot);
     }
 
     public async Task SaveCurrentSessionAsync(string? path = null)
@@ -490,23 +533,36 @@ internal sealed class HardwareTelemetryService : IDisposable
         var gameplaySamples = sampleCopy.Where(IsMeaningfulGameplaySample).ToList();
         var reportSamples = gameplaySamples.Count > 0 ? gameplaySamples : sampleCopy;
 
-        var peakCpuTemp = reportSamples.Max(sample => sample.CpuMaxCoreTemperatureC);
-        var minCpuClock = reportSamples.Where(sample => sample.CpuAverageClockMhz > 0).Select(sample => sample.CpuAverageClockMhz).DefaultIfEmpty(0).Min();
+        var peakCpuTemp = reportSamples.Max(sample => cpuTopology.IsHybrid && sample.PCoreMaxTemperatureC > 0
+            ? sample.PCoreMaxTemperatureC
+            : sample.CpuMaxCoreTemperatureC);
+        var peakCpuPackageTemp = reportSamples.Max(sample => sample.CpuPackageTemperatureC > 0 ? sample.CpuPackageTemperatureC : sample.CpuMaxCoreTemperatureC);
+        var minCpuClock = reportSamples
+            .Select(sample => cpuTopology.IsHybrid && sample.PCoreAverageClockMhz > 0
+                ? sample.PCoreAverageClockMhz
+                : sample.CpuAverageClockMhz)
+            .Where(value => value > 0)
+            .DefaultIfEmpty(0)
+            .Min();
         var peakCpuPower = reportSamples.Max(sample => sample.CpuPackagePowerW);
+        var peakBoostDrop = reportSamples.Max(sample => sample.PCoreBoostDropMhz);
         var peakGpuCore = reportSamples.Max(sample => sample.GpuCoreTemperatureC);
         var peakGpuHotspot = reportSamples.Max(sample => sample.GpuHotspotTemperatureC);
         var peakGpuPower = reportSamples.Max(sample => sample.GpuPowerW);
         var peakGpuLoad = reportSamples.Max(sample => sample.GpuLoadPercent);
         var peakRamLoad = reportSamples.Max(sample => sample.MemoryLoadPercent);
         var peakStorageActivity = reportSamples.Max(sample => sample.PrimaryDiskReadActivityPercent);
+        var peakDpcLatency = reportSamples.Max(sample => sample.DpcLatencyMicros);
         var worstFrametime = reportSamples.Max(sample => sample.FrametimeMs);
 
         builder.AppendLine("Picos registrados:");
         builder.AppendLine($"- Estabilidade: {stabilityScore}/100 | FPS medio: {averageFps:0.##} | 1% Low: {onePercentLowFps:0.##} | 0.1% Low: {zeroPointOnePercentLowFps:0.##}");
         builder.AppendLine($"- CPU: {peakCpuTemp:0.##} °C | menor clock medio: {minCpuClock:0.##} MHz | pacote: {peakCpuPower:0.##} W");
         builder.AppendLine($"- GPU: core {peakGpuCore:0.##} °C | hotspot {peakGpuHotspot:0.##} °C | power {peakGpuPower:0.##} W | carga: {peakGpuLoad:0.##}%");
+        builder.AppendLine($"- CPU pacote: {peakCpuPackageTemp:0.##} C | boost drop: {peakBoostDrop:0.##} MHz");
         builder.AppendLine($"- RAM: {peakRamLoad:0.##}% de uso fisico");
         builder.AppendLine($"- Disco principal/leitura: {peakStorageActivity:0.##}% de atividade");
+        builder.AppendLine($"- Kernel: pico de latencia DPC/ISR {peakDpcLatency:0.##} \u00B5s");
         builder.AppendLine($"- Pior frametime recebido: {worstFrametime:0.##} ms");
         builder.AppendLine();
 
@@ -529,7 +585,15 @@ internal sealed class HardwareTelemetryService : IDisposable
         }
 
         builder.AppendLine("Veredito:");
-        if (cpuFactoryClockMhz > 0 && minCpuClock > 0 && minCpuClock < cpuFactoryClockMhz * CpuClockDropRatio)
+        if (peakDpcLatency >= DpcLatencyConcernMicros)
+        {
+            builder.AppendLine("- Kernel/DPC apresentou picos elevados. Sugestao: revisar driver de rede/audio, overlays, captura de video e politicas agressivas de economia de energia.");
+        }
+        else if (peakBoostDrop >= BoostDegradationConcernMhz && peakCpuPackageTemp >= cpuTopology.BoostDropThresholdC)
+        {
+            builder.AppendLine("- CPU perdeu boost sob temperatura alta. Sugestao: reduzir agressividade de boost e melhorar refrigeracao para proteger o 1% low.");
+        }
+        else if (cpuFactoryClockMhz > 0 && minCpuClock > 0 && minCpuClock < cpuFactoryClockMhz * CpuClockDropRatio)
         {
             builder.AppendLine("- CPU oscilou abaixo do clock base. Sugestao: aplicar preset de energia, revisar temperatura e limite de energia.");
         }
@@ -562,6 +626,7 @@ internal sealed class HardwareTelemetryService : IDisposable
 
         monitorCancellation?.Cancel();
         monitorCancellation?.Dispose();
+        StopKernelLatencyTracker();
         CloseComputer();
         disposed = true;
     }
@@ -572,21 +637,26 @@ internal sealed class HardwareTelemetryService : IDisposable
 
         while (!cancellationToken.IsCancellationRequested)
         {
-            if (detectForegroundProcess && monitoredProcessNames.Length == 0)
+            if (detectForegroundProcess)
             {
-                TryBindForegroundProcess();
+                if (MonitoredProcessId <= 0 || !IsProcessRunning(MonitoredProcessId))
+                {
+                    TryBindForegroundProcess();
+                }
+            }
+            else if (MonitoredProcessId <= 0 || !IsProcessRunning(MonitoredProcessId))
+            {
+                TryBindNamedProcess();
             }
 
             var nowUtc = DateTime.UtcNow;
-            if (monitoredProcessNames.Length > 0 &&
-                IsAnyMonitoredProcessRunning() &&
+            if (MonitoredProcessId > 0 &&
+                IsProcessRunning(MonitoredProcessId) &&
                 nowUtc >= nextSensorSampleUtc)
             {
                 var snapshot = CaptureSnapshot();
-                lock (sync)
-                {
-                    AddHistoryPoint(snapshot, force: false, severeStutter: false);
-                }
+                ApplyDerivedTelemetry(ref snapshot, consumeWindowDpcPeak: true);
+                AddHistoryPoint(snapshot, force: false, severeStutter: false);
 
                 nextSensorSampleUtc = nowUtc + SampleInterval;
             }
@@ -622,6 +692,7 @@ internal sealed class HardwareTelemetryService : IDisposable
             {
                 computer.Close();
                 computer = null;
+                UpdateTelemetryStatus("Sensores de hardware indisponiveis. Telemetria parcial ativa.");
             }
         }
     }
@@ -667,7 +738,81 @@ internal sealed class HardwareTelemetryService : IDisposable
         return snapshot;
     }
 
-    private static void ReadHardwareTree(IHardware hardware, ref TelemetrySnapshot snapshot)
+    private void ApplyDerivedTelemetry(ref TelemetrySnapshot snapshot, bool consumeWindowDpcPeak)
+    {
+        var activeKernelTracker = kernelLatencyTracker;
+        if (activeKernelTracker is not null)
+        {
+            snapshot.DpcLatencyMicros = consumeWindowDpcPeak
+                ? (float)activeKernelTracker.ConsumeWindowPeakMicros()
+                : (float)activeKernelTracker.LatestLatencyMicros;
+        }
+
+        lock (sync)
+        {
+            var trackedClock = cpuTopology.IsHybrid
+                ? snapshot.PCoreAverageClockMhz
+                : snapshot.CpuAverageClockMhz;
+
+            if (trackedClock <= 0)
+            {
+                return;
+            }
+
+            var sessionStartedUtc = sessionData.StartedAtUtc;
+            var packageTemperature = snapshot.CpuPackageTemperatureC > 0
+                ? snapshot.CpuPackageTemperatureC
+                : snapshot.CpuMaxCoreTemperatureC;
+            var stillCalibratingBoost = sessionStartedUtc == default ||
+                                        snapshot.Timestamp - sessionStartedUtc <= BoostReferenceWindow ||
+                                        boostReferenceClockMhz <= 0;
+
+            if (stillCalibratingBoost)
+            {
+                boostReferenceClockMhz = Math.Max(boostReferenceClockMhz, trackedClock);
+            }
+
+            if (boostReferenceClockMhz > 0 && packageTemperature >= cpuTopology.BoostDropThresholdC)
+            {
+                var drop = Math.Max(0F, boostReferenceClockMhz - trackedClock);
+                peakBoostDropMhz = Math.Max(peakBoostDropMhz, drop);
+                snapshot.PCoreBoostDropMhz = drop;
+            }
+
+            snapshot.BoostReferenceClockMhz = boostReferenceClockMhz;
+            snapshot.PeakBoostDropMhz = peakBoostDropMhz;
+        }
+    }
+
+    private void UpdateTelemetryStatus(string message)
+    {
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            return;
+        }
+
+        Volatile.Write(ref telemetryStatusMessage, message);
+    }
+
+    private TelemetryMetricsSnapshot BuildMetricsSnapshot(TelemetrySnapshot snapshot)
+    {
+        var effectiveClock = cpuTopology.IsHybrid && snapshot.PCoreAverageClockMhz > 0
+            ? snapshot.PCoreAverageClockMhz
+            : snapshot.CpuAverageClockMhz;
+
+        return new TelemetryMetricsSnapshot(
+            snapshot.Timestamp,
+            Math.Round(snapshot.DpcLatencyMicros, 2),
+            Math.Round(snapshot.BoostReferenceClockMhz, 2),
+            Math.Round(snapshot.PCoreBoostDropMhz, 2),
+            snapshot.CpuPackageTemperatureC > 0 ? Math.Round(snapshot.CpuPackageTemperatureC, 2) : null,
+            effectiveClock > 0 ? Math.Round(effectiveClock, 2) : null,
+            Volatile.Read(ref telemetryStatusMessage),
+            cpuTopology.IsHybrid,
+            cpuTopology.PerformanceCoreCount);
+    }
+
+    private void ReadHardwareTree(IHardware hardware, ref TelemetrySnapshot snapshot)
     {
         ReadHardwareSensors(hardware, ref snapshot);
 
@@ -678,7 +823,7 @@ internal sealed class HardwareTelemetryService : IDisposable
         }
     }
 
-    private static void ReadHardwareSensors(IHardware hardware, ref TelemetrySnapshot snapshot)
+    private void ReadHardwareSensors(IHardware hardware, ref TelemetrySnapshot snapshot)
     {
         foreach (var sensor in hardware.Sensors)
         {
@@ -708,16 +853,35 @@ internal sealed class HardwareTelemetryService : IDisposable
         }
     }
 
-    private static void ReadCpuSensor(ISensor sensor, float value, ref TelemetrySnapshot snapshot)
+    private void ReadCpuSensor(ISensor sensor, float value, ref TelemetrySnapshot snapshot)
     {
+        var hasCoreIndex = TryGetCpuCoreIndex(sensor.Name, out var coreIndex);
+        var isPerformanceCore = !cpuTopology.IsHybrid || (hasCoreIndex && cpuTopology.IsPerformanceCore(coreIndex));
+
+        if (sensor.SensorType == SensorType.Temperature && IsCpuPackageTemperature(sensor.Name))
+        {
+            snapshot.CpuPackageTemperatureC = Math.Max(snapshot.CpuPackageTemperatureC, value);
+        }
+
         if (sensor.SensorType == SensorType.Temperature && IsCpuCoreTemperature(sensor.Name))
         {
             snapshot.CpuMaxCoreTemperatureC = Math.Max(snapshot.CpuMaxCoreTemperatureC, value);
+
+            if (isPerformanceCore)
+            {
+                snapshot.PCoreMaxTemperatureC = Math.Max(snapshot.PCoreMaxTemperatureC, value);
+            }
         }
         else if (sensor.SensorType == SensorType.Clock && IsCpuCoreClock(sensor.Name))
         {
             snapshot.CpuClockSumMhz += value;
             snapshot.CpuClockCount++;
+
+            if (isPerformanceCore)
+            {
+                snapshot.PCoreClockSumMhz += value;
+                snapshot.PCoreClockCount++;
+            }
         }
         else if (sensor.SensorType == SensorType.Power && sensor.Name.Contains("Package", StringComparison.OrdinalIgnoreCase))
         {
@@ -775,22 +939,44 @@ internal sealed class HardwareTelemetryService : IDisposable
 
     private void AnalyzeSevereFrametime(TelemetrySnapshot snapshot)
     {
+        var packageTemperature = snapshot.CpuPackageTemperatureC > 0
+            ? snapshot.CpuPackageTemperatureC
+            : snapshot.CpuMaxCoreTemperatureC;
+        var trackedClock = cpuTopology.IsHybrid
+            ? snapshot.PCoreAverageClockMhz
+            : snapshot.CpuAverageClockMhz;
         var cpuClockReduced =
             cpuFactoryClockMhz > 0 &&
-            snapshot.CpuAverageClockMhz > 0 &&
-            snapshot.CpuAverageClockMhz < cpuFactoryClockMhz * CpuClockDropRatio;
+            trackedClock > 0 &&
+            trackedClock < cpuFactoryClockMhz * CpuClockDropRatio;
 
-        if (snapshot.CpuMaxCoreTemperatureC > CpuThermalThresholdC && cpuClockReduced)
+        if (packageTemperature > CpuThermalThresholdC && cpuClockReduced)
         {
-            correlationEvents.Add(new FrametimeCorrelationEvent(
+            AddCorrelationEvent(new FrametimeCorrelationEvent(
                 "CPU",
-                $"CPU atingiu {snapshot.CpuMaxCoreTemperatureC:0.##} °C e clock medio caiu para {snapshot.CpuAverageClockMhz:0.##} MHz durante frametime de {snapshot.FrametimeMs:0.##} ms.",
+                $"CPU atingiu {packageTemperature:0.##} C e clock monitorado caiu para {trackedClock:0.##} MHz durante frametime de {snapshot.FrametimeMs:0.##} ms.",
                 "Aplicar preset de energia, revisar cooler/airflow e limites de energia/temperatura."));
+        }
+
+        if (snapshot.DpcLatencyMicros >= DpcLatencyConcernMicros)
+        {
+            AddCorrelationEvent(new FrametimeCorrelationEvent(
+                "Kernel/DPC",
+                $"Pico DPC/ISR de {snapshot.DpcLatencyMicros:0.##} \u00B5s durante frametime de {snapshot.FrametimeMs:0.##} ms.",
+                "Revisar drivers de rede/audio, overlays, captura de video e economia de energia agressiva em controladores."));
+        }
+
+        if (snapshot.PCoreBoostDropMhz >= BoostDegradationConcernMhz && packageTemperature >= cpuTopology.BoostDropThresholdC)
+        {
+            AddCorrelationEvent(new FrametimeCorrelationEvent(
+                "CPU",
+                $"P-Core Boost Drop detectado. Pacote em {packageTemperature:0.##} C com queda de {snapshot.PCoreBoostDropMhz:0.##} MHz durante frametime de {snapshot.FrametimeMs:0.##} ms.",
+                "Proteger o 1% low reduzindo agressividade de boost ou melhorando refrigeracao antes de insistir em presets extremos."));
         }
 
         if (snapshot.GpuHotspotTemperatureC > GpuHotspotThresholdC)
         {
-            correlationEvents.Add(new FrametimeCorrelationEvent(
+            AddCorrelationEvent(new FrametimeCorrelationEvent(
                 "GPU",
                 $"GPU Hotspot atingiu {snapshot.GpuHotspotTemperatureC:0.##} °C durante frametime de {snapshot.FrametimeMs:0.##} ms.",
                 "Reduzir preset grafico, revisar fan curve, airflow, pasta termica e thermal pads."));
@@ -798,7 +984,7 @@ internal sealed class HardwareTelemetryService : IDisposable
 
         if (snapshot.MemoryLoadPercent >= HighRamLoadPercent)
         {
-            correlationEvents.Add(new FrametimeCorrelationEvent(
+            AddCorrelationEvent(new FrametimeCorrelationEvent(
                 "RAM",
                 $"RAM fisica atingiu {snapshot.MemoryLoadPercent:0.##}% durante frametime de {snapshot.FrametimeMs:0.##} ms.",
                 "Usar modulo Background/Politicas, fechar apps pesados ou aumentar memoria fisica."));
@@ -806,7 +992,7 @@ internal sealed class HardwareTelemetryService : IDisposable
 
         if (snapshot.PrimaryDiskReadActivityPercent >= HighStorageActivityPercent)
         {
-            correlationEvents.Add(new FrametimeCorrelationEvent(
+            AddCorrelationEvent(new FrametimeCorrelationEvent(
                 "Storage",
                 $"Disco principal atingiu {snapshot.PrimaryDiskReadActivityPercent:0.##}% de atividade durante frametime de {snapshot.FrametimeMs:0.##} ms.",
                 "Mover o jogo para SSD/NVMe rapido, evitar downloads/indexacao e verificar saude/temperatura do disco."));
@@ -820,17 +1006,31 @@ internal sealed class HardwareTelemetryService : IDisposable
             return;
         }
 
+        var packageTemperature = snapshot.CpuPackageTemperatureC > 0
+            ? snapshot.CpuPackageTemperatureC
+            : snapshot.CpuMaxCoreTemperatureC;
+        var trackedClock = cpuTopology.IsHybrid
+            ? snapshot.PCoreAverageClockMhz
+            : snapshot.CpuAverageClockMhz;
         var cpuBelowBase =
             cpuFactoryClockMhz > 0 &&
-            snapshot.CpuAverageClockMhz > 0 &&
-            snapshot.CpuAverageClockMhz < cpuFactoryClockMhz;
+            trackedClock > 0 &&
+            trackedClock < cpuFactoryClockMhz;
 
-        if (cpuBelowBase && snapshot.CpuMaxCoreTemperatureC > 89F)
+        if (cpuBelowBase && packageTemperature > 89F)
         {
             AddCorrelationEvent(new FrametimeCorrelationEvent(
                 "CPU",
-                $"[Gargalo] Micro-stuttering por Thermal Throttling da CPU detectado. CPU {snapshot.CpuMaxCoreTemperatureC:0.##} °C, clock {snapshot.CpuAverageClockMhz:0.##} MHz abaixo do base {cpuFactoryClockMhz:0.##} MHz, frametime {snapshot.FrametimeMs:0.##} ms.",
+                $"[Gargalo] Micro-stuttering por Thermal Throttling da CPU detectado. Pacote em {packageTemperature:0.##} C, clock monitorado {trackedClock:0.##} MHz abaixo do base {cpuFactoryClockMhz:0.##} MHz, frametime {snapshot.FrametimeMs:0.##} ms.",
                 "Revisar cooler/airflow, limites de energia e aplicar preset de energia somente se a temperatura estiver sob controle."));
+        }
+
+        if (snapshot.DpcLatencyMicros >= DpcLatencyConcernMicros)
+        {
+            AddCorrelationEvent(new FrametimeCorrelationEvent(
+                "Kernel/DPC",
+                $"[Gargalo] Pico DPC/ISR de {snapshot.DpcLatencyMicros:0.##} \u00B5s detectado no mesmo instante do frametime de {snapshot.FrametimeMs:0.##} ms.",
+                "Priorizar investigacao de drivers de rede/audio, overlays e capturas antes de culpar apenas CPU ou GPU."));
         }
 
         if (snapshot.PrimaryDiskReadActivityPercent >= 99.5F)
@@ -844,62 +1044,89 @@ internal sealed class HardwareTelemetryService : IDisposable
 
     private void AddCorrelationEvent(FrametimeCorrelationEvent correlationEvent)
     {
-        if (correlationEvents.Any(item =>
-                item.Component.Equals(correlationEvent.Component, StringComparison.OrdinalIgnoreCase) &&
-                item.Description.Contains("[Gargalo]", StringComparison.OrdinalIgnoreCase) ==
-                correlationEvent.Description.Contains("[Gargalo]", StringComparison.OrdinalIgnoreCase)))
+        lock (sync)
         {
-            return;
+            if (correlationEvents.Any(item =>
+                    item.Component.Equals(correlationEvent.Component, StringComparison.OrdinalIgnoreCase) &&
+                    item.Description.Contains("[Gargalo]", StringComparison.OrdinalIgnoreCase) ==
+                    correlationEvent.Description.Contains("[Gargalo]", StringComparison.OrdinalIgnoreCase)))
+            {
+                return;
+            }
+
+            correlationEvents.Add(correlationEvent);
         }
 
-        correlationEvents.Add(correlationEvent);
-        DiagnosticEventRecorded?.Invoke(correlationEvent.Description);
+        DiagnosticEventRecorded?.Invoke(this, new TelemetryDiagnosticEventArgs(correlationEvent.Description));
     }
 
     private void AddHistoryPoint(TelemetrySnapshot snapshot, bool force, bool severeStutter)
     {
-        if (!force && snapshot.Timestamp - lastHistoryPointUtc < HistoryInterval)
+        TelemetryHistoryPoint? point = null;
+        TelemetrySnapshot? severeSnapshot = null;
+
+        lock (sync)
         {
-            return;
+            if (!force && snapshot.Timestamp - lastHistoryPointUtc < HistoryInterval)
+            {
+                return;
+            }
+
+            lastHistoryPointUtc = snapshot.Timestamp;
+            var averageFrametime = frametimeSampleCount > 0
+                ? frametimeSumMs / frametimeSampleCount
+                : latestFrametimeMs;
+            var worstFrametime = maxFrametimeMs;
+            frametimeSumMs = 0;
+            maxFrametimeMs = 0;
+            frametimeSampleCount = 0;
+            sessionData.RecalculateFrameStats();
+
+            point = new TelemetryHistoryPoint
+            {
+                Timestamp = snapshot.Timestamp,
+                Frametime = Math.Round(averageFrametime, 3),
+                FPS = averageFrametime > 0 ? Math.Round(1000D / averageFrametime, 2) : 0,
+                OnePercentLowFps = Math.Round(sessionData.OnePercentLowFps, 2),
+                ZeroPointOnePercentLowFps = Math.Round(sessionData.ZeroPointOnePercentLowFps, 2),
+                CpuTemp = Math.Round(cpuTopology.IsHybrid && snapshot.PCoreMaxTemperatureC > 0
+                    ? snapshot.PCoreMaxTemperatureC
+                    : snapshot.CpuMaxCoreTemperatureC, 2),
+                CpuPackageTemp = Math.Round(snapshot.CpuPackageTemperatureC, 2),
+                CpuClock = Math.Round(cpuTopology.IsHybrid && snapshot.PCoreAverageClockMhz > 0
+                    ? snapshot.PCoreAverageClockMhz
+                    : snapshot.CpuAverageClockMhz, 2),
+                PCoreBoostDropMhz = Math.Round(snapshot.PCoreBoostDropMhz, 2),
+                CpuUsagePercentage = Math.Round(snapshot.CpuLoadPercent, 2),
+                GpuTemp = Math.Round(Math.Max(snapshot.GpuHotspotTemperatureC, snapshot.GpuCoreTemperatureC), 2),
+                GpuUsagePercentage = Math.Round(snapshot.GpuLoadPercent, 2),
+                RamUsagePercentage = Math.Round(snapshot.MemoryLoadPercent, 2),
+                DiskReadActivity = Math.Round(snapshot.PrimaryDiskReadActivityPercent, 2),
+                DpcLatencyMicros = Math.Round(snapshot.DpcLatencyMicros, 2),
+                SevereStutter = (severeStutter || worstFrametime >= SevereFrametimeMs) && IsMeaningfulGameplaySample(snapshot)
+            };
+
+            samples.Add(snapshot with { FrametimeMs = averageFrametime });
+            TrimSamples();
+            sessionData.Points.Add(point);
+            TrimHistoryPoints();
+
+            if (point.SevereStutter)
+            {
+                severeSnapshot = snapshot with { FrametimeMs = worstFrametime };
+            }
         }
 
-        lastHistoryPointUtc = snapshot.Timestamp;
-        var averageFrametime = frametimeSampleCount > 0
-            ? frametimeSumMs / frametimeSampleCount
-            : latestFrametimeMs;
-        var worstFrametime = maxFrametimeMs;
-        frametimeSumMs = 0;
-        maxFrametimeMs = 0;
-        frametimeSampleCount = 0;
-        sessionData.RecalculateFrameStats();
-
-        var point = new TelemetryHistoryPoint
+        if (point is not null)
         {
-            Timestamp = snapshot.Timestamp,
-            Frametime = Math.Round(averageFrametime, 3),
-            FPS = averageFrametime > 0 ? Math.Round(1000D / averageFrametime, 2) : 0,
-            OnePercentLowFps = Math.Round(sessionData.OnePercentLowFps, 2),
-            ZeroPointOnePercentLowFps = Math.Round(sessionData.ZeroPointOnePercentLowFps, 2),
-            CpuTemp = Math.Round(snapshot.CpuMaxCoreTemperatureC, 2),
-            CpuClock = Math.Round(snapshot.CpuAverageClockMhz, 2),
-            CpuUsagePercentage = Math.Round(snapshot.CpuLoadPercent, 2),
-            GpuTemp = Math.Round(Math.Max(snapshot.GpuHotspotTemperatureC, snapshot.GpuCoreTemperatureC), 2),
-            GpuUsagePercentage = Math.Round(snapshot.GpuLoadPercent, 2),
-            RamUsagePercentage = Math.Round(snapshot.MemoryLoadPercent, 2),
-            DiskReadActivity = Math.Round(snapshot.PrimaryDiskReadActivityPercent, 2),
-            SevereStutter = (severeStutter || worstFrametime >= SevereFrametimeMs) && IsMeaningfulGameplaySample(snapshot)
-        };
+            TelemetryPointRecorded?.Invoke(this, new TelemetryPointEventArgs(point));
+            MetricsSnapshotUpdated?.Invoke(this, new TelemetryMetricsUpdatedEventArgs(BuildMetricsSnapshot(snapshot)));
+        }
 
-        samples.Add(snapshot with { FrametimeMs = averageFrametime });
-        TrimSamples();
-        sessionData.Points.Add(point);
-        TrimHistoryPoints();
-        TelemetryPointRecorded?.Invoke(point);
-
-        if (point.SevereStutter)
+        if (severeSnapshot is not null)
         {
-            AnalyzeStutterEvent(snapshot with { FrametimeMs = worstFrametime });
-            AnalyzeSevereFrametime(snapshot with { FrametimeMs = worstFrametime });
+            AnalyzeStutterEvent(severeSnapshot.Value);
+            AnalyzeSevereFrametime(severeSnapshot.Value);
         }
     }
 
@@ -943,6 +1170,58 @@ internal sealed class HardwareTelemetryService : IDisposable
         return false;
     }
 
+    private bool IsProcessRunning(int processId)
+    {
+        if (processId <= 0)
+        {
+            return false;
+        }
+
+        try
+        {
+            using var process = Process.GetProcessById(processId);
+            return !process.HasExited;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private bool TryBindNamedProcess()
+    {
+        foreach (var processName in monitoredProcessNames)
+        {
+            try
+            {
+                foreach (var process in Process.GetProcessesByName(processName))
+                {
+                    using (process)
+                    {
+                        if (process.HasExited ||
+                            string.IsNullOrWhiteSpace(process.MainWindowTitle) ||
+                            IsSystemOrShellProcess(process.ProcessName))
+                        {
+                            continue;
+                        }
+
+                        Volatile.Write(ref monitoredProcessId, process.Id);
+                        monitoredProcessDisplayName = $"{process.MainWindowTitle} ({process.ProcessName}.exe)";
+                        sessionData.TargetProcess = monitoredProcessDisplayName;
+                        return true;
+                    }
+                }
+            }
+            catch
+            {
+                // Process can exit while being rebound.
+            }
+        }
+
+        Volatile.Write(ref monitoredProcessId, 0);
+        return false;
+    }
+
     private bool TryBindForegroundProcess()
     {
         if (!TryGetForegroundGameProcess(out var processInfo))
@@ -951,6 +1230,7 @@ internal sealed class HardwareTelemetryService : IDisposable
         }
 
         monitoredProcessNames = [processInfo.ProcessName];
+        Volatile.Write(ref monitoredProcessId, processInfo.ProcessId);
         monitoredProcessDisplayName = string.IsNullOrWhiteSpace(processInfo.WindowTitle)
             ? $"{processInfo.ProcessName}.exe"
             : $"{processInfo.WindowTitle} ({processInfo.ProcessName}.exe)";
@@ -962,13 +1242,13 @@ internal sealed class HardwareTelemetryService : IDisposable
     {
         processInfo = new GameProcessInfo(0, string.Empty, string.Empty, string.Empty);
 
-        var foregroundWindow = NativeMethods.GetForegroundWindow();
+        var foregroundWindow = WindowNativeMethods.GetForegroundWindow();
         if (foregroundWindow == nint.Zero)
         {
             return false;
         }
 
-        _ = NativeMethods.GetWindowThreadProcessId(foregroundWindow, out var processId);
+        _ = WindowNativeMethods.GetWindowThreadProcessId(foregroundWindow, out var processId);
         if (processId <= 0 || processId == Environment.ProcessId)
         {
             return false;
@@ -1041,10 +1321,313 @@ internal sealed class HardwareTelemetryService : IDisposable
         return sensorName.Contains("Core", StringComparison.OrdinalIgnoreCase);
     }
 
+    private static bool IsCpuPackageTemperature(string sensorName)
+    {
+        return sensorName.Contains("Package", StringComparison.OrdinalIgnoreCase) ||
+               sensorName.Contains("Tctl", StringComparison.OrdinalIgnoreCase) ||
+               sensorName.Contains("Tdie", StringComparison.OrdinalIgnoreCase);
+    }
+
     private static bool IsCpuCoreClock(string sensorName)
     {
         return sensorName.Contains("Core", StringComparison.OrdinalIgnoreCase) ||
                sensorName.StartsWith("CPU Core", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool TryGetCpuCoreIndex(string sensorName, out int coreIndex)
+    {
+        coreIndex = -1;
+        var markerIndex = sensorName.IndexOf('#');
+        if (markerIndex < 0 || markerIndex == sensorName.Length - 1)
+        {
+            return false;
+        }
+
+        var value = 0;
+        var foundDigit = false;
+        for (var index = markerIndex + 1; index < sensorName.Length; index++)
+        {
+            var character = sensorName[index];
+            if (!char.IsDigit(character))
+            {
+                break;
+            }
+
+            foundDigit = true;
+            value = (value * 10) + (character - '0');
+        }
+
+        if (!foundDigit)
+        {
+            return false;
+        }
+
+        coreIndex = value;
+        return true;
+    }
+
+    private void StartKernelLatencyTracker()
+    {
+        StopKernelLatencyTracker();
+
+        kernelLatencyTracker = new KernelLatencyTracker(message =>
+        {
+            UpdateTelemetryStatus(message);
+            DiagnosticEventRecorded?.Invoke(this, new TelemetryDiagnosticEventArgs(message));
+        });
+        kernelLatencyTracker.Start();
+    }
+
+    private void StopKernelLatencyTracker()
+    {
+        try
+        {
+            kernelLatencyTracker?.Dispose();
+        }
+        catch
+        {
+            // Kernel ETW teardown is best-effort and must not block telemetry shutdown.
+        }
+        finally
+        {
+            kernelLatencyTracker = null;
+            UpdateTelemetryStatus("Telemetria parcial - rastreador DPC/ISR desligado.");
+        }
+    }
+
+    private sealed class CpuTopologyProfile
+    {
+        private readonly HashSet<int> performanceCoreIndexes;
+        private readonly int performanceCoreCount;
+
+        private CpuTopologyProfile(
+            CpuTelemetryKind kind,
+            bool isHybrid,
+            float boostDropThresholdC,
+            int performanceCoreCount,
+            HashSet<int> performanceCoreIndexes)
+        {
+            Kind = kind;
+            IsHybrid = isHybrid;
+            BoostDropThresholdC = boostDropThresholdC;
+            this.performanceCoreCount = performanceCoreCount;
+            this.performanceCoreIndexes = performanceCoreIndexes;
+        }
+
+        public CpuTelemetryKind Kind { get; }
+
+        public bool IsHybrid { get; }
+
+        public float BoostDropThresholdC { get; }
+
+        public int PerformanceCoreCount => performanceCoreCount;
+
+        public bool IsPerformanceCore(int coreIndex)
+        {
+            return performanceCoreIndexes.Contains(coreIndex);
+        }
+
+        public static CpuTopologyProfile Read(HardwareEnvironmentDetectionResult environment)
+        {
+            try
+            {
+                var processorName = ReadProcessorName();
+                var kind = Classify(processorName);
+                if (environment.NativeTopologyAvailable && environment.IsHybrid)
+                {
+                    return new CpuTopologyProfile(
+                        kind,
+                        true,
+                        ResolveBoostThreshold(kind),
+                        environment.PerformanceCoreCount,
+                        environment.PerformanceCoreSensorIndexes);
+                }
+
+                var cores = ReadProcessorCores();
+                if (cores.Count == 0)
+                {
+                    return new CpuTopologyProfile(kind, false, ResolveBoostThreshold(kind), environment.PerformanceCoreCount, []);
+                }
+
+                var maxEfficiencyClass = cores.Max(item => item.EfficiencyClass);
+                var minEfficiencyClass = cores.Min(item => item.EfficiencyClass);
+                if (maxEfficiencyClass == minEfficiencyClass)
+                {
+                    return new CpuTopologyProfile(kind, false, ResolveBoostThreshold(kind), environment.PerformanceCoreCount, []);
+                }
+
+                var performanceIndexes = cores
+                    .Where(item => item.EfficiencyClass == maxEfficiencyClass)
+                    .Select(item => item.CoreIndex)
+                    .ToHashSet();
+
+                return new CpuTopologyProfile(
+                    kind,
+                    performanceIndexes.Count > 0,
+                    ResolveBoostThreshold(kind),
+                    performanceIndexes.Count,
+                    performanceIndexes);
+            }
+            catch
+            {
+                return new CpuTopologyProfile(
+                    CpuTelemetryKind.Unknown,
+                    false,
+                    ResolveBoostThreshold(CpuTelemetryKind.Unknown),
+                    environment.PerformanceCoreCount,
+                    []);
+            }
+        }
+
+        private static string ReadProcessorName()
+        {
+            try
+            {
+                using var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"HARDWARE\DESCRIPTION\System\CentralProcessor\0");
+                return key?.GetValue("ProcessorNameString")?.ToString() ?? string.Empty;
+            }
+            catch
+            {
+                return string.Empty;
+            }
+        }
+
+        private static CpuTelemetryKind Classify(string processorName)
+        {
+            var normalized = processorName.ToUpperInvariant();
+            if (normalized.Contains("INTEL", StringComparison.Ordinal))
+            {
+                if (normalized.Contains("CORE ULTRA", StringComparison.Ordinal) ||
+                    IsIntel12thGenerationOrNewer(normalized))
+                {
+                    return CpuTelemetryKind.IntelHybrid;
+                }
+
+                return CpuTelemetryKind.IntelClassic;
+            }
+
+            if (normalized.Contains("RYZEN", StringComparison.Ordinal) ||
+                normalized.Contains("EPYC", StringComparison.Ordinal))
+            {
+                return CpuTelemetryKind.AmdZen;
+            }
+
+            if (normalized.Contains("AMD", StringComparison.Ordinal))
+            {
+                return CpuTelemetryKind.AmdLegacy;
+            }
+
+            return CpuTelemetryKind.Unknown;
+        }
+
+        private static bool IsIntel12thGenerationOrNewer(string normalized)
+        {
+            var separatorIndex = normalized.IndexOf('I');
+            if (separatorIndex < 0)
+            {
+                return false;
+            }
+
+            for (var index = 0; index < normalized.Length - 4; index++)
+            {
+                if (!char.IsDigit(normalized[index]))
+                {
+                    continue;
+                }
+
+                var end = index;
+                while (end < normalized.Length && char.IsDigit(normalized[end]))
+                {
+                    end++;
+                }
+
+                var length = end - index;
+                if (length is < 4 or > 5)
+                {
+                    continue;
+                }
+
+                if (!int.TryParse(normalized.Substring(index, length), NumberStyles.Integer, CultureInfo.InvariantCulture, out var model))
+                {
+                    continue;
+                }
+
+                var generation = model >= 10000 ? model / 1000 : model / 100;
+                return generation >= 12;
+            }
+
+            return false;
+        }
+
+        private static float ResolveBoostThreshold(CpuTelemetryKind kind)
+        {
+            return kind switch
+            {
+                CpuTelemetryKind.IntelHybrid => 90F,
+                CpuTelemetryKind.IntelClassic => 88F,
+                _ => BaseBoostDegradationTemperatureC
+            };
+        }
+
+        private static List<ProcessorCoreDescriptor> ReadProcessorCores()
+        {
+            var size = 0U;
+            _ = GetLogicalProcessorInformationEx(LOGICAL_PROCESSOR_RELATIONSHIP.RelationProcessorCore, IntPtr.Zero, ref size);
+            if (size == 0)
+            {
+                return [];
+            }
+
+            var buffer = Marshal.AllocHGlobal(checked((int)size));
+            try
+            {
+                if (!GetLogicalProcessorInformationEx(LOGICAL_PROCESSOR_RELATIONSHIP.RelationProcessorCore, buffer, ref size))
+                {
+                    return [];
+                }
+
+                var result = new List<ProcessorCoreDescriptor>();
+                var cursor = buffer;
+                var end = IntPtr.Add(buffer, checked((int)size));
+                var coreIndex = 0;
+
+                while (cursor.ToInt64() < end.ToInt64())
+                {
+                    var header = Marshal.PtrToStructure<SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX_HEADER>(cursor);
+                    if (header.Size <= 0)
+                    {
+                        break;
+                    }
+
+                    if (header.Relationship == LOGICAL_PROCESSOR_RELATIONSHIP.RelationProcessorCore)
+                    {
+                        var processorData = IntPtr.Add(cursor, Marshal.SizeOf<SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX_HEADER>());
+                        var efficiencyClass = Marshal.ReadByte(processorData, 1);
+                        result.Add(new ProcessorCoreDescriptor(coreIndex, efficiencyClass));
+                        coreIndex++;
+                    }
+
+                    cursor = IntPtr.Add(cursor, header.Size);
+                }
+
+                return result;
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(buffer);
+            }
+        }
+
+        private readonly record struct ProcessorCoreDescriptor(int CoreIndex, byte EfficiencyClass);
+    }
+
+    private enum CpuTelemetryKind
+    {
+        Unknown,
+        IntelClassic,
+        IntelHybrid,
+        AmdZen,
+        AmdLegacy
     }
 
     private static string[] NormalizeProcessNames(string[] processNames)
@@ -1076,14 +1659,25 @@ internal sealed class HardwareTelemetryService : IDisposable
             "cmd",
             "conhost",
             "control",
+            "discord",
+            "discordcanary",
+            "discordptb",
             "dwm",
             "explorer",
             "fontdrvhost",
+            "gamebar",
+            "gamebarftserver",
+            "gamebarpresencewriter",
             "lockapp",
             "mmc",
+            "msedgewebview2",
+            "nvidiashare",
+            "obs64",
             "powershell",
             "pwsh",
             "regedit",
+            "rtss",
+            "rtsshooksloader64",
             "runtimebroker",
             "searchhost",
             "searchui",
@@ -1092,6 +1686,8 @@ internal sealed class HardwareTelemetryService : IDisposable
             "sihost",
             "smartscreen",
             "startmenuexperiencehost",
+            "steam",
+            "steamwebhelper",
             "systemsettings",
             "taskhostw",
             "taskmgr",
@@ -1118,7 +1714,31 @@ internal sealed class HardwareTelemetryService : IDisposable
 
     private readonly record struct FrametimeCorrelationEvent(string Component, string Description, string Suggestion);
 
-    private static class NativeMethods
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetLogicalProcessorInformationEx(
+        LOGICAL_PROCESSOR_RELATIONSHIP relationshipType,
+        IntPtr buffer,
+        ref uint returnedLength);
+
+    private enum LOGICAL_PROCESSOR_RELATIONSHIP
+    {
+        RelationProcessorCore = 0,
+        RelationNumaNode = 1,
+        RelationCache = 2,
+        RelationProcessorPackage = 3,
+        RelationGroup = 4,
+        RelationAll = 0xFFFF
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX_HEADER
+    {
+        public LOGICAL_PROCESSOR_RELATIONSHIP Relationship;
+        public int Size;
+    }
+
+    private static class WindowNativeMethods
     {
         [DllImport("user32.dll")]
         public static extern nint GetForegroundWindow();
@@ -1135,11 +1755,43 @@ internal sealed class HardwareTelemetryService : IDisposable
         }
     }
 
+    public sealed class TelemetryPointEventArgs : EventArgs
+    {
+        public TelemetryPointEventArgs(TelemetryHistoryPoint point)
+        {
+            Point = point;
+        }
+
+        public TelemetryHistoryPoint Point { get; }
+    }
+
+    public sealed class TelemetryDiagnosticEventArgs : EventArgs
+    {
+        public TelemetryDiagnosticEventArgs(string message)
+        {
+            Message = message;
+        }
+
+        public string Message { get; }
+    }
+
+    public sealed class TelemetryMetricsUpdatedEventArgs : EventArgs
+    {
+        public TelemetryMetricsUpdatedEventArgs(TelemetryMetricsSnapshot snapshot)
+        {
+            Snapshot = snapshot;
+        }
+
+        public TelemetryMetricsSnapshot Snapshot { get; }
+    }
+
     private record struct TelemetrySnapshot(DateTime Timestamp)
     {
         public double FrametimeMs { get; init; }
 
         public float CpuMaxCoreTemperatureC { get; set; }
+
+        public float CpuPackageTemperatureC { get; set; }
 
         public float CpuPackagePowerW { get; set; }
 
@@ -1150,6 +1802,14 @@ internal sealed class HardwareTelemetryService : IDisposable
         public int CpuClockCount { get; set; }
 
         public float CpuAverageClockMhz => CpuClockCount == 0 ? 0F : CpuClockSumMhz / CpuClockCount;
+
+        public float PCoreClockSumMhz { get; set; }
+
+        public int PCoreClockCount { get; set; }
+
+        public float PCoreAverageClockMhz => PCoreClockCount == 0 ? 0F : PCoreClockSumMhz / PCoreClockCount;
+
+        public float PCoreMaxTemperatureC { get; set; }
 
         public float GpuCoreTemperatureC { get; set; }
 
@@ -1162,6 +1822,221 @@ internal sealed class HardwareTelemetryService : IDisposable
         public float MemoryLoadPercent { get; set; }
 
         public float PrimaryDiskReadActivityPercent { get; set; }
+
+        public float DpcLatencyMicros { get; set; }
+
+        public float BoostReferenceClockMhz { get; set; }
+
+        public float PCoreBoostDropMhz { get; set; }
+
+        public float PeakBoostDropMhz { get; set; }
+    }
+
+    private sealed class KernelLatencyTracker : IDisposable
+    {
+        private const string SessionPrefix = "ApexTweaker-KernelLatency-";
+        private readonly Action<string> reportDiagnostic;
+        private readonly object trackerSync = new();
+        private TraceEventSession? session;
+        private CancellationTokenSource? cancellation;
+        private Task? processingTask;
+        private long latestLatencyMicros;
+        private long windowPeakMicros;
+        private long sessionPeakMicros;
+        private bool disposed;
+
+        public KernelLatencyTracker(Action<string> reportDiagnostic)
+        {
+            this.reportDiagnostic = reportDiagnostic;
+        }
+
+        public double LatestLatencyMicros => Volatile.Read(ref latestLatencyMicros);
+
+        public double ConsumeWindowPeakMicros()
+        {
+            return Interlocked.Exchange(ref windowPeakMicros, 0L);
+        }
+
+        public void Start()
+        {
+            ObjectDisposedException.ThrowIf(disposed, this);
+
+            if (processingTask is { IsCompleted: false })
+            {
+                return;
+            }
+
+            Interlocked.Exchange(ref latestLatencyMicros, 0L);
+            Interlocked.Exchange(ref windowPeakMicros, 0L);
+            Interlocked.Exchange(ref sessionPeakMicros, 0L);
+
+            cancellation = new CancellationTokenSource();
+            processingTask = Task.Run(() => RunTraceSession(cancellation.Token), cancellation.Token);
+        }
+
+        public void Dispose()
+        {
+            if (disposed)
+            {
+                return;
+            }
+
+            cancellation?.Cancel();
+
+            lock (trackerSync)
+            {
+                session?.Source.StopProcessing();
+                session?.Stop(true);
+                session?.Dispose();
+                session = null;
+            }
+
+            try
+            {
+                processingTask?.Wait(TimeSpan.FromMilliseconds(1500));
+            }
+            catch
+            {
+                // ETW worker shutdown is best-effort during app teardown.
+            }
+
+            cancellation?.Dispose();
+            cancellation = null;
+            processingTask = null;
+            disposed = true;
+        }
+
+        private void RunTraceSession(CancellationToken cancellationToken)
+        {
+            try
+            {
+                if (!HasAdministratorRights())
+                {
+                    reportDiagnostic("ETW DPC/ISR indisponivel: execute o ApexTweaker como administrador para habilitar o KernelTraceControl.");
+                    return;
+                }
+
+                CleanupOrphanedSessions();
+
+                using var traceSession = new TraceEventSession($"{SessionPrefix}{Environment.ProcessId}")
+                {
+                    StopOnDispose = true
+                };
+
+                lock (trackerSync)
+                {
+                    session = traceSession;
+                }
+
+                using var registration = cancellationToken.Register(() =>
+                {
+                    lock (trackerSync)
+                    {
+                        session?.Source.StopProcessing();
+                    }
+                });
+
+                traceSession.EnableKernelProvider(
+                    Microsoft.Diagnostics.Tracing.Parsers.KernelTraceEventParser.Keywords.DeferedProcedureCalls |
+                    Microsoft.Diagnostics.Tracing.Parsers.KernelTraceEventParser.Keywords.Interrupt,
+                    Microsoft.Diagnostics.Tracing.Parsers.KernelTraceEventParser.Keywords.None);
+
+                traceSession.Source.Kernel.PerfInfoDPC += OnDpc;
+                traceSession.Source.Kernel.PerfInfoTimerDPC += OnDpc;
+                traceSession.Source.Kernel.PerfInfoThreadedDPC += OnDpc;
+                traceSession.Source.Kernel.PerfInfoISR += OnIsr;
+                traceSession.Source.Process();
+            }
+            catch (UnauthorizedAccessException)
+            {
+                reportDiagnostic("ETW DPC/ISR indisponivel: privilegio insuficiente para abrir a sessao global do kernel.");
+            }
+            catch (System.Security.SecurityException)
+            {
+                reportDiagnostic("ETW DPC/ISR indisponivel: a politica de seguranca bloqueou a sessao global do kernel.");
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                reportDiagnostic($"ETW DPC/ISR indisponivel: {ex.Message}");
+            }
+        }
+
+        private static void CleanupOrphanedSessions()
+        {
+            try
+            {
+                foreach (var sessionName in TraceEventSession.GetActiveSessionNames())
+                {
+                    if (!sessionName.StartsWith(SessionPrefix, StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    try
+                    {
+                        using var orphan = TraceEventSession.GetActiveSession(sessionName);
+                        orphan?.Stop(true);
+                    }
+                    catch
+                    {
+                        // Orphan cleanup is opportunistic and can fail under stricter ETW ownership.
+                    }
+                }
+            }
+            catch
+            {
+                // Active session enumeration can fail under restricted ETW states.
+            }
+        }
+
+        private void OnDpc(DPCTraceData data)
+        {
+            UpdateLatency(data.ElapsedTimeMSec);
+        }
+
+        private void OnIsr(ISRTraceData data)
+        {
+            UpdateLatency(data.ElapsedTimeMSec);
+        }
+
+        private void UpdateLatency(double elapsedMilliseconds)
+        {
+            if (elapsedMilliseconds is <= 0 or > 1000)
+            {
+                return;
+            }
+
+            var latencyMicros = (long)Math.Round(elapsedMilliseconds * 1000D);
+            Interlocked.Exchange(ref latestLatencyMicros, latencyMicros);
+            UpdatePeak(ref windowPeakMicros, latencyMicros);
+            UpdatePeak(ref sessionPeakMicros, latencyMicros);
+        }
+
+        private static void UpdatePeak(ref long target, long value)
+        {
+            long current;
+            while ((current = Volatile.Read(ref target)) < value)
+            {
+                if (Interlocked.CompareExchange(ref target, value, current) == current)
+                {
+                    break;
+                }
+            }
+        }
+
+        private static bool HasAdministratorRights()
+        {
+            try
+            {
+                using var identity = System.Security.Principal.WindowsIdentity.GetCurrent();
+                var principal = new System.Security.Principal.WindowsPrincipal(identity);
+                return principal.IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator);
+            }
+            catch
+            {
+                return false;
+            }
+        }
     }
 }
 
@@ -1276,7 +2151,11 @@ public sealed record TelemetryHistoryPoint
 
     public double CpuTemp { get; init; }
 
+    public double CpuPackageTemp { get; init; }
+
     public double CpuClock { get; init; }
+
+    public double PCoreBoostDropMhz { get; init; }
 
     public double CpuUsagePercentage { get; init; }
 
@@ -1288,5 +2167,18 @@ public sealed record TelemetryHistoryPoint
 
     public double DiskReadActivity { get; init; }
 
+    public double DpcLatencyMicros { get; init; }
+
     public bool SevereStutter { get; init; }
 }
+
+public sealed record TelemetryMetricsSnapshot(
+    DateTime TimestampUtc,
+    double PeakDpcLatencyMicros,
+    double BoostReferenceClockMhz,
+    double BoostDropMhz,
+    double? CpuPackageTemperatureC,
+    double? EffectiveGameClockMhz,
+    string TelemetryStatusMessage,
+    bool IsHybridCpu,
+    int PerformanceCoreCount);

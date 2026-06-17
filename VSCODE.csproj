@@ -17,6 +17,7 @@
     <Authors>Igor Silva</Authors>
     <Copyright>Copyright 2026 Igor Silva</Copyright>
     <UseWindowsForms>true</UseWindowsForms>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <DebugType>none</DebugType>
@@ -27,10 +28,52 @@
     <PublishReadyToRun>true</PublishReadyToRun>
   </PropertyGroup>
 
+  <PropertyGroup>
+    <NativeProjectDir>$(MSBuildProjectDirectory)\native\ApexTweaker.Native\</NativeProjectDir>
+    <NativeProjectPath>$(NativeProjectDir)ApexTweaker.Native.vcxproj</NativeProjectPath>
+    <NativeBuildConfiguration>Release</NativeBuildConfiguration>
+    <NativeBuildPlatform>x64</NativeBuildPlatform>
+    <NativeOutputDir>$(NativeProjectDir)bin\$(NativeBuildConfiguration)\$(NativeBuildPlatform)\</NativeOutputDir>
+    <NativeDllPath>$(NativeOutputDir)ApexTweaker.Native.dll</NativeDllPath>
+    <VsWherePath>$(MSBuildProgramFiles32)\Microsoft Visual Studio\Installer\vswhere.exe</VsWherePath>
+    <NativeMsBuildPathFile>$(IntermediateOutputPath)native-msbuild-path.txt</NativeMsBuildPathFile>
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="LibreHardwareMonitorLib" Version="0.9.6" />
     <PackageReference Include="Microsoft.Diagnostics.Tracing.TraceEvent" Version="3.1.21" />
     <PackageReference Include="System.Management" Version="10.0.2" />
   </ItemGroup>
+
+  <Target Name="BuildNativeDll" BeforeTargets="BeforeBuild">
+    <Error Condition="!Exists('$(NativeProjectPath)')" Text="Projeto nativo nao encontrado em '$(NativeProjectPath)'." />
+    <Error Condition="!Exists('$(VsWherePath)')" Text="vswhere.exe nao encontrado em '$(VsWherePath)'. Instale o Visual Studio Build Tools com suporte a C++." />
+
+    <MakeDir Directories="$(IntermediateOutputPath)" />
+    <Exec Command="&quot;$(VsWherePath)&quot; -latest -products * -requires Microsoft.Component.MSBuild -find MSBuild\**\Bin\MSBuild.exe &gt; &quot;$(NativeMsBuildPathFile)&quot;" />
+    <ReadLinesFromFile File="$(NativeMsBuildPathFile)">
+      <Output TaskParameter="Lines" ItemName="NativeMsBuildCandidate" />
+    </ReadLinesFromFile>
+
+    <PropertyGroup>
+      <NativeMsBuildExe>@(NativeMsBuildCandidate->'%(Identity)')</NativeMsBuildExe>
+    </PropertyGroup>
+
+    <Error Condition="'$(NativeMsBuildExe)' == ''" Text="MSBuild.exe do Visual Studio nao foi localizado via vswhere." />
+
+    <Exec
+      Command="&quot;$(NativeMsBuildExe)&quot; &quot;$(NativeProjectPath)&quot; /m /nologo /p:Configuration=$(NativeBuildConfiguration);Platform=$(NativeBuildPlatform)"
+      WorkingDirectory="$(NativeProjectDir)" />
+
+    <Error Condition="!Exists('$(NativeDllPath)')" Text="A compilacao nativa terminou sem gerar '$(NativeDllPath)'." />
+  </Target>
+
+  <Target Name="CopyNativeDllToBuildOutput" AfterTargets="Build" Condition="Exists('$(NativeDllPath)')">
+    <Copy SourceFiles="$(NativeDllPath)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+  </Target>
+
+  <Target Name="CopyNativeDllToRelease" AfterTargets="Publish" Condition="Exists('$(NativeDllPath)')">
+    <Copy SourceFiles="$(NativeDllPath)" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" />
+  </Target>
 
 </Project>

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.ComponentModel;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -13,7 +13,7 @@ internal sealed class RoundedButton : Button
     public RoundedButton()
     {
         BorderRadius = 8;
-        BorderColor = Color.FromArgb(45, 58, 80);
+        BorderColor = Color.FromArgb(42, 50, 66);
         FlatStyle = FlatStyle.Flat;
         FlatAppearance.BorderSize = 0;
         UseVisualStyleBackColor = false;

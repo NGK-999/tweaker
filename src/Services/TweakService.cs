@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Security;
 using System.Text.RegularExpressions;
+using System.Threading;
 using Microsoft.Win32;
 using Renomeador.Infrastructure;
 using Renomeador.Models;
@@ -35,20 +36,21 @@ internal sealed class TweakService
     private const string ProcessorEnergyPreference = "36687f9e-e3a5-4dbf-b1dc-15eb381c6863";
     private const string ProcessorCoreParkingMinCores = "0cc5b647-c1df-4637-891a-dec35c318583";
     private const string ProcessorCoreParkingMaxCores = "ea062031-0e34-4ff1-9b6d-eb1059334028";
-    private const string ProcessorHeterogeneousPolicy = "HETEROPOLICY";
-    private const string ProcessorHeterogeneousThreadScheduling = "HETEROTHREAD";
-    private const string ProcessorSchedulingPolicy = "SCHEDPOLICY";
     private const string ProcessorIdleDisable = "5d76a2ca-e8c0-402f-a133-2158492d58ad";
     private const string PciExpressAspm = "ee12f906-d277-404b-b6da-e5fa1a576df5";
     private const string DiskIdle = "6738e2c4-e8a5-4a42-b16a-e040e769756e";
     private const string StandbyIdle = "29f6c1db-86da-48c5-9fdb-f2b67b1f44da";
     private const string HibernateIdle = "9d7815a6-7ee4-497e-8888-515a05f02364";
     private const string UsbSelectiveSuspend = "48e6b7a6-50f5-4782-a5d4-53bb8f07e226";
-    private const string UltimatePerformanceGuid = "e9a42b02-d5df-448d-aa00-03f14749eb61";
-    private const string ProtectedRegistryWarning = "[AVISO] Chave bloqueada pela seguranca do Windows. Pulando etapa para garantir estabilidade.";
+    private const string UltimatePerformanceGuid = WindowsPowerModeService.UltimatePerformanceGuid;
+    private const string ProtectedRegistryWarning =
+        "[ERRO] Chave bloqueada. Desative o Tamper Protection (Prote\u00e7\u00e3o contra Viola\u00e7\u00f5es) do Defender para aplicar este Tweak.";
     private readonly CommandRunner commandRunner = new();
+    private readonly BackupService backupService = new();
+    private readonly GpuOptimizationService gpuOptimizationService = new();
     private readonly OptimizationEngine optimizationEngine = new();
     private readonly TweakManager validatedTweakManager = new();
+    private readonly AsyncLocal<MutationSession?> activeMutationSession = new();
 
     public IReadOnlyList<TweakDefinition> GetValidatedTweakCatalog()
     {
@@ -72,13 +74,7 @@ internal sealed class TweakService
 
     public IReadOnlyList<string> CreateRestorePoint()
     {
-        var result = commandRunner.Run(
-            "powershell.exe",
-            "-NoProfile -ExecutionPolicy Bypass -Command \"Checkpoint-Computer -Description 'ApexTweaker' -RestorePointType MODIFY_SETTINGS\"");
-
-        return result.ExitCode == 0
-            ? ["Ponto de restauracao criado."]
-            : [$"Nao foi possivel criar ponto de restauracao. Rode como Administrador e verifique se a Restauracao do Sistema esta ativa. Saida: {result.Output}"];
+        return SystemRestoreService.CreatePreOptimizationRestorePoint();
     }
 
     public IReadOnlyList<string> ApplyMaximumPreset(string? valorantExePath)
@@ -88,37 +84,45 @@ internal sealed class TweakService
 
     public IReadOnlyList<string> ApplyMaximumPreset(string? valorantExePath, HardwareInfo? hardware)
     {
-        var log = new List<string> { "Preset maximo iniciado. Acoes profundas exigem reinicio." };
-        log.AddRange(ApplyPowerTweaks());
-        log.AddRange(ApplyCpuArchitectureTweaks());
-        log.AddRange(ApplyExtremeLatencyTweaks(hardware));
-        log.AddRange(ApplyFullscreenExclusiveTweaks());
-        log.AddRange(ApplySchedulerQuantumTweaks());
-        log.AddRange(ApplyKernelMemoryTweaks());
-        log.AddRange(ApplyBootTimerControls());
-        log.AddRange(ApplyMpoStabilityFix());
-        log.AddRange(ApplyAdvancedDpcLatencyTweaks());
-        log.AddRange(ApplyGpuDisplayTweaks(valorantExePath));
-        log.AddRange(ApplyInputTweaks());
-        log.AddRange(ApplyNetworkTweaks());
-        log.AddRange(ApplyBackgroundTweaks());
-        log.Add("Preset maximo concluido. Reinicie o PC antes de testar.");
-        return log;
+        return RunMutationPipeline("Preset maximo", () =>
+        {
+            var log = new List<string> { "Preset maximo iniciado. Acoes profundas exigem reinicio." };
+            AddSystemRestorePointIfCurrentRootMutation("Preset maximo", log);
+            log.AddRange(ApplyPowerTweaks());
+            log.AddRange(ApplyCpuArchitectureTweaks());
+            log.AddRange(ApplyExtremeLatencyTweaks(hardware));
+            log.AddRange(ApplyFullscreenExclusiveTweaks());
+            log.AddRange(ApplySchedulerQuantumTweaks());
+            log.AddRange(ApplyKernelMemoryTweaks());
+            log.AddRange(ApplyBootTimerControls());
+            log.AddRange(ApplyMpoStabilityFix());
+            log.AddRange(ApplyAdvancedDpcLatencyTweaks());
+            log.AddRange(ApplyGpuDisplayTweaks(valorantExePath));
+            log.AddRange(ApplyInputTweaks());
+            log.AddRange(ApplyNetworkTweaks());
+            log.AddRange(ApplyBackgroundTweaks());
+            log.Add("Preset maximo concluido. Reinicie o PC antes de testar.");
+            return log;
+        });
     }
 
     public IReadOnlyList<string> ApplyCompetitivePreset(string? valorantExePath)
     {
-        var log = new List<string> { "Preset competitivo iniciado. Perfil agressivo, mas sem desativar idle states/hibernacao." };
-        log.AddRange(ApplyPowerTweaks());
-        log.AddRange(ApplyCpuArchitectureTweaks());
-        log.AddRange(ApplyAdvancedDpcLatencyTweaks());
-        log.AddRange(ApplyGpuDisplayTweaks(valorantExePath));
-        log.AddRange(ApplyInputTweaks());
-        log.AddRange(ApplyNetworkTweaks());
-        log.AddRange(ApplyBackgroundTweaks());
-        log.AddRange(ApplyPolicyAndServiceTweaks());
-        log.Add("Preset competitivo concluido. Reinicie o PC antes de medir.");
-        return log;
+        return RunMutationPipeline("Preset competitivo", () =>
+        {
+            var log = new List<string> { "Preset competitivo iniciado. Perfil agressivo, mas sem desativar idle states/hibernacao." };
+            AddSystemRestorePointIfCurrentRootMutation("Preset competitivo", log);
+            log.AddRange(ApplyPowerTweaks());
+            log.AddRange(ApplyCpuArchitectureTweaks());
+            log.AddRange(ApplyAdvancedDpcLatencyTweaks());
+            log.AddRange(ApplyGpuDisplayTweaks(valorantExePath));
+            log.AddRange(ApplyInputTweaks());
+            log.AddRange(ApplyNetworkTweaks());
+            log.AddRange(ApplyBackgroundTweaks());
+            log.AddRange(ApplyPolicyAndServiceTweaks());
+            log.Add("Preset competitivo concluido. Reinicie o PC antes de medir.");
+            return log;
+        });
     }
 
     public IReadOnlyList<string> ApplyExtremeLatencyTweaks()
@@ -128,45 +132,46 @@ internal sealed class TweakService
 
     public IReadOnlyList<string> ApplyExtremeLatencyTweaks(HardwareInfo? hardware)
     {
-        var log = new List<string>
+        return RunMutationPipeline("Latencia extrema", () =>
         {
-            "Latencia extrema: aproximando pelo Windows o comportamento de BIOS agressiva.",
-            "Ring ratio, PL1/PL2 e current limit nao sao controles nativos do Windows; isso precisa de BIOS/firmware."
-        };
-        var architectureProfile = optimizationEngine.IdentifyCPUArchitecture(hardware);
+            var log = new List<string>
+            {
+                "Latencia extrema: aproximando pelo Windows o comportamento de BIOS agressiva.",
+                "Ring ratio, PL1/PL2 e current limit nao sao controles nativos do Windows; isso precisa de BIOS/firmware."
+            };
+            AddSystemRestorePointIfCurrentRootMutation("Latencia extrema", log);
+            var architectureProfile = optimizationEngine.IdentifyCPUArchitecture(hardware);
 
-        optimizationEngine.ApplyThermalAwareProcessorBoostProfile(log.Add);
-        RunPowercfgSetting($"/setacvalueindex {PowerSchemeCurrent} {SubProcessor} {ProcessorEnergyPreference} 0", "EPP em 0: preferencia total por desempenho.", log);
+            ApplyThermalAwareProcessorBoostProfile(log);
+            RunPowercfgSetting($"/setacvalueindex {PowerSchemeCurrent} {SubProcessor} {ProcessorEnergyPreference} 0", "EPP em 0: preferencia total por desempenho.", log);
 
-        if (architectureProfile.IsHeterogeneousArchitecture)
-        {
-            log.Add("[INFO] CPU heterogenea detectada. Core Parking preservado para nao quebrar Thread Director/P-Cores/E-Cores.");
-            RunPowercfgSetting($"/setacvalueindex {PowerSchemeCurrent} SUB_PROCESSOR {ProcessorHeterogeneousPolicy} 4", "HETEROPOLICY=4: politica heterogenea orientada a P-Cores para threads prioritarias.", log);
-            RunPowercfgSetting($"/setacvalueindex {PowerSchemeCurrent} SUB_PROCESSOR {ProcessorHeterogeneousThreadScheduling} 0", "HETEROTHREAD=0: escalonamento heterogeneo preservado para o Windows.", log);
-            RunPowercfgSetting($"/setacvalueindex {PowerSchemeCurrent} SUB_PROCESSOR {ProcessorSchedulingPolicy} 2", "SCHEDPOLICY=2: scheduler prioriza cores de performance em workloads foreground.", log);
-        }
-        else
-        {
-            log.Add("[INFO] CPU homogenea detectada. Aplicando Core Parking 100% como regra legacy de baixa latencia.");
-            RunPowercfgSetting($"/setacvalueindex {PowerSchemeCurrent} {SubProcessor} {ProcessorCoreParkingMinCores} 100", "Core parking minimo em 100%.", log);
-            RunPowercfgSetting($"/setacvalueindex {PowerSchemeCurrent} {SubProcessor} {ProcessorCoreParkingMaxCores} 100", "Core parking maximo em 100%.", log);
-        }
+            if (architectureProfile.IsHeterogeneousArchitecture)
+            {
+                log.Add("[INFO] CPU heterogenea detectada. Core Parking preservado para nao quebrar Thread Director/P-Cores/E-Cores.");
+                ApplyHeterogeneousCpuPolicy(log);
+            }
+            else
+            {
+                log.Add("[INFO] CPU homogenea detectada. Aplicando Core Parking 100% como regra legacy de baixa latencia.");
+                RunPowercfgSetting($"/setacvalueindex {PowerSchemeCurrent} {SubProcessor} {ProcessorCoreParkingMinCores} 100", "Core parking minimo em 100%.", log);
+                RunPowercfgSetting($"/setacvalueindex {PowerSchemeCurrent} {SubProcessor} {ProcessorCoreParkingMaxCores} 100", "Core parking maximo em 100%.", log);
+            }
 
-        RunPowercfgSetting($"/setacvalueindex {PowerSchemeCurrent} {SubProcessor} {ProcessorIdleDisable} 1", "Processor idle states desativados no plano atual.", log);
-        RunPowercfgSetting($"/setacvalueindex {PowerSchemeCurrent} {SubPciExpress} {PciExpressAspm} 0", "PCIe ASPM desligado para evitar economia de energia no barramento.", log);
-        RunPowercfgSetting($"/setacvalueindex {PowerSchemeCurrent} {SubDisk} {DiskIdle} 0", "Disco configurado para nao desligar na tomada.", log);
-        RunPowercfgSetting($"/setacvalueindex {PowerSchemeCurrent} {SubSleep} {StandbyIdle} 0", "Suspensao automatica desligada na tomada.", log);
-        RunPowercfgSetting($"/setacvalueindex {PowerSchemeCurrent} {SubSleep} {HibernateIdle} 0", "Hibernacao automatica desligada na tomada.", log);
-        RunPowercfgSetting("/hibernate off", "Hibernacao desligada.", log);
-        commandRunner.Run("powercfg", "/setactive SCHEME_CURRENT");
+            RunPowercfgSetting($"/setacvalueindex {PowerSchemeCurrent} {SubProcessor} {ProcessorIdleDisable} 1", "Processor idle states desativados no plano atual.", log);
+            RunPowercfgSetting($"/setacvalueindex {PowerSchemeCurrent} {SubPciExpress} {PciExpressAspm} 0", "PCIe ASPM desligado para evitar economia de energia no barramento.", log);
+            RunPowercfgSetting($"/setacvalueindex {PowerSchemeCurrent} {SubDisk} {DiskIdle} 0", "Disco configurado para nao desligar na tomada.", log);
+            RunPowercfgSetting($"/setacvalueindex {PowerSchemeCurrent} {SubSleep} {StandbyIdle} 0", "Suspensao automatica desligada na tomada.", log);
+            RunPowercfgSetting($"/setacvalueindex {PowerSchemeCurrent} {SubSleep} {HibernateIdle} 0", "Hibernacao automatica desligada na tomada.", log);
+            RunPowercfgSetting("/hibernate off", "Hibernacao desligada.", log);
+            RunPowercfgSetting("/setactive SCHEME_CURRENT", "Plano atual reativado apos ajustes de latencia extrema.", log);
 
-        BackupRegistryKey(@"HKLM\SOFTWARE\Microsoft\Windows\Dwm", "dwm", log);
-        // DWM: diretrizes experimentais para reduzir overhead de composicao quando workload 3D esta em foco.
-        TrySetDword(Registry.LocalMachine, DwmPath, "RealTimeGamingResolution", 1, "DWM RealTimeGamingResolution=1 aplicado para priorizar janela 3D em foco.", log);
-        TrySetDword(Registry.LocalMachine, DwmPath, "CompositionPolicy", 2, "DWM CompositionPolicy=2 aplicado para politica de composicao orientada a baixa latencia.", log);
+            BackupRegistryKey(@"HKLM\SOFTWARE\Microsoft\Windows\Dwm", "dwm", log);
+            TrySetDword(Registry.LocalMachine, DwmPath, "RealTimeGamingResolution", 1, "DWM RealTimeGamingResolution=1 aplicado para priorizar janela 3D em foco.", log);
+            TrySetDword(Registry.LocalMachine, DwmPath, "CompositionPolicy", 2, "DWM CompositionPolicy=2 aplicado para politica de composicao orientada a baixa latencia.", log);
 
-        log.Add("Aviso: isso aumenta consumo, temperatura e ruido. Teste frametime, nao apenas FPS medio.");
-        return log;
+            log.Add("Aviso: isso aumenta consumo, temperatura e ruido. Teste frametime, nao apenas FPS medio.");
+            return log;
+        });
     }
 
     public IReadOnlyList<string> ApplyFullscreenExclusiveTweaks()
@@ -248,8 +253,7 @@ internal sealed class TweakService
         }
         else
         {
-            DisableFullscreenOptimizations(valorantExePath);
-            log.Add("Otimizacao de tela cheia do executavel do VALORANT foi desativada.");
+            DisableFullscreenOptimizations(valorantExePath, log);
         }
 
         log.Add("Reinicie o PC antes de medir FPS, input lag ou stutter.");
@@ -258,18 +262,21 @@ internal sealed class TweakService
 
     public IReadOnlyList<string> ApplyPowerTweaks()
     {
-        var log = new List<string> { "Energia: tentando Ultimate; se indisponivel, os ajustes serao injetados no plano ativo." };
+        return RunMutationPipeline("Energia", () =>
+        {
+            var log = new List<string> { "Energia: tentando Ultimate; se indisponivel, os ajustes serao injetados no plano ativo." };
 
-        log.AddRange(ActivateUltimatePerformanceOrFallback());
-        optimizationEngine.ApplyThermalAwareProcessorBoostProfile(log.Add);
+            log.AddRange(ActivateUltimatePerformanceOrFallback());
+            ApplyThermalAwareProcessorBoostProfile(log);
 
-        RunPowercfgSetting("/setacvalueindex SCHEME_CURRENT SUB_PROCESSOR PROCTHROTTLEMIN 100", "CPU minimo em 100% na tomada.", log);
-        RunPowercfgSetting("/setacvalueindex SCHEME_CURRENT SUB_PROCESSOR PROCTHROTTLEMAX 100", "CPU maximo em 100% na tomada.", log);
-        RunPowercfgSetting("/setacvalueindex SCHEME_CURRENT SUB_PROCESSOR SYSCOOLPOL 1", "Politica de resfriamento ativa na tomada.", log);
-        RunPowercfgSetting($"/setacvalueindex {PowerSchemeCurrent} {SubUsb} {UsbSelectiveSuspend} 0", "Suspensao seletiva USB desativada na tomada via GUID absoluto.", log);
-        commandRunner.Run("powercfg", "/setactive SCHEME_CURRENT");
+            RunPowercfgSetting("/setacvalueindex SCHEME_CURRENT SUB_PROCESSOR PROCTHROTTLEMIN 100", "CPU minimo em 100% na tomada.", log);
+            RunPowercfgSetting("/setacvalueindex SCHEME_CURRENT SUB_PROCESSOR PROCTHROTTLEMAX 100", "CPU maximo em 100% na tomada.", log);
+            RunPowercfgSetting("/setacvalueindex SCHEME_CURRENT SUB_PROCESSOR SYSCOOLPOL 1", "Politica de resfriamento ativa na tomada.", log);
+            RunPowercfgSetting($"/setacvalueindex {PowerSchemeCurrent} {SubUsb} {UsbSelectiveSuspend} 0", "Suspensao seletiva USB desativada na tomada via GUID absoluto.", log);
+            RunPowercfgSetting("/setactive SCHEME_CURRENT", "Plano atual reativado apos ajustes de energia.", log);
 
-        return log;
+            return log;
+        });
     }
 
     public IReadOnlyList<string> ActivateUltimatePerformanceOrFallback()
@@ -279,48 +286,25 @@ internal sealed class TweakService
         try
         {
             var listBeforeImportResult = commandRunner.Run("powercfg", "/list");
-            var activationGuid = UltimatePerformanceGuid;
-            CommandResult? importResult = null;
-
-            if (listBeforeImportResult.ExitCode == 0 &&
-                listBeforeImportResult.Output.Contains(UltimatePerformanceGuid, StringComparison.OrdinalIgnoreCase))
-            {
-                log.Add("Plano Desempenho Maximo ja listado. Importacao duplicada ignorada.");
-            }
-            else
-            {
-                importResult = commandRunner.Run("powercfg", $"-duplicatescheme {UltimatePerformanceGuid}");
-                if (importResult.Value.ExitCode == 0)
-                {
-                    log.Add("Plano Desempenho Maximo registrado/desbloqueado via GUID injection.");
-                    activationGuid = ExtractFirstGuid(importResult.Value.Output) ?? activationGuid;
-                }
-                else
-                {
-                    log.Add($"Desbloqueio do Desempenho Maximo retornou aviso. Verificando se o plano ja existe. Saida: {importResult.Value.Output}");
-                }
-            }
-
-            var listResult = commandRunner.Run("powercfg", "/list");
             var ultimateAvailable =
-                importResult?.ExitCode == 0 ||
-                (listResult.ExitCode == 0 &&
-                 listResult.Output.Contains(UltimatePerformanceGuid, StringComparison.OrdinalIgnoreCase));
+                listBeforeImportResult.ExitCode == 0 &&
+                listBeforeImportResult.Output.Contains(UltimatePerformanceGuid, StringComparison.OrdinalIgnoreCase);
 
             if (!ultimateAvailable)
             {
-                log.Add("Desempenho Maximo indisponivel neste Windows/firmware. Plano atual preservado; ajustes serao aplicados via SCHEME_CURRENT.");
+                if (WindowsPowerModeService.TryApplyBestPerformanceOverlay(out _, out _))
+                {
+                    log.Add("Desempenho Maximo legado indisponivel. Windows 11 Power Mode ajustado para Best Performance.");
+                }
+                else
+                {
+                    log.Add("[INFO] GUID de energia legado nao suportado nesta CPU, mantendo Thread Director nativo.");
+                }
+
                 return log;
             }
 
-            var ultimateResult = commandRunner.Run("powercfg", $"-setactive {activationGuid}");
-            if (ultimateResult.ExitCode == 0)
-            {
-                log.Add("Plano Desempenho Maximo ativado.");
-                return log;
-            }
-
-            log.Add($"Falha ao ativar Desempenho Maximo. Plano atual preservado; ajustes serao aplicados via SCHEME_CURRENT. Saida: {ultimateResult.Output}");
+            RunPowercfgSetting($"-setactive {UltimatePerformanceGuid}", "Plano Desempenho Maximo ativado.", log);
         }
         catch (Exception ex)
         {
@@ -332,11 +316,14 @@ internal sealed class TweakService
 
     public IReadOnlyList<string> ApplyCpuSchedulerTweaks()
     {
-        var log = new List<string>();
-        log.AddRange(ApplyCpuArchitectureTweaks());
-        log.AddRange(ApplyAdvancedDpcLatencyTweaks());
-        log.AddRange(ApplySchedulerQuantumTweaks());
-        return log;
+        return RunMutationPipeline("CPU/Scheduler", () =>
+        {
+            var log = new List<string>();
+            log.AddRange(ApplyCpuArchitectureTweaks());
+            log.AddRange(ApplyAdvancedDpcLatencyTweaks());
+            log.AddRange(ApplySchedulerQuantumTweaks());
+            return log;
+        });
     }
 
     public IReadOnlyList<string> ApplyCpuArchitectureTweaks()
@@ -377,7 +364,7 @@ internal sealed class TweakService
             // Expoe o controle de core parking minimo no plano de energia para permitir travar 100% dos nucleos ativos.
             TrySetDword(Registry.LocalMachine, CoreParkingMinCoresPowerSettingPath, "Attributes", 0, "Core Parking minimo exposto para ajuste agressivo em CPU legacy.", log);
             RunPowercfgSetting("-setacvalueindex SCHEME_CURRENT SUB_PROCESSOR CPMINCORES 100", "Core Parking minimo travado em 100% no plano atual.", log);
-            commandRunner.Run("powercfg", "-setactive SCHEME_CURRENT");
+            RunPowercfgSetting("-setactive SCHEME_CURRENT", "Plano atual reativado apos ajuste de core parking legacy.", log);
         }
 
         if (!profile.IsHybridIntel && !profile.IsMultiCcdAMD && !profile.IsLegacyCPU)
@@ -418,54 +405,62 @@ internal sealed class TweakService
 
     public IReadOnlyList<string> ApplyGpuDisplayTweaks(string? valorantExePath)
     {
-        var log = new List<string> { "GPU/Display: ajustando HAGS/GameDVR/fullscreen. HAGS exige suporte do driver e reinicio." };
-
-        TrySetDword(Registry.LocalMachine, GraphicsDriversPath, "HwSchMode", 2, "Hardware Accelerated GPU Scheduling solicitado.", log);
-        log.AddRange(ApplyGameModeAndGameDvrTweaks());
-
-        if (valorantExePath is null)
+        return RunMutationPipeline("GPU/Display", () =>
         {
-            log.Add("VALORANT nao encontrado para aplicar compatibilidade por executavel.");
-        }
-        else
-        {
-            DisableFullscreenOptimizations(valorantExePath);
-            log.Add("Fullscreen optimizations desativado para VALORANT.");
-        }
+            var log = new List<string> { "GPU/Display: ajustando HAGS/GameDVR/fullscreen. HAGS exige suporte do driver e reinicio." };
 
-        return log;
+            TrySetDword(Registry.LocalMachine, GraphicsDriversPath, "HwSchMode", 2, "Hardware Accelerated GPU Scheduling solicitado.", log);
+            log.AddRange(ApplyGameModeAndGameDvrTweaks());
+
+            if (valorantExePath is null)
+            {
+                log.Add("VALORANT nao encontrado para aplicar compatibilidade por executavel.");
+            }
+            else
+            {
+                DisableFullscreenOptimizations(valorantExePath, log);
+            }
+
+            return log;
+        });
     }
 
     public IReadOnlyList<string> ApplyInputTweaks()
     {
-        var log = new List<string> { "Input/USB: removendo aceleracao do mouse e economia USB." };
+        return RunMutationPipeline("Input/USB", () =>
+        {
+            var log = new List<string> { "Input/USB: removendo aceleracao do mouse e economia USB." };
 
-        RegistryService.SetString(Registry.CurrentUser, @"Control Panel\Mouse", "MouseSpeed", "0");
-        RegistryService.SetString(Registry.CurrentUser, @"Control Panel\Mouse", "MouseThreshold1", "0");
-        RegistryService.SetString(Registry.CurrentUser, @"Control Panel\Mouse", "MouseThreshold2", "0");
-        RegistryService.SetString(Registry.CurrentUser, @"Control Panel\Keyboard", "KeyboardDelay", "0");
-        RegistryService.SetString(Registry.CurrentUser, @"Control Panel\Keyboard", "KeyboardSpeed", "31");
-        log.Add("Aceleracao do mouse removida e repeticao do teclado configurada para resposta rapida.");
+            TrySetString(Registry.CurrentUser, @"Control Panel\Mouse", "MouseSpeed", "0", "MouseSpeed=0 aplicado.", log);
+            TrySetString(Registry.CurrentUser, @"Control Panel\Mouse", "MouseThreshold1", "0", "MouseThreshold1=0 aplicado.", log);
+            TrySetString(Registry.CurrentUser, @"Control Panel\Mouse", "MouseThreshold2", "0", "MouseThreshold2=0 aplicado.", log);
+            TrySetString(Registry.CurrentUser, @"Control Panel\Keyboard", "KeyboardDelay", "0", "KeyboardDelay=0 aplicado.", log);
+            TrySetString(Registry.CurrentUser, @"Control Panel\Keyboard", "KeyboardSpeed", "31", "KeyboardSpeed=31 aplicado.", log);
+            log.Add("Aceleracao do mouse removida e repeticao do teclado configurada para resposta rapida.");
 
-        RunPowercfgSetting($"/setacvalueindex {PowerSchemeCurrent} {SubUsb} {UsbSelectiveSuspend} 0", "Suspensao seletiva USB desativada via GUID absoluto.", log);
-        commandRunner.Run("powercfg", "/setactive SCHEME_CURRENT");
+            RunPowercfgSetting($"/setacvalueindex {PowerSchemeCurrent} {SubUsb} {UsbSelectiveSuspend} 0", "Suspensao seletiva USB desativada via GUID absoluto.", log);
+            RunPowercfgSetting("/setactive SCHEME_CURRENT", "Plano atual reativado apos ajustes USB.", log);
 
-        return log;
+            return log;
+        });
     }
 
     public IReadOnlyList<string> ApplyNetworkTweaks()
     {
-        var log = new List<string> { "Rede: priorizando baixa latencia sem quebrar o TCP moderno do Windows." };
+        return RunMutationPipeline("Rede", () =>
+        {
+            var log = new List<string> { "Rede: priorizando baixa latencia sem quebrar o TCP moderno do Windows." };
 
-        TrySetDword(Registry.LocalMachine, MultimediaProfilePath, "NetworkThrottlingIndex", -1, "Network throttling desligado para perfil multimidia.", log);
-        var rss = commandRunner.Run("netsh", "int tcp set global rss=enabled");
-        log.Add(rss.ExitCode == 0 ? "TCP RSS habilitado." : $"Nao foi possivel habilitar RSS: {rss.Output}");
+            TrySetDword(Registry.LocalMachine, MultimediaProfilePath, "NetworkThrottlingIndex", -1, "Network throttling desligado para perfil multimidia.", log);
+            var rss = commandRunner.Run("netsh", "int tcp set global rss=enabled");
+            log.Add(rss.ExitCode == 0 ? "TCP RSS habilitado." : $"Nao foi possivel habilitar RSS: {rss.Output}");
 
-        var ecn = commandRunner.Run("netsh", "int tcp set global ecncapability=disabled");
-        log.Add(ecn.ExitCode == 0 ? "ECN desabilitado para evitar incompatibilidade de roteadores antigos." : $"Nao foi possivel alterar ECN: {ecn.Output}");
-        log.AddRange(DisableNetworkInterruptModerationAndGreenEthernet());
+            var ecn = commandRunner.Run("netsh", "int tcp set global ecncapability=disabled");
+            log.Add(ecn.ExitCode == 0 ? "ECN desabilitado para evitar incompatibilidade de roteadores antigos." : $"Nao foi possivel alterar ECN: {ecn.Output}");
+            log.AddRange(DisableNetworkInterruptModerationAndGreenEthernet());
 
-        return log;
+            return log;
+        });
     }
 
     public IReadOnlyList<string> DisableNetworkInterruptModerationAndGreenEthernet()
@@ -548,118 +543,81 @@ internal sealed class TweakService
 
     public IReadOnlyList<string> ApplyBackgroundTweaks()
     {
-        var log = new List<string> { "Background: reduzindo capturas e overlays do Windows." };
+        return RunMutationPipeline("Background", () =>
+        {
+            var log = new List<string> { "Background: reduzindo capturas e overlays do Windows." };
 
-        log.AddRange(ApplyGameModeAndGameDvrTweaks());
-        TrySetDword(Registry.CurrentUser, GameBarPath, "ShowStartupPanel", 0, "Painel inicial do Game Bar desativado.", log);
-        TrySetDword(Registry.CurrentUser, GameBarPath, "UseNexusForGameBarEnabled", 0, "Atalho/overlay Nexus do Game Bar desativado.", log);
-        log.Add("Capturas/paineis do Game Bar reduzidos. O app nao remove Game Bar nem desativa Defender.");
+            log.AddRange(ApplyGameModeAndGameDvrTweaks());
+            TrySetDword(Registry.CurrentUser, GameBarPath, "ShowStartupPanel", 0, "Painel inicial do Game Bar desativado.", log);
+            TrySetDword(Registry.CurrentUser, GameBarPath, "UseNexusForGameBarEnabled", 0, "Atalho/overlay Nexus do Game Bar desativado.", log);
+            log.Add("Capturas/paineis do Game Bar reduzidos. O app nao remove Game Bar nem desativa Defender.");
 
-        return log;
+            return log;
+        });
     }
 
     public IReadOnlyList<string> ApplyPolicyAndServiceTweaks()
     {
-        var log = new List<string>
+        return RunMutationPipeline("Politicas/Servicos", () =>
         {
-            "Politicas/Servicos: aplicando ajustes conservadores de ruido em segundo plano."
-        };
+            var log = new List<string>
+            {
+                "Politicas/Servicos: aplicando ajustes conservadores de ruido em segundo plano."
+            };
 
-        BackupRegistryKey(@"HKLM\SOFTWARE\Policies\Microsoft\Windows\CloudContent", "policy-cloudcontent", log);
-        BackupRegistryKey(@"HKLM\SOFTWARE\Policies\Microsoft\Windows\DataCollection", "policy-datacollection", log);
-        BackupRegistryKey(@"HKLM\SOFTWARE\Policies\Microsoft\Windows\GameDVR", "policy-gamedvr", log);
-        BackupRegistryKey(@"HKLM\SOFTWARE\Policies\Microsoft\Windows\Windows Search", "policy-windows-search", log);
-        BackupRegistryKey(@"HKLM\SOFTWARE\Policies\Microsoft\Windows\AppPrivacy", "policy-appprivacy", log);
-        BackupRegistryKey(@"HKLM\SOFTWARE\Microsoft\Windows\Windows Error Reporting", "windows-error-reporting", log);
-        BackupRegistryKey(@"HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\DeliveryOptimization\Config", "delivery-optimization", log);
-        BackupRegistryKey(@"HKCU\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager", "content-delivery-manager", log);
-        BackupRegistryKey(@"HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced", "explorer-advanced", log);
-        BackupRegistryKey(@"HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects", "visual-effects", log);
+            BackupRegistryKey(@"HKLM\SOFTWARE\Policies\Microsoft\Windows\CloudContent", "policy-cloudcontent", log);
+            BackupRegistryKey(@"HKLM\SOFTWARE\Policies\Microsoft\Windows\DataCollection", "policy-datacollection", log);
+            BackupRegistryKey(@"HKLM\SOFTWARE\Policies\Microsoft\Windows\GameDVR", "policy-gamedvr", log);
+            BackupRegistryKey(@"HKLM\SOFTWARE\Policies\Microsoft\Windows\Windows Search", "policy-windows-search", log);
+            BackupRegistryKey(@"HKLM\SOFTWARE\Policies\Microsoft\Windows\AppPrivacy", "policy-appprivacy", log);
+            BackupRegistryKey(@"HKLM\SOFTWARE\Microsoft\Windows\Windows Error Reporting", "windows-error-reporting", log);
+            BackupRegistryKey(@"HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\DeliveryOptimization\Config", "delivery-optimization", log);
+            BackupRegistryKey(@"HKCU\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager", "content-delivery-manager", log);
+            BackupRegistryKey(@"HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced", "explorer-advanced", log);
+            BackupRegistryKey(@"HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects", "visual-effects", log);
 
-        TrySetDword(Registry.LocalMachine, @"SOFTWARE\Policies\Microsoft\Windows\CloudContent", "DisableWindowsConsumerFeatures", 1, "Politica: Windows Consumer Features desativado.", log);
-        TrySetDword(Registry.LocalMachine, @"SOFTWARE\Policies\Microsoft\Windows\DataCollection", "AllowTelemetry", 1, "Politica: telemetria limitada ao nivel basico/necessario quando suportado.", log);
-        TrySetDword(Registry.LocalMachine, @"SOFTWARE\Policies\Microsoft\Windows\GameDVR", "AllowGameDVR", 0, "Politica: GameDVR bloqueado em nivel de maquina.", log);
-        TrySetDword(Registry.LocalMachine, @"SOFTWARE\Policies\Microsoft\Windows\Windows Search", "AllowCortana", 0, "Politica: Cortana desativada quando suportado.", log);
-        TrySetDword(Registry.LocalMachine, @"SOFTWARE\Policies\Microsoft\Windows\AppPrivacy", "LetAppsRunInBackground", 2, "Politica: apps UWP em segundo plano bloqueados quando suportado.", log);
-        TrySetDword(Registry.LocalMachine, @"SOFTWARE\Microsoft\Windows\Windows Error Reporting", "Disabled", 1, "Windows Error Reporting desativado.", log);
-        // Delivery Optimization: bloqueia modo P2P de updates para evitar IOPS/rede em background durante jogos.
-        TrySetDword(Registry.LocalMachine, DeliveryOptimizationConfigPath, "DODownloadMode", 0, "Delivery Optimization DODownloadMode=0: P2P de updates desativado.", log);
+            TrySetDword(Registry.LocalMachine, @"SOFTWARE\Policies\Microsoft\Windows\CloudContent", "DisableWindowsConsumerFeatures", 1, "Politica: Windows Consumer Features desativado.", log);
+            TrySetDword(Registry.LocalMachine, @"SOFTWARE\Policies\Microsoft\Windows\DataCollection", "AllowTelemetry", 1, "Politica: telemetria limitada ao nivel basico/necessario quando suportado.", log);
+            TrySetDword(Registry.LocalMachine, @"SOFTWARE\Policies\Microsoft\Windows\GameDVR", "AllowGameDVR", 0, "Politica: GameDVR bloqueado em nivel de maquina.", log);
+            TrySetDword(Registry.LocalMachine, @"SOFTWARE\Policies\Microsoft\Windows\Windows Search", "AllowCortana", 0, "Politica: Cortana desativada quando suportado.", log);
+            TrySetDword(Registry.LocalMachine, @"SOFTWARE\Policies\Microsoft\Windows\AppPrivacy", "LetAppsRunInBackground", 2, "Politica: apps UWP em segundo plano bloqueados quando suportado.", log);
+            TrySetDword(Registry.LocalMachine, @"SOFTWARE\Microsoft\Windows\Windows Error Reporting", "Disabled", 1, "Windows Error Reporting desativado.", log);
+            TrySetDword(Registry.LocalMachine, DeliveryOptimizationConfigPath, "DODownloadMode", 0, "Delivery Optimization DODownloadMode=0: P2P de updates desativado.", log);
 
-        TrySetDword(Registry.CurrentUser, @"Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager", "ContentDeliveryAllowed", 0, "Sugestoes/entrega de conteudo desativadas para o usuario atual.", log);
-        TrySetDword(Registry.CurrentUser, @"Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager", "FeatureManagementEnabled", 0, "Feature suggestions desativado para o usuario atual.", log);
-        TrySetDword(Registry.CurrentUser, @"Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager", "OemPreInstalledAppsEnabled", 0, "Apps OEM sugeridos desativados.", log);
-        TrySetDword(Registry.CurrentUser, @"Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager", "PreInstalledAppsEnabled", 0, "Apps pre-instalados sugeridos desativados.", log);
-        TrySetDword(Registry.CurrentUser, @"Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager", "SilentInstalledAppsEnabled", 0, "Instalacao silenciosa de apps sugeridos desativada.", log);
-        TrySetDword(Registry.CurrentUser, @"Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager", "SubscribedContent-338387Enabled", 0, "Sugestoes do Windows Spotlight desativadas.", log);
-        TrySetDword(Registry.CurrentUser, @"Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager", "SubscribedContent-338388Enabled", 0, "Sugestoes do Windows desativadas.", log);
-        TrySetDword(Registry.CurrentUser, @"Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager", "SubscribedContent-338389Enabled", 0, "Conteudo sugerido desativado.", log);
-        TrySetDword(Registry.CurrentUser, @"Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager", "SubscribedContent-353694Enabled", 0, "Dicas e notificacoes sugeridas desativadas.", log);
-        TrySetDword(Registry.CurrentUser, @"Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager", "SubscribedContent-353698Enabled", 0, "Sugestoes de configuracao desativadas.", log);
-        TrySetDword(Registry.CurrentUser, @"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced", "ShowSyncProviderNotifications", 0, "Sugestoes/anuncios do Explorer desativados.", log);
-        TrySetDword(Registry.CurrentUser, @"Software\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects", "VisualFXSetting", 2, "Efeitos visuais definidos para perfil customizado/leve.", log);
+            TrySetDword(Registry.CurrentUser, @"Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager", "ContentDeliveryAllowed", 0, "Sugestoes/entrega de conteudo desativadas para o usuario atual.", log);
+            TrySetDword(Registry.CurrentUser, @"Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager", "FeatureManagementEnabled", 0, "Feature suggestions desativado para o usuario atual.", log);
+            TrySetDword(Registry.CurrentUser, @"Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager", "OemPreInstalledAppsEnabled", 0, "Apps OEM sugeridos desativados.", log);
+            TrySetDword(Registry.CurrentUser, @"Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager", "PreInstalledAppsEnabled", 0, "Apps pre-instalados sugeridos desativados.", log);
+            TrySetDword(Registry.CurrentUser, @"Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager", "SilentInstalledAppsEnabled", 0, "Instalacao silenciosa de apps sugeridos desativada.", log);
+            TrySetDword(Registry.CurrentUser, @"Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager", "SubscribedContent-338387Enabled", 0, "Sugestoes do Windows Spotlight desativadas.", log);
+            TrySetDword(Registry.CurrentUser, @"Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager", "SubscribedContent-338388Enabled", 0, "Sugestoes do Windows desativadas.", log);
+            TrySetDword(Registry.CurrentUser, @"Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager", "SubscribedContent-338389Enabled", 0, "Conteudo sugerido desativado.", log);
+            TrySetDword(Registry.CurrentUser, @"Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager", "SubscribedContent-353694Enabled", 0, "Dicas e notificacoes sugeridas desativadas.", log);
+            TrySetDword(Registry.CurrentUser, @"Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager", "SubscribedContent-353698Enabled", 0, "Sugestoes de configuracao desativadas.", log);
+            TrySetDword(Registry.CurrentUser, @"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced", "ShowSyncProviderNotifications", 0, "Sugestoes/anuncios do Explorer desativados.", log);
+            TrySetDword(Registry.CurrentUser, @"Software\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects", "VisualFXSetting", 2, "Efeitos visuais definidos para perfil customizado/leve.", log);
 
-        DisableServiceIfPresent("DiagTrack", "Connected User Experiences and Telemetry", log);
-        DisableServiceIfPresent("dmwappushservice", "WAP Push Message Routing", log);
-        DisableServiceIfPresent("RetailDemo", "Retail Demo", log);
-        DisableServiceIfPresent("MapsBroker", "Downloaded Maps Manager", log);
-        DisableServiceIfPresent("WMPNetworkSvc", "Windows Media Player Network Sharing", log);
-        DisableServiceIfPresent("Fax", "Fax", log);
-        DisableServiceIfPresent("WpcMonSvc", "Controle dos Pais", log);
+            DisableServiceIfPresent("DiagTrack", "Connected User Experiences and Telemetry", log);
+            DisableServiceIfPresent("dmwappushservice", "WAP Push Message Routing", log);
+            DisableServiceIfPresent("RetailDemo", "Retail Demo", log);
+            DisableServiceIfPresent("MapsBroker", "Downloaded Maps Manager", log);
+            DisableServiceIfPresent("WMPNetworkSvc", "Windows Media Player Network Sharing", log);
+            DisableServiceIfPresent("Fax", "Fax", log);
+            DisableServiceIfPresent("WpcMonSvc", "Controle dos Pais", log);
 
-        log.Add("Politicas/Servicos concluido. Servicos criticos como Windows Update, Defender, audio, rede e drivers foram preservados.");
-        return log;
+            log.Add("Politicas/Servicos concluido. Servicos criticos como Windows Update, Defender, audio, rede e drivers foram preservados.");
+            return log;
+        });
     }
 
     public IReadOnlyList<string> RevertSafeTweaks(string? valorantExePath)
     {
-        var log = new List<string>();
-
-        RegistryService.SetDword(Registry.CurrentUser, @"Software\Microsoft\GameBar", "AutoGameModeEnabled", 0);
-        RegistryService.SetDword(Registry.CurrentUser, @"System\GameConfigStore", "GameDVR_Enabled", 1);
-        RegistryService.SetDword(Registry.CurrentUser, @"Software\Microsoft\Windows\CurrentVersion\GameDVR", "AppCaptureEnabled", 1);
-        log.Add("Game Mode/Game DVR voltaram para valores comuns do Windows.");
-
-        if (valorantExePath is not null)
-        {
-            EnableFullscreenOptimizations(valorantExePath);
-            log.Add("Compatibilidade de tela cheia do VALORANT revertida.");
-        }
-
-        return log;
+        return RevertLastAppliedState();
     }
 
     public IReadOnlyList<string> RevertAdvancedTweaks(string? valorantExePath)
     {
-        var log = new List<string>();
-        log.AddRange(RevertSafeTweaks(valorantExePath));
-
-        RegistryService.SetString(Registry.CurrentUser, @"Control Panel\Mouse", "MouseSpeed", "0");
-        RegistryService.SetString(Registry.CurrentUser, @"Control Panel\Mouse", "MouseThreshold1", "6");
-        RegistryService.SetString(Registry.CurrentUser, @"Control Panel\Mouse", "MouseThreshold2", "10");
-        RegistryService.SetDword(Registry.LocalMachine, MemoryManagementPath, "DisablePagingExecutive", 0);
-        RegistryService.SetDword(Registry.LocalMachine, MemoryManagementPath, "LargeSystemCache", 0);
-        RegistryService.DeleteValue(Registry.LocalMachine, MemoryManagementPath, "IoPageLimit");
-        RegistryService.SetDword(Registry.LocalMachine, PriorityControlPath, "Win32PrioritySeparation", 2);
-        RegistryService.SetDword(Registry.LocalMachine, CoreParkingMinCoresPowerSettingPath, "Attributes", 1);
-        RegistryService.DeleteValue(Registry.CurrentUser, GameConfigStorePath, "GameDVR_FSEBehavior");
-        RegistryService.DeleteValue(Registry.CurrentUser, GameConfigStorePath, "GameDVR_FSEBehaviorMode");
-        RegistryService.DeleteValue(Registry.LocalMachine, GraphicsDriversPath, "HwSchMode");
-        RegistryService.DeleteValue(Registry.LocalMachine, DwmPath, "RealTimeGamingResolution");
-        RegistryService.DeleteValue(Registry.LocalMachine, DwmPath, "CompositionPolicy");
-        RegistryService.DeleteValue(Registry.LocalMachine, DeliveryOptimizationConfigPath, "DODownloadMode");
-        log.Add("Input voltou para padrao comum e HAGS voltou para decisao do Windows/driver.");
-        log.Add("Kernel memory, FSE, thread quantum, DWM gaming policy e Delivery Optimization voltaram para defaults conservadores quando nao houver backup granular.");
-
-        RunBcdEditSetting("/deletevalue useplatformclock", "BCD rollback: useplatformclock removido para o Windows escolher TSC/HPET.", log);
-        RunBcdEditSetting("/deletevalue disabledynamictick", "BCD rollback: disabledynamictick removido para voltar ao padrao do Windows.", log);
-
-        commandRunner.Run("powercfg", "/setactive SCHEME_BALANCED");
-        commandRunner.Run("powercfg", "/hibernate on");
-        log.Add("Plano Equilibrado solicitado.");
-        log.Add("Hibernacao religada.");
-
-        log.Add("Alguns ajustes HKLM de scheduler permanecem ate restauracao manual/ponto de restauracao.");
-        return log;
+        return RevertLastAppliedState();
     }
 
     public bool HasFullscreenOptimizationDisabled(string exePath)
@@ -669,16 +627,233 @@ internal sealed class TweakService
         return value.Contains(DisableFullscreenOptimizationFlag, StringComparison.OrdinalIgnoreCase);
     }
 
-    private static void DisableFullscreenOptimizations(string exePath)
+    public IReadOnlyList<string> ApplyAutonomousOptimization(string? valorantExePath, HardwareInfo? hardware = null)
     {
-        using var key = Registry.CurrentUser.CreateSubKey(AppCompatLayersPath);
-        key?.SetValue(exePath, $"~ {DisableFullscreenOptimizationFlag}", RegistryValueKind.String);
+        return RunMutationPipeline("Auto-Tuning", () =>
+        {
+            var targetHardware = hardware ?? new SystemDiagnosticsService().GetHardwareInfo();
+            var recommendation = optimizationEngine.Analyze(targetHardware);
+            var log = new List<string>
+            {
+                "Analisando hardware...",
+                $"Perfil detectado: {recommendation.Title}",
+                recommendation.Reason
+            };
+
+            AddSystemRestorePointIfCurrentRootMutation("Auto-Tuning", log);
+            log.AddRange(ApplyPowerTweaks());
+            log.AddRange(ApplyCpuArchitectureTweaks());
+            log.AddRange(ApplyAdvancedDpcLatencyTweaks());
+            log.AddRange(ApplyGpuDisplayTweaks(valorantExePath));
+            log.AddRange(ApplyInputTweaks());
+            log.AddRange(ApplyNetworkTweaks());
+            log.AddRange(ApplyBackgroundTweaks());
+            log.AddRange(ApplyPolicyAndServiceTweaks());
+
+            if (targetHardware.TotalMemoryGb >= 16)
+            {
+                log.AddRange(ApplyKernelMemoryTweaks());
+            }
+            else
+            {
+                log.Add("[INFO] RAM abaixo de 16 GB. Kernel cache agressivo ignorado para evitar pressao de memoria.");
+            }
+
+            log.Add("[SUCESSO] Auto-Tuning concluido. Reinicie o PC antes de medir frametime.");
+            return log;
+        });
     }
 
-    private static void EnableFullscreenOptimizations(string exePath)
+    public IReadOnlyList<string> ApplyGpuWindowsProfile()
     {
-        using var key = Registry.CurrentUser.OpenSubKey(AppCompatLayersPath, writable: true);
-        key?.DeleteValue(exePath, throwOnMissingValue: false);
+        return RunMutationPipeline("GPU Windows", () => ExecuteGpuPlan(gpuOptimizationService.BuildWindowsGpuPlan()));
+    }
+
+    public IReadOnlyList<string> ApplyGpuDriverRegistryProfile()
+    {
+        return RunMutationPipeline("GPU regedit", () => ExecuteGpuPlan(gpuOptimizationService.BuildDriverRegistryPlan()));
+    }
+
+    public IReadOnlyList<string> ApplyHypervisorOffTweak()
+    {
+        return RunMutationPipeline("Hypervisor off", () => ExecuteSingleCommand(new HypervisorTweakCommand()));
+    }
+
+    public IReadOnlyList<string> ApplyTimerResolutionTweak()
+    {
+        return RunMutationPipeline("Timer resolution BCD", () => ExecuteSingleCommand(new TimerResolutionTweakCommand()));
+    }
+
+    public IReadOnlyList<string> ApplyMpoTweak()
+    {
+        return RunMutationPipeline("MPO off", () => ExecuteSingleCommand(new MpoTweakCommand()));
+    }
+
+    public IReadOnlyList<string> ApplyGpuMsiModeTweak(string? pnpDeviceId = null)
+    {
+        return RunMutationPipeline("GPU MSI Mode", () => ExecuteSingleCommand(new MsiModeTweakCommand(pnpDeviceId)));
+    }
+
+    public IReadOnlyList<string> ApplyRyzenAffinityIsolation(HardwareInfo hardware, string targetProcessName = "VALORANT-Win64-Shipping")
+    {
+        return RunMutationPipeline("Ryzen X3D affinity isolation", () => ExecuteSingleCommand(new AffinityIsolationCommand(hardware, targetProcessName)));
+    }
+
+    public IReadOnlyList<string> RevertLastAppliedState()
+    {
+        return backupService.RestoreLatestMutationSession();
+    }
+
+    private IReadOnlyList<string> ExecuteGpuPlan(GpuMutationPlan plan)
+    {
+        var log = new List<string>();
+        log.AddRange(plan.IntroLines);
+
+        foreach (var command in plan.Commands)
+        {
+            _ = ExecuteCommand(command, log);
+        }
+
+        log.Add("Plano de GPU concluido. Reinicie o PC para garantir recarga completa do driver/DWM.");
+        return log;
+    }
+
+    private IReadOnlyList<string> ExecuteSingleCommand(ISystemMutationCommand command)
+    {
+        var log = new List<string>();
+        _ = ExecuteCommand(command, log);
+        return log;
+    }
+
+    private void AddSystemRestorePointIfCurrentRootMutation(string expectedOperationName, List<string> log)
+    {
+        var session = activeMutationSession.Value;
+        if (session is null ||
+            !string.Equals(session.OperationName, expectedOperationName, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        log.AddRange(SystemRestoreService.CreatePreOptimizationRestorePoint());
+    }
+
+    private void ApplyThermalAwareProcessorBoostProfile(List<string> log)
+    {
+        var decision = optimizationEngine.BuildProcessorBoostDecision(log.Add);
+        RunPowercfgSetting(
+            $"/setacvalueindex {PowerSchemeCurrent} {SubProcessor} {ProcessorBoostMode} {decision.BoostMode}",
+            decision.BoostMode == 3
+                ? "CPU Boost Mode na tomada ajustado para EfficientEnabled para estabilidade de frametime."
+                : "CPU Boost Mode na tomada ajustado para Aggressive.",
+            log);
+        RunPowercfgSetting(
+            $"/setdcvalueindex {PowerSchemeCurrent} {SubProcessor} {ProcessorBoostMode} {decision.BoostMode}",
+            decision.BoostMode == 3
+                ? "CPU Boost Mode na bateria ajustado para EfficientEnabled para estabilidade de frametime."
+                : "CPU Boost Mode na bateria ajustado para Aggressive.",
+            log);
+        RunPowercfgSetting("/setactive SCHEME_CURRENT", "Plano de energia reativado para carregar o perfil de boost.", log);
+    }
+
+    private IReadOnlyList<string> RunMutationPipeline(string operationName, Func<IReadOnlyList<string>> action)
+    {
+        if (activeMutationSession.Value is not null)
+        {
+            return action();
+        }
+
+        var session = backupService.BeginMutationSession(operationName);
+        activeMutationSession.Value = session;
+        var pipelineLog = new List<string> { $"Pipeline unico: Validar -> Snapshot -> Executar -> Verify -> Logar ({operationName})" };
+        var completed = false;
+
+        try
+        {
+            pipelineLog.AddRange(action());
+            completed = true;
+            return pipelineLog;
+        }
+        finally
+        {
+            pipelineLog.AddRange(backupService.CommitMutationSession(session, completed));
+            activeMutationSession.Value = null;
+        }
+    }
+
+    private MutationSession RequireActiveMutationSession()
+    {
+        return activeMutationSession.Value
+            ?? throw new InvalidOperationException("Mutacao de SO fora do pipeline unico. Encapsule a chamada em RunMutationPipeline.");
+    }
+
+    private bool ExecuteCommand(ISystemMutationCommand command, List<string> log)
+    {
+        try
+        {
+            command.Validate();
+            command.Snapshot(backupService, RequireActiveMutationSession());
+            command.Execute();
+            command.Verify();
+            log.Add(command.SuccessMessage);
+            return true;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            log.Add(ProtectedRegistryWarning);
+        }
+        catch (SecurityException)
+        {
+            log.Add(ProtectedRegistryWarning);
+        }
+        catch (NotSupportedException ex)
+        {
+            log.Add(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            log.Add($"{command.FailurePrefix}: {ex.Message}");
+        }
+
+        return false;
+    }
+
+    private void DisableFullscreenOptimizations(string exePath, List<string> log)
+    {
+        _ = ExecuteCommand(
+            new SystemMutationCommand(
+                $"Disable fullscreen optimizations for {Path.GetFileName(exePath)}",
+                (_, session) => backupService.CaptureRegistryValue(session, Registry.CurrentUser, AppCompatLayersPath, exePath),
+                () => RegistryService.SetString(Registry.CurrentUser, AppCompatLayersPath, exePath, $"~ {DisableFullscreenOptimizationFlag}"),
+                () =>
+                {
+                    if (!RegistryService.TryReadString(Registry.CurrentUser, AppCompatLayersPath, exePath, out var actualValue) ||
+                        !string.Equals(actualValue, $"~ {DisableFullscreenOptimizationFlag}", StringComparison.Ordinal))
+                    {
+                        throw new InvalidOperationException("Read-back divergente para fullscreen optimizations.");
+                    }
+                },
+                "Fullscreen optimizations desativado para o executavel selecionado.",
+                "Falha ao desativar fullscreen optimizations"),
+            log);
+    }
+
+    private void EnableFullscreenOptimizations(string exePath, List<string> log)
+    {
+        _ = ExecuteCommand(
+            new SystemMutationCommand(
+                $"Enable fullscreen optimizations for {Path.GetFileName(exePath)}",
+                (_, session) => backupService.CaptureRegistryValue(session, Registry.CurrentUser, AppCompatLayersPath, exePath),
+                () => RegistryService.DeleteValue(Registry.CurrentUser, AppCompatLayersPath, exePath),
+                () =>
+                {
+                    if (RegistryService.ValueExists(Registry.CurrentUser, AppCompatLayersPath, exePath))
+                    {
+                        throw new InvalidOperationException("A flag de compatibilidade ainda esta presente apos o rollback.");
+                    }
+                },
+                "Compatibilidade de tela cheia revertida pelo snapshot.",
+                "Falha ao reverter fullscreen optimizations"),
+            log);
     }
 
     private IReadOnlyList<string> ApplyGameModeAndGameDvrTweaks()
@@ -700,23 +875,346 @@ internal sealed class TweakService
         return match.Success ? match.Value : null;
     }
 
+    private static string? ExtractBcdSettingName(string arguments)
+    {
+        var parts = arguments.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length < 2)
+        {
+            return null;
+        }
+
+        return parts[1];
+    }
+
+    private static (RegistryKey Root, string Path) ResolveRegistryLocation(string keyName)
+    {
+        const string localMachinePrefix = "HKEY_LOCAL_MACHINE\\";
+        const string currentUserPrefix = "HKEY_CURRENT_USER\\";
+
+        if (keyName.StartsWith(localMachinePrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            return (Registry.LocalMachine, keyName[localMachinePrefix.Length..]);
+        }
+
+        if (keyName.StartsWith(currentUserPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            return (Registry.CurrentUser, keyName[currentUserPrefix.Length..]);
+        }
+
+        throw new InvalidOperationException($"Colmeia de Registro nao suportada: {keyName}");
+    }
+
+    private void SnapshotPowercfgMutation(string arguments, MutationSession session)
+    {
+        if (TryParsePowercfgValueIndex(arguments, out var settingCommand))
+        {
+            backupService.CapturePowerSettingValue(
+                session,
+                settingCommand.SchemeGuidOrAlias,
+                settingCommand.SubgroupGuidOrAlias,
+                settingCommand.SettingGuidOrAlias,
+                settingCommand.IsAcValue);
+            return;
+        }
+
+        if (arguments.Contains("/hibernate", StringComparison.OrdinalIgnoreCase))
+        {
+            backupService.CaptureRegistryValue(session, Registry.LocalMachine, @"SYSTEM\CurrentControlSet\Control\Power", "HibernateEnabled");
+            return;
+        }
+
+        backupService.CaptureActivePowerScheme(session);
+    }
+
+    private void VerifyPowercfgMutation(string arguments)
+    {
+        if (TryParsePowercfgValueIndex(arguments, out var settingCommand))
+        {
+            if (!backupService.TryReadPowerSettingValue(
+                    settingCommand.SchemeGuidOrAlias,
+                    settingCommand.SubgroupGuidOrAlias,
+                    settingCommand.SettingGuidOrAlias,
+                    settingCommand.IsAcValue,
+                    out var actualValue,
+                    out var error))
+            {
+                throw new InvalidOperationException(error);
+            }
+
+            if (actualValue != settingCommand.ExpectedValue)
+            {
+                throw new InvalidOperationException($"Read-back divergente para powercfg. Esperado={settingCommand.ExpectedValue}, Atual={actualValue}.");
+            }
+
+            return;
+        }
+
+        if (TryParsePowercfgSetActive(arguments, out var targetScheme))
+        {
+            var actualScheme = backupService.ReadActivePowerScheme();
+            var expectedScheme = string.Equals(targetScheme, PowerSchemeCurrent, StringComparison.OrdinalIgnoreCase)
+                ? actualScheme
+                : targetScheme;
+
+            if (string.IsNullOrWhiteSpace(actualScheme) ||
+                (!string.Equals(targetScheme, PowerSchemeCurrent, StringComparison.OrdinalIgnoreCase) &&
+                 !string.Equals(actualScheme, expectedScheme, StringComparison.OrdinalIgnoreCase)))
+            {
+                throw new InvalidOperationException($"Read-back divergente para plano de energia ativo. Esperado={targetScheme}, Atual={actualScheme ?? "<nulo>"}");
+            }
+
+            return;
+        }
+
+        if (arguments.Contains("/hibernate off", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!RegistryService.TryReadDword(Registry.LocalMachine, @"SYSTEM\CurrentControlSet\Control\Power", "HibernateEnabled", out var actualValue) ||
+                actualValue != 0)
+            {
+                throw new InvalidOperationException("Read-back divergente para hibernacao.");
+            }
+        }
+    }
+
+    private static bool TryParsePowercfgValueIndex(string arguments, out PowercfgValueIndexCommand command)
+    {
+        var parts = arguments.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length >= 5 &&
+            (parts[0].Equals("/setacvalueindex", StringComparison.OrdinalIgnoreCase) ||
+             parts[0].Equals("/setdcvalueindex", StringComparison.OrdinalIgnoreCase)) &&
+            int.TryParse(parts[4], out var expectedValue))
+        {
+            command = new PowercfgValueIndexCommand(
+                parts[0].Equals("/setacvalueindex", StringComparison.OrdinalIgnoreCase),
+                parts[1],
+                parts[2],
+                parts[3],
+                expectedValue);
+            return true;
+        }
+
+        command = default;
+        return false;
+    }
+
+    private static bool TryParsePowercfgSetActive(string arguments, out string schemeGuidOrAlias)
+    {
+        var parts = arguments.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length >= 2 &&
+            (parts[0].Equals("/setactive", StringComparison.OrdinalIgnoreCase) ||
+             parts[0].Equals("-setactive", StringComparison.OrdinalIgnoreCase)))
+        {
+            schemeGuidOrAlias = parts[1];
+            return true;
+        }
+
+        schemeGuidOrAlias = string.Empty;
+        return false;
+    }
+
+    private static string? ExtractBcdExpectedValue(string arguments)
+    {
+        var parts = arguments.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length >= 3 ? parts[2] : null;
+    }
+
+    private static string? ParseBcdValue(string output, string name)
+    {
+        foreach (var rawLine in output.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries))
+        {
+            var line = rawLine.Trim();
+            if (!line.StartsWith(name, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            return line[name.Length..].Trim();
+        }
+
+        return null;
+    }
+
+    private static string NormalizeBcdValue(string? value)
+    {
+        return value?.Trim().ToLowerInvariant() ?? string.Empty;
+    }
+
+    private static string? ParseServiceStartModeOutput(string output)
+    {
+        foreach (var rawLine in output.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries))
+        {
+            var line = rawLine.Trim();
+            if (!line.StartsWith("START_TYPE", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (line.Contains("AUTO_START", StringComparison.OrdinalIgnoreCase))
+            {
+                return "auto";
+            }
+
+            if (line.Contains("DEMAND_START", StringComparison.OrdinalIgnoreCase))
+            {
+                return "demand";
+            }
+
+            if (line.Contains("DISABLED", StringComparison.OrdinalIgnoreCase))
+            {
+                return "disabled";
+            }
+
+            if (line.Contains("SYSTEM_START", StringComparison.OrdinalIgnoreCase))
+            {
+                return "system";
+            }
+
+            if (line.Contains("BOOT_START", StringComparison.OrdinalIgnoreCase))
+            {
+                return "boot";
+            }
+        }
+
+        return null;
+    }
+
+    private readonly record struct PowercfgValueIndexCommand(
+        bool IsAcValue,
+        string SchemeGuidOrAlias,
+        string SubgroupGuidOrAlias,
+        string SettingGuidOrAlias,
+        int ExpectedValue);
+
+    private void ApplyHeterogeneousCpuPolicy(List<string> log)
+    {
+        if (!TryApplyLegacyHeterogeneousSetting(
+                $"/setacvalueindex {PowerSchemeCurrent} SUB_PROCESSOR HETEROPOLICY 4",
+                "HETEROPOLICY=4: politica heterogenea orientada a P-Cores para threads prioritarias.",
+                log))
+        {
+            return;
+        }
+
+        if (!TryApplyLegacyHeterogeneousSetting(
+                $"/setacvalueindex {PowerSchemeCurrent} SUB_PROCESSOR HETEROTHREAD 0",
+                "HETEROTHREAD=0: escalonamento heterogeneo preservado para o Windows.",
+                log))
+        {
+            return;
+        }
+
+        TryApplyLegacyHeterogeneousSetting(
+            $"/setacvalueindex {PowerSchemeCurrent} SUB_PROCESSOR SCHEDPOLICY 2",
+            "SCHEDPOLICY=2: scheduler prioriza cores de performance em workloads foreground.",
+            log);
+    }
+
+    private bool TryApplyLegacyHeterogeneousSetting(string arguments, string successMessage, List<string> log)
+    {
+        return ExecuteCommand(
+            new SystemMutationCommand(
+                $"powercfg {arguments}",
+                (_, session) => SnapshotPowercfgMutation(arguments, session),
+                () =>
+                {
+                    var result = commandRunner.Run("powercfg", arguments);
+                    if (result.ExitCode == 0)
+                    {
+                        return;
+                    }
+
+                    if (WindowsPowerModeService.IsLegacyPowercfgSettingUnsupported(result.Output))
+                    {
+                        if (WindowsPowerModeService.TryApplyBestPerformanceOverlay(out _, out _))
+                        {
+                            throw new NotSupportedException("[INFO] GUID de energia legado nao suportado nesta CPU. Windows 11 Power Mode ajustado para Best Performance via Power Overlay moderno.");
+                        }
+
+                        throw new NotSupportedException("[INFO] GUID de energia legado nao suportado nesta CPU, mantendo Thread Director nativo.");
+                    }
+
+                    throw new InvalidOperationException($"powercfg falhou ({arguments}): {result.Output}");
+                },
+                () => VerifyPowercfgMutation(arguments),
+                successMessage,
+                "Falha ao aplicar politica heterogenea"),
+            log);
+    }
+
     private void RunPowercfgSetting(string arguments, string successMessage, List<string> log)
     {
-        var result = commandRunner.Run("powercfg", arguments);
-        log.Add(result.ExitCode == 0 ? successMessage : $"powercfg falhou ({arguments}): {result.Output}");
+        ExecuteCommand(
+            new SystemMutationCommand(
+                $"powercfg {arguments}",
+                (_, session) => SnapshotPowercfgMutation(arguments, session),
+                () =>
+                {
+                    var result = commandRunner.Run("powercfg", arguments);
+                    if (result.ExitCode != 0)
+                    {
+                        throw new InvalidOperationException($"powercfg falhou ({arguments}): {result.Output}");
+                    }
+                },
+                () => VerifyPowercfgMutation(arguments),
+                successMessage,
+                "Falha ao aplicar powercfg"),
+            log);
     }
 
     private void RunBcdEditSetting(string arguments, string successMessage, List<string> log)
     {
-        try
-        {
-            var result = commandRunner.Run("bcdedit", arguments);
-            log.Add(result.ExitCode == 0 ? successMessage : $"bcdedit falhou ({arguments}): {result.Output}");
-        }
-        catch (Exception ex)
-        {
-            log.Add($"bcdedit falhou ({arguments}): {ex.Message}");
-        }
+        var settingName = ExtractBcdSettingName(arguments);
+        ExecuteCommand(
+            new SystemMutationCommand(
+                $"bcdedit {arguments}",
+                (_, session) =>
+                {
+                    if (!string.IsNullOrWhiteSpace(settingName))
+                    {
+                        backupService.CaptureBcdValue(session, settingName);
+                    }
+                },
+                () =>
+                {
+                    var result = commandRunner.Run("bcdedit", arguments);
+                    if (result.ExitCode != 0)
+                    {
+                        throw new InvalidOperationException($"bcdedit falhou ({arguments}): {result.Output}");
+                    }
+                },
+                () =>
+                {
+                    if (string.IsNullOrWhiteSpace(settingName))
+                    {
+                        return;
+                    }
+
+                    var state = commandRunner.Run("bcdedit", "/enum {current}");
+                    if (state.ExitCode != 0)
+                    {
+                        throw new InvalidOperationException($"Nao foi possivel verificar o BCD: {state.Output}");
+                    }
+
+                    var actualValue = ParseBcdValue(state.Output, settingName);
+                    if (arguments.Contains("/deletevalue", StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (actualValue is not null)
+                        {
+                            throw new InvalidOperationException($"Read-back divergente para BCD {settingName}. Valor atual: {actualValue}");
+                        }
+
+                        return;
+                    }
+
+                    var expectedValue = ExtractBcdExpectedValue(arguments);
+                    if (!string.Equals(NormalizeBcdValue(actualValue), NormalizeBcdValue(expectedValue), StringComparison.OrdinalIgnoreCase))
+                    {
+                        throw new InvalidOperationException($"Read-back divergente para BCD {settingName}. Esperado={expectedValue}, Atual={actualValue}");
+                    }
+                },
+                successMessage,
+                "Falha ao aplicar bcdedit"),
+            log);
     }
 
     private void DisableServiceIfPresent(string serviceName, string displayName, List<string> log)
@@ -728,20 +1226,37 @@ internal sealed class TweakService
             return;
         }
 
-        var stop = commandRunner.Run("sc.exe", $"stop \"{serviceName}\"");
-        if (stop.ExitCode == 0)
-        {
-            log.Add($"Servico parado: {displayName} ({serviceName}).");
-        }
-        else
-        {
-            log.Add($"Servico nao foi parado agora ou ja estava parado: {displayName} ({serviceName}).");
-        }
+        ExecuteCommand(
+            new SystemMutationCommand(
+                $"Disable service {serviceName}",
+                (_, session) => backupService.CaptureServiceState(session, serviceName),
+                () =>
+                {
+                    _ = commandRunner.Run("sc.exe", $"stop \"{serviceName}\"");
+                    var config = commandRunner.Run("sc.exe", $"config \"{serviceName}\" start= disabled");
+                    if (config.ExitCode != 0)
+                    {
+                        throw new InvalidOperationException(config.Output);
+                    }
+                },
+                () =>
+                {
+                    var state = commandRunner.Run("sc.exe", $"query \"{serviceName}\"");
+                    var config = commandRunner.Run("sc.exe", $"qc \"{serviceName}\"");
+                    if (state.ExitCode != 0 || config.ExitCode != 0)
+                    {
+                        throw new InvalidOperationException($"Nao foi possivel verificar o servico {serviceName}.");
+                    }
 
-        var config = commandRunner.Run("sc.exe", $"config \"{serviceName}\" start= disabled");
-        log.Add(config.ExitCode == 0
-            ? $"Servico desativado: {displayName} ({serviceName})."
-            : $"Falha ao desativar {displayName} ({serviceName}): {config.Output}");
+                    var startMode = ParseServiceStartModeOutput(config.Output);
+                    if (!string.Equals(startMode, "disabled", StringComparison.OrdinalIgnoreCase))
+                    {
+                        throw new InvalidOperationException($"Read-back divergente para {serviceName}. StartMode atual: {startMode}");
+                    }
+                },
+                $"Servico desativado: {displayName} ({serviceName}).",
+                $"Falha ao desativar {displayName} ({serviceName})"),
+            log);
     }
 
     private void BackupRegistryKey(string registryPath, string filePrefix, List<string> log)
@@ -786,75 +1301,69 @@ internal sealed class TweakService
         return !string.IsNullOrWhiteSpace(characteristics) || adapterKey.GetValue("NetCfgInstanceId") is not null;
     }
 
-    private static int TrySetStringValue(RegistryKey key, string name, string value, List<string> log, string successMessage)
+    private int TrySetStringValue(RegistryKey key, string name, string value, List<string> log, string successMessage)
     {
-        try
+        if (key.GetValue(name) is null)
         {
-            if (key.GetValue(name) is null)
-            {
-                return 0;
-            }
+            return 0;
+        }
 
-            key.SetValue(name, value, RegistryValueKind.String);
-            log.Add(successMessage);
-            return 1;
-        }
-        catch (UnauthorizedAccessException)
-        {
-            log.Add(ProtectedRegistryWarning);
-            return 0;
-        }
-        catch (SecurityException)
-        {
-            log.Add(ProtectedRegistryWarning);
-            return 0;
-        }
-        catch (Exception ex)
-        {
-            log.Add($"Falha ao definir {name}: {ex.Message}");
-            return 0;
-        }
+        var (root, path) = ResolveRegistryLocation(key.Name);
+        var succeeded = ExecuteCommand(
+            new SystemMutationCommand(
+                $"Registry string {path}\\{name}",
+                (_, session) => backupService.CaptureRegistryValue(session, root, path, name),
+                () => key.SetValue(name, value, RegistryValueKind.String),
+                () =>
+                {
+                    if (!RegistryService.TryReadString(root, path, name, out var actualValue) ||
+                        !string.Equals(actualValue, value, StringComparison.Ordinal))
+                    {
+                        throw new InvalidOperationException($"Read-back divergente para {path}\\{name}.");
+                    }
+                },
+                successMessage,
+                $"Falha ao definir {name}"),
+            log);
+        return succeeded ? 1 : 0;
     }
 
-    private static void TrySetDword(RegistryKey root, string path, string name, int value, string successMessage, List<string> log)
+    private void TrySetDword(RegistryKey root, string path, string name, int value, string successMessage, List<string> log)
     {
-        try
-        {
-            RegistryService.SetDword(root, path, name, value);
-            log.Add(successMessage);
-        }
-        catch (UnauthorizedAccessException)
-        {
-            log.Add(ProtectedRegistryWarning);
-        }
-        catch (SecurityException)
-        {
-            log.Add(ProtectedRegistryWarning);
-        }
-        catch (Exception ex)
-        {
-            log.Add($"Falha ao alterar {path}\\{name}: {ex.Message}");
-        }
+        _ = ExecuteCommand(
+            new SystemMutationCommand(
+                $"Registry dword {path}\\{name}",
+                (_, session) => backupService.CaptureRegistryValue(session, root, path, name),
+                () => RegistryService.SetDword(root, path, name, value),
+                () =>
+                {
+                    if (!RegistryService.TryReadDword(root, path, name, out var actualValue) || actualValue != value)
+                    {
+                        throw new InvalidOperationException($"Read-back divergente para {path}\\{name}. Esperado={value}, Atual={actualValue}");
+                    }
+                },
+                successMessage,
+                $"Falha ao alterar {path}\\{name}"),
+            log);
     }
 
-    private static void TrySetString(RegistryKey root, string path, string name, string value, string successMessage, List<string> log)
+    private void TrySetString(RegistryKey root, string path, string name, string value, string successMessage, List<string> log)
     {
-        try
-        {
-            RegistryService.SetString(root, path, name, value);
-            log.Add(successMessage);
-        }
-        catch (UnauthorizedAccessException)
-        {
-            log.Add(ProtectedRegistryWarning);
-        }
-        catch (SecurityException)
-        {
-            log.Add(ProtectedRegistryWarning);
-        }
-        catch (Exception ex)
-        {
-            log.Add($"Falha ao alterar {path}\\{name}: {ex.Message}");
-        }
+        _ = ExecuteCommand(
+            new SystemMutationCommand(
+                $"Registry string {path}\\{name}",
+                (_, session) => backupService.CaptureRegistryValue(session, root, path, name),
+                () => RegistryService.SetString(root, path, name, value),
+                () =>
+                {
+                    if (!RegistryService.TryReadString(root, path, name, out var actualValue) ||
+                        !string.Equals(actualValue, value, StringComparison.Ordinal))
+                    {
+                        throw new InvalidOperationException($"Read-back divergente para {path}\\{name}.");
+                    }
+                },
+                successMessage,
+                $"Falha ao alterar {path}\\{name}"),
+            log);
     }
 }

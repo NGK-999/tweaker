@@ -10,6 +10,7 @@ using System.Security;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 using Microsoft.Win32;
 using Renomeador.Infrastructure;
@@ -30,9 +31,10 @@ internal sealed class TweakManager
     private const string AppCompatLayersPath = @"Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InprocServer32";
     private const string PhotoViewerCommandPath = @"Software\Classes\Applications\photoviewer.dll\shell\open\command";
     private const string UacPolicyPath = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System";
-    private const string UltimatePerformanceGuid = "e9a42b02-d5df-448d-aa00-03f14749eb61";
+    private const string DefenderTamperProtectionMessage =
+        "[ERRO] Chave bloqueada. Desative o Tamper Protection (Prote\u00e7\u00e3o contra Viola\u00e7\u00f5es) do Defender para aplicar este Tweak.";
     private const string CriticalWarning =
-        "AVISO: Esta otimização altera funções vitais de kernel, segurança ou hardware. Recomendado apenas para usuários avançados. Deseja prosseguir?";
+        "AVISO: Esta otimizacao altera funcoes vitais de kernel, seguranca ou hardware. Recomendado apenas para usuarios avancados. Deseja prosseguir?";
 
     private static readonly string[] BackgroundProcessHints =
     [
@@ -60,6 +62,9 @@ internal sealed class TweakManager
 
     private readonly CommandRunner commandRunner = new();
     private readonly Func<TweakDefinition, bool> confirmCriticalExecution;
+    private readonly object standbyMonitorSync = new();
+    private CancellationTokenSource? standbyMonitorCancellation;
+    private Task? standbyMonitorTask;
 
     public TweakManager(Func<TweakDefinition, bool>? confirmCriticalExecution = null)
     {
@@ -391,7 +396,7 @@ internal sealed class TweakManager
                     "hardcore.disable-memory-compression",
                     "Desativar Compressao de Memoria",
                     TweakModule.Hardcore,
-                    "Disable-MMAgent -MemoryCompression",
+                    "try { Disable-MMAgent -mc -ErrorAction Stop } catch { Disable-MMAgent -MemoryCompression -ErrorAction Stop }",
                     "(Get-MMAgent).MemoryCompression.ToString().ToLowerInvariant()",
                     "false")
             },
@@ -538,11 +543,11 @@ internal sealed class TweakManager
         }
         catch (UnauthorizedAccessException ex)
         {
-            return BuildError(id, name, module, $"Permissao negada ao gravar Registro: {GetFirstLine(ex.Message)}");
+            return BuildError(id, name, module, BuildDefenderBlockedMessage(GetFirstLine(ex.Message)));
         }
         catch (SecurityException ex)
         {
-            return BuildError(id, name, module, $"Seguranca do Windows bloqueou o Registro: {GetFirstLine(ex.Message)}");
+            return BuildError(id, name, module, BuildDefenderBlockedMessage(GetFirstLine(ex.Message)));
         }
         catch (Exception ex)
         {
@@ -668,27 +673,25 @@ internal sealed class TweakManager
 
             var standbyBefore = ReadStandbyBytes();
             var threshold = totalRamBytes / 2;
+            EnsureStandbyMonitorRunning();
+
             if (standbyBefore <= threshold)
             {
-                return BuildSkipped(
+                return BuildSuccess(
                     id,
                     name,
                     module,
-                    $"Standby list abaixo de 50% da RAM. Atual={FormatBytes(standbyBefore)} | Limite={FormatBytes(threshold)}");
+                    "Monitor de standby armado. A purge sera disparada automaticamente quando o cache em espera exceder 50% da RAM fisica.",
+                    "StandbyMonitor=Running",
+                    $"Atual={FormatBytes(standbyBefore)} | Limite={FormatBytes(threshold)}");
             }
 
-            var purgeCommand = MemoryPurgeStandbyList;
-            var ntstatus = NtSetSystemInformation(SystemMemoryListInformation, ref purgeCommand, sizeof(int));
-            if (ntstatus != 0)
+            if (!TryPurgeStandbyList(out var ntstatus, out var standbyAfter))
             {
                 return BuildError(id, name, module, $"NtSetSystemInformation retornou NTSTATUS 0x{ntstatus:X8}.");
             }
 
-            Thread.Sleep(50);
-
-            var standbyAfter = ReadStandbyBytes();
-            var success = standbyAfter < standbyBefore;
-            if (!success)
+            if (standbyAfter >= standbyBefore)
             {
                 return BuildMismatchError(
                     id,
@@ -702,9 +705,9 @@ internal sealed class TweakManager
                 id,
                 name,
                 module,
-                "Standby memory purgada com queda real de cache em espera.",
-                $"Antes>{FormatBytes(threshold)}",
-                $"Antes={FormatBytes(standbyBefore)} | Depois={FormatBytes(standbyAfter)}");
+                "Standby memory purgada com queda real de cache em espera e monitor persistente habilitado.",
+                "StandbyMonitor=Running",
+                $"Antes={FormatBytes(standbyBefore)} | Depois={FormatBytes(standbyAfter)} | Limite={FormatBytes(threshold)}");
         }
         catch (Exception ex)
         {
@@ -774,11 +777,11 @@ internal sealed class TweakManager
         }
         catch (UnauthorizedAccessException ex)
         {
-            return BuildError(id, name, module, $"Permissao negada no Enum da GPU: {GetFirstLine(ex.Message)}");
+            return BuildError(id, name, module, BuildDefenderBlockedMessage($"Enum da GPU: {GetFirstLine(ex.Message)}"));
         }
         catch (SecurityException ex)
         {
-            return BuildError(id, name, module, $"Seguranca do Windows bloqueou o Enum da GPU: {GetFirstLine(ex.Message)}");
+            return BuildError(id, name, module, BuildDefenderBlockedMessage($"Enum da GPU: {GetFirstLine(ex.Message)}"));
         }
         catch (Exception ex)
         {
@@ -797,13 +800,13 @@ internal sealed class TweakManager
             return BuildSuccess(id, name, module, "Edge ja esta ausente do caminho padrao.", "msedge.exe ausente", "msedge.exe ausente");
         }
 
-        var setupPath = FindEdgeSetupPath();
-        if (string.IsNullOrWhiteSpace(setupPath))
+        var uninstallCommand = ResolveEdgeUninstallCommand();
+        if (uninstallCommand is null)
         {
-            return BuildError(id, name, module, "Nao foi possivel localizar setup.exe do Edge para desinstalacao.");
+            return BuildError(id, name, module, "String de desinstalacao do Microsoft Edge nao foi encontrada no Registro.");
         }
 
-        var uninstallResult = commandRunner.Run(setupPath, "--uninstall --system-level --force-uninstall");
+        var uninstallResult = commandRunner.Run(uninstallCommand.Value.FileName, uninstallCommand.Value.Arguments);
         if (uninstallResult.ExitCode != 0)
         {
             return BuildError(id, name, module, $"Uninstaller do Edge falhou: {uninstallResult.Output}");
@@ -933,11 +936,11 @@ Write-Output $count";
         }
         catch (UnauthorizedAccessException ex)
         {
-            return BuildError(id, name, module, $"Permissao negada ao desativar servico {serviceName}: {GetFirstLine(ex.Message)}");
+            return BuildError(id, name, module, BuildDefenderBlockedMessage($"{serviceName}: {GetFirstLine(ex.Message)}"));
         }
         catch (SecurityException ex)
         {
-            return BuildError(id, name, module, $"Seguranca do Windows bloqueou o servico {serviceName}: {GetFirstLine(ex.Message)}");
+            return BuildError(id, name, module, BuildDefenderBlockedMessage($"{serviceName}: {GetFirstLine(ex.Message)}"));
         }
         catch (Exception ex)
         {
@@ -985,16 +988,16 @@ Write-Output $remaining";
         var before = commandRunner.Run("powercfg", "/list");
         if (before.ExitCode != 0)
         {
-            return BuildError(id, name, module, $"Falha ao listar planos de energia: {before.Output}");
+            return TryApplyModernPowerModeFallback(id, name, module, before.Output);
         }
 
         var targetGuid = ResolveUltimateSchemeGuid(before.Output);
         if (string.IsNullOrWhiteSpace(targetGuid))
         {
-            var duplicate = commandRunner.Run("powercfg", $"-duplicatescheme {UltimatePerformanceGuid}");
+            var duplicate = commandRunner.Run("powercfg", $"-duplicatescheme {WindowsPowerModeService.UltimatePerformanceGuid}");
             if (duplicate.ExitCode != 0)
             {
-                return BuildError(id, name, module, $"Falha ao duplicar Ultimate Performance: {duplicate.Output}");
+                return TryApplyModernPowerModeFallback(id, name, module, duplicate.Output);
             }
 
             targetGuid = ExtractGuid(duplicate.Output);
@@ -1009,13 +1012,13 @@ Write-Output $remaining";
 
         if (string.IsNullOrWhiteSpace(targetGuid))
         {
-            return BuildError(id, name, module, "GUID do plano Ultimate Performance nao foi localizado apos a duplicacao.");
+            return TryApplyModernPowerModeFallback(id, name, module, "GUID do plano Ultimate Performance nao foi localizado apos a duplicacao.");
         }
 
         var activate = commandRunner.Run("powercfg", $"/setactive {targetGuid}");
         if (activate.ExitCode != 0)
         {
-            return BuildError(id, name, module, $"Falha ao ativar Ultimate Performance: {activate.Output}");
+            return TryApplyModernPowerModeFallback(id, name, module, activate.Output);
         }
 
         Thread.Sleep(1);
@@ -1067,11 +1070,11 @@ Write-Output $remaining";
         }
         catch (UnauthorizedAccessException ex)
         {
-            return BuildError(id, name, module, $"Permissao negada ao gravar Registro: {GetFirstLine(ex.Message)}");
+            return BuildError(id, name, module, BuildDefenderBlockedMessage(GetFirstLine(ex.Message)));
         }
         catch (SecurityException ex)
         {
-            return BuildError(id, name, module, $"Seguranca do Windows bloqueou o Registro: {GetFirstLine(ex.Message)}");
+            return BuildError(id, name, module, BuildDefenderBlockedMessage(GetFirstLine(ex.Message)));
         }
         catch (Exception ex)
         {
@@ -1242,6 +1245,68 @@ Write-Output $remaining";
         return Convert.ToInt64(reserve.NextValue() + normal.NextValue() + core.NextValue(), CultureInfo.InvariantCulture);
     }
 
+    private void EnsureStandbyMonitorRunning()
+    {
+        lock (standbyMonitorSync)
+        {
+            if (standbyMonitorTask is { IsCompleted: false })
+            {
+                return;
+            }
+
+            standbyMonitorCancellation?.Cancel();
+            standbyMonitorCancellation?.Dispose();
+            standbyMonitorCancellation = new CancellationTokenSource();
+            var cancellationToken = standbyMonitorCancellation.Token;
+
+            standbyMonitorTask = Task.Run(async () =>
+            {
+                while (!cancellationToken.IsCancellationRequested)
+                {
+                    try
+                    {
+                        var totalRamBytes = (long)Math.Min(GetTotalPhysicalMemoryBytes(), (ulong)long.MaxValue);
+                        if (totalRamBytes > 0)
+                        {
+                            var standbyBytes = ReadStandbyBytes();
+                            if (standbyBytes > totalRamBytes / 2)
+                            {
+                                TryPurgeStandbyList(out _, out _);
+                            }
+                        }
+                    }
+                    catch
+                    {
+                    }
+
+                    try
+                    {
+                        await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken).ConfigureAwait(false);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        break;
+                    }
+                }
+            }, cancellationToken);
+        }
+    }
+
+    private static bool TryPurgeStandbyList(out int ntstatus, out long standbyAfter)
+    {
+        var purgeCommand = MemoryPurgeStandbyList;
+        ntstatus = NtSetSystemInformation(SystemMemoryListInformation, ref purgeCommand, sizeof(int));
+        if (ntstatus != 0)
+        {
+            standbyAfter = 0;
+            return false;
+        }
+
+        Thread.Sleep(50);
+        standbyAfter = ReadStandbyBytes();
+        return true;
+    }
+
     private static string FormatBytes(long bytes)
     {
         return $"{bytes / 1024d / 1024d / 1024d:0.##} GB";
@@ -1288,23 +1353,6 @@ Write-Output $remaining";
         return adapters;
     }
 
-    private static string? FindEdgeSetupPath()
-    {
-        var basePath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86),
-            "Microsoft",
-            "Edge",
-            "Application");
-
-        if (!Directory.Exists(basePath))
-        {
-            return null;
-        }
-
-        return Directory.GetFiles(basePath, "setup.exe", SearchOption.AllDirectories)
-            .FirstOrDefault(path => path.Contains($"{Path.DirectorySeparatorChar}Installer{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase));
-    }
-
     private static string? GetEdgeExecutablePath()
     {
         var basePath = Path.Combine(
@@ -1319,6 +1367,96 @@ Write-Output $remaining";
         }
 
         return Directory.GetFiles(basePath, "msedge.exe", SearchOption.AllDirectories).FirstOrDefault();
+    }
+
+    private static CommandSpec? ResolveEdgeUninstallCommand()
+    {
+        foreach (var view in new[] { RegistryView.Registry64, RegistryView.Registry32 })
+        {
+            using var baseKey = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, view);
+            using var uninstallRoot = baseKey.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall");
+            if (uninstallRoot is null)
+            {
+                continue;
+            }
+
+            foreach (var subKeyName in uninstallRoot.GetSubKeyNames())
+            {
+                using var packageKey = uninstallRoot.OpenSubKey(subKeyName);
+                var displayName = packageKey?.GetValue("DisplayName")?.ToString();
+                if (string.IsNullOrWhiteSpace(displayName) ||
+                    !displayName.Contains("Microsoft Edge", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                var commandLine = packageKey?.GetValue("QuietUninstallString")?.ToString();
+                if (string.IsNullOrWhiteSpace(commandLine))
+                {
+                    commandLine = packageKey?.GetValue("UninstallString")?.ToString();
+                }
+
+                if (!TrySplitCommandLine(commandLine, out var fileName, out var arguments))
+                {
+                    continue;
+                }
+
+                if (string.Equals(Path.GetFileName(fileName), "setup.exe", StringComparison.OrdinalIgnoreCase) &&
+                    !arguments.Contains("--force-uninstall", StringComparison.OrdinalIgnoreCase))
+                {
+                    arguments = $"{arguments} --force-uninstall --system-level".Trim();
+                }
+
+                return new CommandSpec(fileName, arguments);
+            }
+        }
+
+        return null;
+    }
+
+    private static bool TrySplitCommandLine(string? commandLine, out string fileName, out string arguments)
+    {
+        fileName = string.Empty;
+        arguments = string.Empty;
+
+        if (string.IsNullOrWhiteSpace(commandLine))
+        {
+            return false;
+        }
+
+        var trimmed = commandLine.Trim();
+        if (trimmed.StartsWith('"'))
+        {
+            var closingQuote = trimmed.IndexOf('"', 1);
+            if (closingQuote <= 1)
+            {
+                return false;
+            }
+
+            fileName = trimmed[1..closingQuote];
+            arguments = trimmed[(closingQuote + 1)..].Trim();
+            return true;
+        }
+
+        var exeIndex = trimmed.IndexOf(".exe", StringComparison.OrdinalIgnoreCase);
+        if (exeIndex >= 0)
+        {
+            var endIndex = exeIndex + 4;
+            fileName = trimmed[..endIndex].Trim();
+            arguments = trimmed[endIndex..].Trim();
+            return true;
+        }
+
+        var splitIndex = trimmed.IndexOf(' ');
+        if (splitIndex < 0)
+        {
+            fileName = trimmed;
+            return true;
+        }
+
+        fileName = trimmed[..splitIndex].Trim();
+        arguments = trimmed[(splitIndex + 1)..].Trim();
+        return true;
     }
 
     private static bool IsCompactOsDisabledOutput(string output)
@@ -1372,6 +1510,44 @@ Write-Output $remaining";
 
         var match = Regex.Match(text, @"[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}");
         return match.Success ? match.Value : null;
+    }
+
+    private TweakExecutionResult TryApplyModernPowerModeFallback(
+        string id,
+        string name,
+        TweakModule module,
+        string? powercfgOutput)
+    {
+        if (WindowsPowerModeService.TryApplyBestPerformanceOverlay(out var actualState, out var diagnostic))
+        {
+            return BuildSuccess(
+                id,
+                name,
+                module,
+                "GUID legado indisponivel. Windows 11 Power Mode ajustado para Best Performance sem quebrar o Thread Director nativo.",
+                WindowsPowerModeService.BestPerformanceGuidText,
+                actualState);
+        }
+
+        if (WindowsPowerModeService.IsLegacyPowercfgSettingUnsupported(powercfgOutput))
+        {
+            return BuildSkipped(
+                id,
+                name,
+                module,
+                "[INFO] GUID de energia legado nao suportado nesta CPU, mantendo Thread Director nativo.");
+        }
+
+        return BuildError(
+            id,
+            name,
+            module,
+            $"Falha ao configurar energia: {GetFirstLine(string.IsNullOrWhiteSpace(powercfgOutput) ? diagnostic : powercfgOutput!)}");
+    }
+
+    private static string BuildDefenderBlockedMessage(string detail)
+    {
+        return $"{DefenderTamperProtectionMessage} Detalhe: {detail}";
     }
 
     private static TweakExecutionResult BuildSuccess(
@@ -1429,6 +1605,7 @@ Write-Output $remaining";
         RegistryView? View = null);
 
     private readonly record struct DisplayAdapterInfo(string Name, string PnpDeviceId);
+    private readonly record struct CommandSpec(string FileName, string Arguments);
 
     [StructLayout(LayoutKind.Sequential)]
     private struct MemoryStatusEx

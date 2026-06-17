@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Reflection;
@@ -9,18 +9,18 @@ namespace Renomeador.Forms;
 
 internal sealed class LoadingForm : Form
 {
-    private static readonly Color Bg = Color.FromArgb(10, 15, 24);
-    private static readonly Color Panel = Color.FromArgb(17, 24, 39);
-    private static readonly Color Border = Color.FromArgb(45, 58, 80);
-    private static readonly Color TextMain = Color.FromArgb(243, 244, 246);
-    private static readonly Color TextMuted = Color.FromArgb(156, 163, 175);
+    private static readonly Color Bg = Color.FromArgb(17, 22, 37);
+    private static readonly Color Panel = Color.FromArgb(26, 31, 44);
+    private static readonly Color Border = Color.FromArgb(42, 50, 66);
+    private static readonly Color TextMain = Color.FromArgb(255, 255, 255);
+    private static readonly Color TextMuted = Color.FromArgb(139, 148, 158);
     private static readonly Color ProgressBack = Color.FromArgb(20, 25, 35);
-    private static readonly Color Accent = Color.FromArgb(34, 211, 238);
+    private static readonly Color Accent = Color.FromArgb(0, 180, 216);
 
     private readonly Panel customProgressBar;
     private readonly System.Windows.Forms.Timer marqueeTimer = new() { Interval = 16 };
-    private int _marqueeX = -50;
-    private readonly int _marqueeWidth = 100;
+    private int marqueeX = -50;
+    private readonly int marqueeWidth = 100;
     private bool marqueeTimerDisposed;
 
     public LoadingForm()
@@ -29,7 +29,7 @@ internal sealed class LoadingForm : Form
         StartPosition = FormStartPosition.CenterScreen;
         FormBorderStyle = FormBorderStyle.None;
         ShowInTaskbar = false;
-        ClientSize = new Size(420, 150);
+        ClientSize = new Size(420, 156);
         BackColor = Bg;
         Font = new Font("Segoe UI", 9.5F, FontStyle.Regular, GraphicsUnit.Point);
 
@@ -50,9 +50,10 @@ internal sealed class LoadingForm : Form
             Dock = DockStyle.Fill,
             BackColor = Panel,
             ColumnCount = 1,
-            RowCount = 3
+            RowCount = 4
         };
         layout.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 12F));
         layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 4F));
         layout.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
 
@@ -62,7 +63,15 @@ internal sealed class LoadingForm : Form
             Dock = DockStyle.Fill,
             ForeColor = TextMain,
             Font = new Font("Segoe UI", 13F, FontStyle.Bold, GraphicsUnit.Point),
-            TextAlign = ContentAlignment.BottomCenter
+            TextAlign = ContentAlignment.BottomCenter,
+            Margin = new Padding(0)
+        };
+
+        var titleSpacer = new Panel
+        {
+            Dock = DockStyle.Fill,
+            BackColor = Panel,
+            Margin = new Padding(0)
         };
 
         customProgressBar = new Panel
@@ -81,7 +90,7 @@ internal sealed class LoadingForm : Form
 
         var subtitle = new Label
         {
-            Text = "Preparando interface e servicos internos",
+            Text = "Preparando interface, telemetria e servi\u00E7os internos",
             Dock = DockStyle.Fill,
             ForeColor = TextMuted,
             TextAlign = ContentAlignment.TopCenter,
@@ -89,8 +98,9 @@ internal sealed class LoadingForm : Form
         };
 
         layout.Controls.Add(title, 0, 0);
-        layout.Controls.Add(customProgressBar, 0, 1);
-        layout.Controls.Add(subtitle, 0, 2);
+        layout.Controls.Add(titleSpacer, 0, 1);
+        layout.Controls.Add(customProgressBar, 0, 2);
+        layout.Controls.Add(subtitle, 0, 3);
         shell.Controls.Add(layout);
         Controls.Add(shell);
 
@@ -109,10 +119,10 @@ internal sealed class LoadingForm : Form
 
     private void MarqueeTimer_Tick(object? sender, EventArgs e)
     {
-        _marqueeX += 4;
-        if (_marqueeX > customProgressBar.Width)
+        marqueeX += 4;
+        if (marqueeX > customProgressBar.Width)
         {
-            _marqueeX = -_marqueeWidth;
+            marqueeX = -marqueeWidth;
         }
 
         customProgressBar.Invalidate();
@@ -122,7 +132,7 @@ internal sealed class LoadingForm : Form
     {
         e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
         using var brush = new SolidBrush(Accent);
-        e.Graphics.FillRectangle(brush, _marqueeX, 0, _marqueeWidth, customProgressBar.Height);
+        e.Graphics.FillRectangle(brush, marqueeX, 0, marqueeWidth, customProgressBar.Height);
     }
 
     private void StopAndDisposeMarqueeTimer()

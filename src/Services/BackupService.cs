@@ -1,9 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
+using System.Threading;
 using Microsoft.Win32;
 using Renomeador.Infrastructure;
 using Renomeador.Models;
@@ -12,7 +15,10 @@ namespace Renomeador.Services;
 
 internal sealed class BackupService
 {
+    private const string PendingLedgerStatus = "Pending";
+    private const string RestoredLedgerStatus = "Restored";
     private readonly CommandRunner commandRunner = new();
+    private Dictionary<string, string>? powerAliasCache;
 
     private static readonly (RegistryKey Root, string RootName, string Path, string Name)[] RegistryTargets =
     [
@@ -68,6 +74,295 @@ internal sealed class BackupService
         Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
         "ApexTweaker",
         "Backups");
+
+    public MutationSession BeginMutationSession(string operationName)
+    {
+        Directory.CreateDirectory(BackupDirectory);
+        return new MutationSession(operationName);
+    }
+
+    public void CaptureRegistryValue(MutationSession session, RegistryKey root, string path, string name)
+    {
+        var rootName = ReferenceEquals(root, Registry.LocalMachine) ? "HKLM" : "HKCU";
+        var snapshotKey = $@"{rootName}\{path}\{name}";
+        if (session.RegistrySnapshots.ContainsKey(snapshotKey))
+        {
+            return;
+        }
+
+        using var key = root.OpenSubKey(path);
+        var value = key?.GetValue(name);
+        var kind = key is null || value is null ? null : key.GetValueKind(name).ToString();
+        var valueBase64 = value is byte[] bytes ? Convert.ToBase64String(bytes) : null;
+
+        session.RegistrySnapshots[snapshotKey] = new RegistryValueSnapshot(
+            rootName,
+            path,
+            name,
+            value is not null,
+            kind,
+            valueBase64 is null ? value?.ToString() : null,
+            valueBase64,
+            session.NextSequence());
+    }
+
+    public void CaptureActivePowerScheme(MutationSession session)
+    {
+        if (session.PowerSnapshot is not null)
+        {
+            return;
+        }
+
+        session.PowerSnapshot = new PowerSchemeSnapshot(GetActivePowerScheme(), session.NextSequence());
+    }
+
+    public void CapturePowerSettingValue(
+        MutationSession session,
+        string schemeGuidOrAlias,
+        string subgroupGuidOrAlias,
+        string settingGuidOrAlias,
+        bool isAcValue)
+    {
+        var resolvedSchemeGuid = ResolvePowerSchemeGuid(schemeGuidOrAlias);
+        var resolvedSubgroupGuid = ResolvePowerIdentifier(subgroupGuidOrAlias);
+        var resolvedSettingGuid = ResolvePowerIdentifier(settingGuidOrAlias);
+        var snapshotKey = $"{resolvedSchemeGuid}|{resolvedSubgroupGuid}|{resolvedSettingGuid}|{(isAcValue ? "AC" : "DC")}";
+
+        if (session.PowerSettingSnapshots.ContainsKey(snapshotKey))
+        {
+            return;
+        }
+
+        if (!TryReadResolvedPowerSettingValue(
+                resolvedSchemeGuid,
+                resolvedSubgroupGuid,
+                resolvedSettingGuid,
+                isAcValue,
+                out var previousValue,
+                out var error))
+        {
+            throw new InvalidOperationException(error);
+        }
+
+        session.PowerSettingSnapshots[snapshotKey] = new PowerSettingSnapshot(
+            resolvedSchemeGuid,
+            resolvedSubgroupGuid,
+            resolvedSettingGuid,
+            isAcValue,
+            previousValue,
+            session.NextSequence());
+    }
+
+    public void CaptureBcdValue(MutationSession session, string valueName)
+    {
+        if (session.BcdSnapshots.ContainsKey(valueName))
+        {
+            return;
+        }
+
+        var result = commandRunner.Run("bcdedit", "/enum {current}");
+        if (result.ExitCode != 0)
+        {
+            throw new InvalidOperationException($"Nao foi possivel ler o BCD atual: {result.Output}");
+        }
+
+        var value = ParseBcdValue(result.Output, valueName);
+        session.BcdSnapshots[valueName] = new BcdValueSnapshot(
+            valueName,
+            value is not null,
+            value,
+            session.NextSequence());
+    }
+
+    public void CaptureServiceState(MutationSession session, string serviceName)
+    {
+        if (session.ServiceSnapshots.ContainsKey(serviceName))
+        {
+            return;
+        }
+
+        var query = commandRunner.Run("sc.exe", $"query \"{serviceName}\"");
+        if (query.ExitCode != 0)
+        {
+        session.ServiceSnapshots[serviceName] = new ServiceStateSnapshot(
+            serviceName,
+            Exists: false,
+            StartMode: null,
+            Status: null,
+            Sequence: session.NextSequence());
+            return;
+        }
+
+        var config = commandRunner.Run("sc.exe", $"qc \"{serviceName}\"");
+        if (config.ExitCode != 0)
+        {
+            throw new InvalidOperationException($"Nao foi possivel ler configuracao do servico {serviceName}: {config.Output}");
+        }
+
+        session.ServiceSnapshots[serviceName] = new ServiceStateSnapshot(
+            serviceName,
+            Exists: true,
+            StartMode: ParseServiceStartMode(config.Output),
+            Status: ParseServiceStatus(query.Output),
+            Sequence: session.NextSequence());
+    }
+
+    public void CaptureProcessState(MutationSession session, int processId)
+    {
+        var snapshotKey = processId.ToString(CultureInfo.InvariantCulture);
+        if (session.ProcessSnapshots.ContainsKey(snapshotKey))
+        {
+            return;
+        }
+
+        using var process = Process.GetProcessById(processId);
+
+        DateTime? startTimeUtc = null;
+        long? affinityMask = null;
+        int? priorityClass = null;
+
+        try
+        {
+            startTimeUtc = process.StartTime.ToUniversalTime();
+        }
+        catch
+        {
+            // Process identity check on restore becomes best-effort when StartTime is unavailable.
+        }
+
+        try
+        {
+            affinityMask = process.ProcessorAffinity.ToInt64();
+        }
+        catch
+        {
+            // Some protected processes refuse affinity reads; restore then skips affinity.
+        }
+
+        try
+        {
+            priorityClass = (int)process.PriorityClass;
+        }
+        catch
+        {
+            // Priority restore is optional when the OS blocks inspection.
+        }
+
+        session.ProcessSnapshots[snapshotKey] = new ProcessStateSnapshot(
+            process.Id,
+            process.ProcessName,
+            startTimeUtc,
+            affinityMask,
+            priorityClass,
+            session.NextSequence());
+    }
+
+    public IReadOnlyList<string> CommitMutationSession(MutationSession session, bool completed)
+    {
+        Directory.CreateDirectory(BackupDirectory);
+        if (!session.HasSnapshots)
+        {
+            return ["Pipeline concluido sem snapshots persistentes."];
+        }
+
+        var record = session.ToRecord(completed);
+        var fileName = $"mutation-{record.CreatedAtUtc:yyyyMMdd-HHmmss}-{SanitizeFileNameFragment(record.OperationName)}.json";
+        var path = Path.Combine(BackupDirectory, fileName);
+        var json = JsonSerializer.Serialize(record, new JsonSerializerOptions { WriteIndented = true });
+        File.WriteAllText(path, json);
+
+        return
+        [
+            completed
+                ? $"Snapshot real persistido: {path}"
+                : $"Snapshot parcial persistido apos falha/interrupcao: {path}"
+        ];
+    }
+
+    public IReadOnlyList<string> RestoreLatestMutationSession()
+    {
+        if (!TryLoadLatestPendingMutationSession(out var session, out var path) ||
+            session is null ||
+            string.IsNullOrWhiteSpace(path))
+        {
+            return ["Nenhum snapshot pendente encontrado para restauracao."];
+        }
+
+        var log = new List<string> { $"Restaurando snapshot real: {path}" };
+        var restoreActions = BuildRestoreActions(session);
+
+        foreach (var action in restoreActions.OrderByDescending(item => item.Sequence))
+        {
+            action.Restore(log);
+        }
+
+        MarkMutationSessionAsRestored(path, session);
+        log.Add("Ledger transacional consumido. Esta sessao nao sera restaurada novamente.");
+        return log;
+    }
+
+    public IReadOnlyList<string> RestoreAllPendingMutationSessions(
+        IProgress<string>? progress = null,
+        CancellationToken cancellationToken = default)
+    {
+        var aggregateLog = new List<string>();
+        var restoredCount = 0;
+
+        while (true)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (!TryLoadLatestPendingMutationSession(out _, out var path))
+            {
+                if (restoredCount == 0)
+                {
+                    const string noPending = "Nenhum snapshot pendente encontrado para restauracao.";
+                    progress?.Report(noPending);
+                    aggregateLog.Add(noPending);
+                }
+                else
+                {
+                    var completed = $"Master rollback concluido. {restoredCount} sessao(oes) transacionais restauradas em ordem reversa.";
+                    progress?.Report(completed);
+                    aggregateLog.Add(completed);
+                }
+
+                return aggregateLog;
+            }
+
+            var startMessage = $"[ROLLBACK] Restaurando sessao transacional: {Path.GetFileName(path)}";
+            progress?.Report(startMessage);
+            aggregateLog.Add(startMessage);
+
+            var currentLog = RestoreLatestMutationSession();
+            foreach (var line in currentLog)
+            {
+                progress?.Report(line);
+            }
+
+            aggregateLog.AddRange(currentLog);
+            restoredCount++;
+        }
+    }
+
+    public bool TryReadPowerSettingValue(
+        string schemeGuidOrAlias,
+        string subgroupGuidOrAlias,
+        string settingGuidOrAlias,
+        bool isAcValue,
+        out int value,
+        out string error)
+    {
+        var resolvedSchemeGuid = ResolvePowerSchemeGuid(schemeGuidOrAlias);
+        var resolvedSubgroupGuid = ResolvePowerIdentifier(subgroupGuidOrAlias);
+        var resolvedSettingGuid = ResolvePowerIdentifier(settingGuidOrAlias);
+        return TryReadResolvedPowerSettingValue(resolvedSchemeGuid, resolvedSubgroupGuid, resolvedSettingGuid, isAcValue, out value, out error);
+    }
+
+    public string? ReadActivePowerScheme()
+    {
+        return GetActivePowerScheme();
+    }
 
     public IReadOnlyList<string> CreateBackup()
     {
@@ -397,6 +692,87 @@ internal sealed class BackupService
         }
     }
 
+    private static IReadOnlyList<(int Sequence, Action<List<string>> Restore)> BuildRestoreActions(TweakMutationSession session)
+    {
+        var actions = new List<(int Sequence, Action<List<string>> Restore)>();
+
+        foreach (var entry in session.RegistrySnapshots ?? Array.Empty<RegistryValueSnapshot>())
+        {
+            actions.Add((entry.Sequence, log => RestoreRegistrySnapshot(entry, log)));
+        }
+
+        foreach (var entry in session.BcdSnapshots ?? Array.Empty<BcdValueSnapshot>())
+        {
+            actions.Add((entry.Sequence, log => RestoreBcdSnapshot(entry, log)));
+        }
+
+        foreach (var entry in session.ServiceSnapshots ?? Array.Empty<ServiceStateSnapshot>())
+        {
+            actions.Add((entry.Sequence, log => RestoreServiceSnapshot(entry, log)));
+        }
+
+        foreach (var entry in session.PowerSettingSnapshots ?? Array.Empty<PowerSettingSnapshot>())
+        {
+            actions.Add((entry.Sequence, log => RestorePowerSettingSnapshot(entry, log)));
+        }
+
+        foreach (var entry in session.ProcessSnapshots ?? Array.Empty<ProcessStateSnapshot>())
+        {
+            actions.Add((entry.Sequence, log => RestoreProcessSnapshot(entry, log)));
+        }
+
+        if (session.PowerSnapshot is not null)
+        {
+            actions.Add((session.PowerSnapshot.Sequence, log => RestorePowerSnapshot(session.PowerSnapshot, log)));
+        }
+
+        return actions;
+    }
+
+    private bool TryLoadLatestPendingMutationSession(out TweakMutationSession? session, out string? path)
+    {
+        session = null;
+        path = null;
+
+        if (!Directory.Exists(BackupDirectory))
+        {
+            return false;
+        }
+
+        var files = Directory.GetFiles(BackupDirectory, "mutation-*.json");
+        if (files.Length == 0)
+        {
+            return false;
+        }
+
+        Array.Sort(files, StringComparer.OrdinalIgnoreCase);
+
+        for (var index = files.Length - 1; index >= 0; index--)
+        {
+            var currentPath = files[index];
+            var current = JsonSerializer.Deserialize<TweakMutationSession>(File.ReadAllText(currentPath));
+            if (current is null)
+            {
+                continue;
+            }
+
+            var status = string.IsNullOrWhiteSpace(current.Status)
+                ? PendingLedgerStatus
+                : current.Status;
+
+            if (string.Equals(status, RestoredLedgerStatus, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            session = current;
+            path = currentPath;
+            return true;
+        }
+
+        return false;
+    }
+
     private string? GetActivePowerScheme()
     {
         var result = commandRunner.Run("powercfg", "/getactivescheme");
@@ -415,6 +791,44 @@ internal sealed class BackupService
         return string.IsNullOrWhiteSpace(guid) ? null : guid;
     }
 
+    private void MarkMutationSessionAsRestored(string path, TweakMutationSession session)
+    {
+        var restored = session with
+        {
+            Status = RestoredLedgerStatus,
+            RestoredAtUtc = DateTime.UtcNow
+        };
+
+        var json = JsonSerializer.Serialize(restored, new JsonSerializerOptions { WriteIndented = true });
+        File.WriteAllText(path, json);
+    }
+
+    private static void RestorePowerSnapshot(PowerSchemeSnapshot snapshot, List<string> log)
+    {
+        if (string.IsNullOrWhiteSpace(snapshot.ActivePowerScheme))
+        {
+            log.Add("Snapshot de energia sem GUID anterior. Plano atual preservado.");
+            return;
+        }
+
+        var result = new CommandRunner().Run("powercfg", $"/setactive {snapshot.ActivePowerScheme}");
+        log.Add(result.ExitCode == 0
+            ? $"Plano de energia restaurado: {snapshot.ActivePowerScheme}"
+            : $"Falha ao restaurar plano de energia: {result.Output}");
+    }
+
+    private static void RestorePowerSettingSnapshot(PowerSettingSnapshot snapshot, List<string> log)
+    {
+        var scopeCommand = snapshot.IsAcValue ? "/setacvalueindex" : "/setdcvalueindex";
+        var commandRunner = new CommandRunner();
+        var arguments = $"{scopeCommand} {snapshot.SchemeGuid} {snapshot.SubgroupGuid} {snapshot.SettingGuid} {snapshot.PreviousValue.ToString(CultureInfo.InvariantCulture)}";
+        var result = commandRunner.Run("powercfg", arguments);
+
+        log.Add(result.ExitCode == 0
+            ? $"Energia restaurada: {snapshot.SettingGuid} => {snapshot.PreviousValue} ({(snapshot.IsAcValue ? "AC" : "DC")})."
+            : $"Falha ao restaurar energia {snapshot.SettingGuid}: {result.Output}");
+    }
+
     private void RestoreBcdEntry(BcdBackupEntry entry, List<string> log)
     {
         var arguments = entry.Exists && !string.IsNullOrWhiteSpace(entry.Value)
@@ -427,6 +841,24 @@ internal sealed class BackupService
             log.Add(entry.Exists
                 ? $"BCD restaurado: {entry.Name}={entry.Value}"
                 : $"BCD rollback: {entry.Name} removido para voltar ao padrao do Windows.");
+            return;
+        }
+
+        log.Add($"Falha ao restaurar BCD {entry.Name}: {result.Output}");
+    }
+
+    private static void RestoreBcdSnapshot(BcdValueSnapshot entry, List<string> log)
+    {
+        var arguments = entry.Exists && !string.IsNullOrWhiteSpace(entry.Value)
+            ? $"/set {entry.Name} {NormalizeBcdValueForCommand(entry.Value)}"
+            : $"/deletevalue {entry.Name}";
+
+        var result = new CommandRunner().Run("bcdedit", arguments);
+        if (result.ExitCode == 0)
+        {
+            log.Add(entry.Exists
+                ? $"BCD restaurado: {entry.Name}={entry.Value}"
+                : $"BCD restaurado: {entry.Name} removido para voltar ao estado anterior.");
             return;
         }
 
@@ -467,6 +899,237 @@ internal sealed class BackupService
         return normalized;
     }
 
+    private static string? ParseServiceStartMode(string output)
+    {
+        foreach (var rawLine in output.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries))
+        {
+            var line = rawLine.Trim();
+            if (!line.StartsWith("START_TYPE", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (line.Contains("AUTO_START", StringComparison.OrdinalIgnoreCase))
+            {
+                return "auto";
+            }
+
+            if (line.Contains("DEMAND_START", StringComparison.OrdinalIgnoreCase))
+            {
+                return "demand";
+            }
+
+            if (line.Contains("DISABLED", StringComparison.OrdinalIgnoreCase))
+            {
+                return "disabled";
+            }
+
+            if (line.Contains("SYSTEM_START", StringComparison.OrdinalIgnoreCase))
+            {
+                return "system";
+            }
+
+            if (line.Contains("BOOT_START", StringComparison.OrdinalIgnoreCase))
+            {
+                return "boot";
+            }
+        }
+
+        return null;
+    }
+
+    private static string? ParseServiceStatus(string output)
+    {
+        foreach (var rawLine in output.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries))
+        {
+            var line = rawLine.Trim();
+            if (!line.StartsWith("STATE", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (line.Contains("RUNNING", StringComparison.OrdinalIgnoreCase))
+            {
+                return "running";
+            }
+
+            if (line.Contains("STOPPED", StringComparison.OrdinalIgnoreCase))
+            {
+                return "stopped";
+            }
+
+            if (line.Contains("PAUSED", StringComparison.OrdinalIgnoreCase))
+            {
+                return "paused";
+            }
+        }
+
+        return null;
+    }
+
+    private bool TryReadResolvedPowerSettingValue(
+        string resolvedSchemeGuid,
+        string resolvedSubgroupGuid,
+        string resolvedSettingGuid,
+        bool isAcValue,
+        out int value,
+        out string error)
+    {
+        var result = commandRunner.Run(
+            "powercfg",
+            $"/query {resolvedSchemeGuid} {resolvedSubgroupGuid} {resolvedSettingGuid}");
+
+        if (result.ExitCode != 0)
+        {
+            value = default;
+            error = $"powercfg /query falhou: {result.Output}";
+            return false;
+        }
+
+        var patterns = isAcValue
+            ? new[]
+            {
+                @"Current AC Power Setting Index:\s*0x([0-9a-fA-F]+)",
+                @"(?im)^.*\bAC\b.*0x([0-9a-fA-F]+)\s*$"
+            }
+            : new[]
+            {
+                @"Current DC Power Setting Index:\s*0x([0-9a-fA-F]+)",
+                @"(?im)^.*\bDC\b.*0x([0-9a-fA-F]+)\s*$"
+            };
+
+        Match match = Match.Empty;
+        foreach (var pattern in patterns)
+        {
+            match = Regex.Match(result.Output, pattern, RegexOptions.IgnoreCase);
+            if (match.Success)
+            {
+                break;
+            }
+        }
+
+        if (!match.Success)
+        {
+            value = default;
+            error = $"Nao foi possivel ler o valor {(isAcValue ? "AC" : "DC")} de {resolvedSettingGuid}.";
+            return false;
+        }
+
+        value = int.Parse(match.Groups[1].Value, NumberStyles.HexNumber, CultureInfo.InvariantCulture);
+        error = string.Empty;
+        return true;
+    }
+
+    private string ResolvePowerSchemeGuid(string schemeGuidOrAlias)
+    {
+        if (string.Equals(schemeGuidOrAlias, "SCHEME_CURRENT", StringComparison.OrdinalIgnoreCase))
+        {
+            return GetActivePowerScheme()
+                   ?? throw new InvalidOperationException("Nao foi possivel resolver o plano de energia ativo.");
+        }
+
+        return ResolvePowerIdentifier(schemeGuidOrAlias);
+    }
+
+    private string ResolvePowerIdentifier(string identifier)
+    {
+        if (Guid.TryParse(identifier, out _))
+        {
+            return identifier;
+        }
+
+        var aliases = powerAliasCache ??= LoadPowerAliasCache();
+        if (aliases.TryGetValue(identifier, out var resolved))
+        {
+            return resolved;
+        }
+
+        return identifier;
+    }
+
+    private Dictionary<string, string> LoadPowerAliasCache()
+    {
+        var cache = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var result = commandRunner.Run("powercfg", "/aliases");
+        if (result.ExitCode != 0)
+        {
+            return cache;
+        }
+
+        foreach (var rawLine in result.Output.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries))
+        {
+            var line = rawLine.Trim();
+            if (string.IsNullOrWhiteSpace(line))
+            {
+                continue;
+            }
+
+            var match = Regex.Match(
+                line,
+                @"(?<guid>[0-9a-fA-F\-]{36})\s+(?<alias>[A-Z0-9_]+)",
+                RegexOptions.IgnoreCase);
+
+            if (!match.Success)
+            {
+                continue;
+            }
+
+            cache[match.Groups["alias"].Value] = match.Groups["guid"].Value;
+        }
+
+        return cache;
+    }
+
+    private static void RestoreServiceSnapshot(ServiceStateSnapshot entry, List<string> log)
+    {
+        if (!entry.Exists)
+        {
+            log.Add($"Servico ausente no snapshot original: {entry.ServiceName}. Nenhuma acao aplicada.");
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(entry.StartMode))
+        {
+            var config = new CommandRunner().Run("sc.exe", $"config \"{entry.ServiceName}\" start= {entry.StartMode}");
+            log.Add(config.ExitCode == 0
+                ? $"Modo de inicializacao restaurado: {entry.ServiceName} -> {entry.StartMode}"
+                : $"Falha ao restaurar modo do servico {entry.ServiceName}: {config.Output}");
+        }
+
+        if (string.Equals(entry.Status, "running", StringComparison.OrdinalIgnoreCase))
+        {
+            var start = new CommandRunner().Run("sc.exe", $"start \"{entry.ServiceName}\"");
+            log.Add(start.ExitCode == 0
+                ? $"Servico religado: {entry.ServiceName}"
+                : $"Falha ao religar servico {entry.ServiceName}: {start.Output}");
+            return;
+        }
+
+        if (string.Equals(entry.Status, "stopped", StringComparison.OrdinalIgnoreCase))
+        {
+            var stop = new CommandRunner().Run("sc.exe", $"stop \"{entry.ServiceName}\"");
+            log.Add(stop.ExitCode == 0
+                ? $"Servico retornado para estado parado: {entry.ServiceName}"
+                : $"Falha ao parar servico {entry.ServiceName}: {stop.Output}");
+        }
+    }
+
+    private static string SanitizeFileNameFragment(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return "session";
+        }
+
+        var builder = new StringBuilder(value.Length);
+        foreach (var character in value)
+        {
+            builder.Append(char.IsLetterOrDigit(character) ? char.ToLowerInvariant(character) : '-');
+        }
+
+        return builder.ToString().Trim('-');
+    }
+
     private static void RestoreRegistryEntry(RegistryBackupEntry entry, List<string> log)
     {
         var root = entry.Root == "HKLM" ? Registry.LocalMachine : Registry.CurrentUser;
@@ -504,6 +1167,99 @@ internal sealed class BackupService
         catch (Exception ex)
         {
             log.Add($"Falha ao restaurar {entry.Root}\\{entry.Path}\\{entry.Name}: {ex.Message}");
+        }
+    }
+
+    private static void RestoreRegistrySnapshot(RegistryValueSnapshot entry, List<string> log)
+    {
+        var root = entry.Root == "HKLM" ? Registry.LocalMachine : Registry.CurrentUser;
+
+        try
+        {
+            if (!entry.Exists)
+            {
+                RegistryService.DeleteValue(root, entry.Path, entry.Name);
+                log.Add($"Removido valor criado pela sessao: {entry.Root}\\{entry.Path}\\{entry.Name}");
+                return;
+            }
+
+            if (entry.Kind == RegistryValueKind.DWord.ToString() && int.TryParse(entry.Value, out var dword))
+            {
+                RegistryService.SetDword(root, entry.Path, entry.Name, dword);
+            }
+            else if (entry.Kind == RegistryValueKind.QWord.ToString() && long.TryParse(entry.Value, out var qword))
+            {
+                using var key = root.CreateSubKey(entry.Path);
+                key?.SetValue(entry.Name, qword, RegistryValueKind.QWord);
+            }
+            else if (entry.Kind == RegistryValueKind.Binary.ToString() && entry.ValueBase64 is not null)
+            {
+                using var key = root.CreateSubKey(entry.Path);
+                key?.SetValue(entry.Name, Convert.FromBase64String(entry.ValueBase64), RegistryValueKind.Binary);
+            }
+            else
+            {
+                RegistryService.SetString(root, entry.Path, entry.Name, entry.Value ?? string.Empty);
+            }
+
+            log.Add($"Restaurado snapshot real: {entry.Root}\\{entry.Path}\\{entry.Name}");
+        }
+        catch (Exception ex)
+        {
+            log.Add($"Falha ao restaurar snapshot {entry.Root}\\{entry.Path}\\{entry.Name}: {ex.Message}");
+        }
+    }
+
+    private static void RestoreProcessSnapshot(ProcessStateSnapshot entry, List<string> log)
+    {
+        try
+        {
+            using var process = Process.GetProcessById(entry.ProcessId);
+
+            if (!string.Equals(process.ProcessName, entry.ProcessName, StringComparison.OrdinalIgnoreCase))
+            {
+                log.Add($"Processo {entry.ProcessName} ({entry.ProcessId}) mudou de identidade; rollback de afinidade ignorado.");
+                return;
+            }
+
+            if (entry.StartTimeUtc.HasValue)
+            {
+                DateTime? currentStartTimeUtc = null;
+                try
+                {
+                    currentStartTimeUtc = process.StartTime.ToUniversalTime();
+                }
+                catch
+                {
+                    // If StartTime is blocked now, fall back to PID/name only.
+                }
+
+                if (currentStartTimeUtc.HasValue && currentStartTimeUtc.Value != entry.StartTimeUtc.Value)
+                {
+                    log.Add($"PID reutilizado para {entry.ProcessName}; rollback de processo ignorado para evitar tocar no processo errado.");
+                    return;
+                }
+            }
+
+            if (entry.AffinityMask.HasValue && entry.AffinityMask.Value > 0)
+            {
+                process.ProcessorAffinity = new IntPtr(entry.AffinityMask.Value);
+            }
+
+            if (entry.PriorityClass.HasValue)
+            {
+                process.PriorityClass = (ProcessPriorityClass)entry.PriorityClass.Value;
+            }
+
+            log.Add($"Estado de processo restaurado: {entry.ProcessName} ({entry.ProcessId}).");
+        }
+        catch (ArgumentException)
+        {
+            log.Add($"Processo {entry.ProcessName} ({entry.ProcessId}) nao esta mais em execucao; rollback de afinidade nao foi necessario.");
+        }
+        catch (Exception ex)
+        {
+            log.Add($"Falha ao restaurar estado de processo {entry.ProcessName} ({entry.ProcessId}): {ex.Message}");
         }
     }
 }

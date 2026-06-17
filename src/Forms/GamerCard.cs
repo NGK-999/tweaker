@@ -1,4 +1,4 @@
-using System.Drawing;
+﻿using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.ComponentModel;
 using System.Windows.Forms;
@@ -7,8 +7,8 @@ namespace Renomeador.Forms;
 
 internal sealed class GamerCard : Panel
 {
-    private static readonly Color CardBack = Color.FromArgb(17, 22, 34);
-    private static readonly Color CardBorder = Color.FromArgb(31, 41, 61);
+    private static readonly Color CardBack = Color.FromArgb(26, 31, 44);
+    private static readonly Color CardBorder = Color.FromArgb(42, 50, 66);
 
     public GamerCard()
     {

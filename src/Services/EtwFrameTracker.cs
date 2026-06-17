@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
@@ -13,13 +14,14 @@ internal sealed class EtwFrameTracker : IDisposable
     private const string SessionPrefix = "ApexTweaker-DxgKrnl-";
     private readonly HardwareTelemetryService telemetryService;
     private readonly object sync = new();
+    private readonly ConcurrentDictionary<int, bool> rejectedProcessCache = new();
 
     private TraceEventSession? session;
     private CancellationTokenSource? cancellation;
     private Task? processingTask;
-    private long lastPresentTimestamp;
+    private long lastPresentTimestampTicks;
+    private int lastTrackedProcessId;
     private bool disposed;
-    private static readonly double StopwatchTickToMilliseconds = 1000d / Stopwatch.Frequency;
 
     public EtwFrameTracker(HardwareTelemetryService telemetryService)
     {
@@ -40,7 +42,9 @@ internal sealed class EtwFrameTracker : IDisposable
         }
 
         cancellation = new CancellationTokenSource();
-        Interlocked.Exchange(ref lastPresentTimestamp, 0);
+        Interlocked.Exchange(ref lastPresentTimestampTicks, 0);
+        Interlocked.Exchange(ref lastTrackedProcessId, 0);
+        rejectedProcessCache.Clear();
 
         processingTask = Task.Run(() => RunTraceSession(cancellation.Token), cancellation.Token);
     }
@@ -77,6 +81,9 @@ internal sealed class EtwFrameTracker : IDisposable
         cancellation.Dispose();
         cancellation = null;
         processingTask = null;
+        Interlocked.Exchange(ref lastPresentTimestampTicks, 0);
+        Interlocked.Exchange(ref lastTrackedProcessId, 0);
+        rejectedProcessCache.Clear();
     }
 
     public void Dispose()
@@ -109,6 +116,7 @@ internal sealed class EtwFrameTracker : IDisposable
         cancellation?.Dispose();
         cancellation = null;
         processingTask = null;
+        rejectedProcessCache.Clear();
         disposed = true;
     }
 
@@ -139,6 +147,7 @@ internal sealed class EtwFrameTracker : IDisposable
             traceSession.EnableProvider(DxgKrnlProvider, TraceEventLevel.Informational, ulong.MaxValue);
             traceSession.Source.Dynamic.AddCallbackForProviderEvent(DxgKrnlProvider, "Present", OnDxgKrnlEvent);
             traceSession.Source.Dynamic.AddCallbackForProviderEvent(DxgKrnlProvider, "PresentMPO", OnDxgKrnlEvent);
+            traceSession.Source.Dynamic.AddCallbackForProviderEvent(DxgKrnlProvider, "PresentHistory", OnDxgKrnlEvent);
             traceSession.Source.Process();
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -170,19 +179,102 @@ internal sealed class EtwFrameTracker : IDisposable
 
     private void OnDxgKrnlEvent(TraceEvent data)
     {
-        var timestamp = Stopwatch.GetTimestamp();
-        var previous = Interlocked.Exchange(ref lastPresentTimestamp, timestamp);
-        if (previous == 0)
+        var targetProcessId = telemetryService.MonitoredProcessId;
+        if (targetProcessId <= 0)
         {
             return;
         }
 
-        var frametimeMs = (timestamp - previous) * StopwatchTickToMilliseconds;
+        var eventProcessId = ResolveEventProcessId(data);
+        if (eventProcessId <= 0 || eventProcessId != targetProcessId)
+        {
+            return;
+        }
+
+        if (IsRejectedNoiseProcess(eventProcessId))
+        {
+            return;
+        }
+
+        var previousTrackedProcessId = Interlocked.Exchange(ref lastTrackedProcessId, targetProcessId);
+        var eventTimestampUtcTicks = data.TimeStamp.ToUniversalTime().Ticks;
+
+        if (previousTrackedProcessId != targetProcessId)
+        {
+            Interlocked.Exchange(ref lastPresentTimestampTicks, eventTimestampUtcTicks);
+            return;
+        }
+
+        var previousTimestampTicks = Interlocked.Exchange(ref lastPresentTimestampTicks, eventTimestampUtcTicks);
+        if (previousTimestampTicks == 0)
+        {
+            return;
+        }
+
+        var frametimeMs = (eventTimestampUtcTicks - previousTimestampTicks) / (double)TimeSpan.TicksPerMillisecond;
         if (frametimeMs is < 0.1 or > 1000)
         {
             return;
         }
 
         telemetryService.RegisterFrametimeSample(frametimeMs);
+    }
+
+    private static int ResolveEventProcessId(TraceEvent data)
+    {
+        if (data.ProcessID > 0)
+        {
+            return data.ProcessID;
+        }
+
+        for (var index = 0; index < data.PayloadNames.Length; index++)
+        {
+            var payloadName = data.PayloadNames[index];
+            if (!payloadName.Equals("ProcessId", StringComparison.OrdinalIgnoreCase) &&
+                !payloadName.Equals("ProcessID", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            try
+            {
+                var payloadValue = data.PayloadValue(index);
+                if (payloadValue is null)
+                {
+                    continue;
+                }
+
+                return Convert.ToInt32(payloadValue, System.Globalization.CultureInfo.InvariantCulture);
+            }
+            catch
+            {
+                return 0;
+            }
+        }
+
+        return 0;
+    }
+
+    private bool IsRejectedNoiseProcess(int processId)
+    {
+        return rejectedProcessCache.GetOrAdd(processId, static pid =>
+        {
+            try
+            {
+                using var process = Process.GetProcessById(pid);
+                var name = process.ProcessName;
+                return name.Equals("dwm", StringComparison.OrdinalIgnoreCase) ||
+                       name.Equals("discord", StringComparison.OrdinalIgnoreCase) ||
+                       name.Equals("discordcanary", StringComparison.OrdinalIgnoreCase) ||
+                       name.Equals("discordptb", StringComparison.OrdinalIgnoreCase) ||
+                       name.Equals("gamebar", StringComparison.OrdinalIgnoreCase) ||
+                       name.Equals("gamebarftserver", StringComparison.OrdinalIgnoreCase) ||
+                       name.Equals("gamebarpresencewriter", StringComparison.OrdinalIgnoreCase);
+            }
+            catch
+            {
+                return false;
+            }
+        });
     }
 }
