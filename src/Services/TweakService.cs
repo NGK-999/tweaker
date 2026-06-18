@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.RegularExpressions;
+using System.Runtime.InteropServices;
 using ApexTweaker.Core.Pipeline;
 using Microsoft.Win32;
 using Renomeador.Infrastructure;
@@ -16,7 +17,11 @@ internal sealed class TweakService
     private const string GameBarPath = @"Software\Microsoft\GameBar";
     private const string GameConfigStorePath = @"System\GameConfigStore";
     private const string GameDvrPath = @"Software\Microsoft\Windows\CurrentVersion\GameDVR";
+    private const string EdgePoliciesPath = @"SOFTWARE\Policies\Microsoft\Edge";
     private const string DwmPath = @"SOFTWARE\Microsoft\Windows\Dwm";
+    private const string DesktopPath = @"Control Panel\Desktop";
+    private const string WindowMetricsPath = @"Control Panel\Desktop\WindowMetrics";
+    private const string ThemesPersonalizePath = @"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize";
     private const string MemoryManagementPath = @"SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management";
     private const string PriorityControlPath = @"SYSTEM\CurrentControlSet\Control\PriorityControl";
     private const string CoreParkingMinCoresPowerSettingPath = @"SYSTEM\CurrentControlSet\Control\Power\PowerSettings\54533251-82be-4824-96c1-47b60b740d00\0cc5b647-c1df-4637-891a-dec35c318583";
@@ -272,19 +277,14 @@ internal sealed class TweakService
 
             if (!ultimateAvailable)
             {
-                if (WindowsPowerModeService.TryApplyBestPerformanceOverlay(out _, out _))
-                {
-                    log.Add("Desempenho Maximo legado indisponivel. Windows 11 Power Mode ajustado para Best Performance.");
-                }
-                else
-                {
-                    log.Add("[INFO] GUID de energia legado nao suportado nesta CPU, mantendo Thread Director nativo.");
-                }
-
-                return log;
+                log.Add("[INFO] Plano Desempenho Máximo legado não está exposto neste Windows. O ApexTweaker vai reforçar o Power Mode moderno.");
+            }
+            else
+            {
+                RunPowercfgSetting($"-setactive {UltimatePerformanceGuid}", "Plano Desempenho Máximo ativado.", log);
             }
 
-            RunPowercfgSetting($"-setactive {UltimatePerformanceGuid}", "Plano Desempenho Maximo ativado.", log);
+            ApplyModernBestPerformanceOverlay(log);
         }
         catch (Exception ex)
         {
@@ -459,12 +459,13 @@ internal sealed class TweakService
     {
         return RunMutationPipeline("Background", () =>
         {
-            var log = new List<string> { "Background: reduzindo capturas e overlays do Windows." };
+            var log = new List<string> { "Background: reduzindo capturas, preload do Edge e overlays do Windows." };
 
             log.AddRange(ApplyGameModeAndGameDvrTweaks());
+            log.AddRange(ApplyEdgeNoiseReduction());
             TrySetDword(Registry.CurrentUser, GameBarPath, "ShowStartupPanel", 0, "Painel inicial do Game Bar desativado.", log);
             TrySetDword(Registry.CurrentUser, GameBarPath, "UseNexusForGameBarEnabled", 0, "Atalho/overlay Nexus do Game Bar desativado.", log);
-            log.Add("Capturas/paineis do Game Bar reduzidos. O app nao remove Game Bar nem desativa Defender.");
+            log.Add("Capturas, paineis do Game Bar e preload do Edge reduzidos. O app nao remove Defender nem interfere no anti-cheat.");
 
             return log;
         });
@@ -510,6 +511,7 @@ internal sealed class TweakService
             TrySetDword(Registry.CurrentUser, @"Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager", "SubscribedContent-353698Enabled", 0, "Sugestoes de configuracao desativadas.", log);
             TrySetDword(Registry.CurrentUser, @"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced", "ShowSyncProviderNotifications", 0, "Sugestoes/anuncios do Explorer desativados.", log);
             TrySetDword(Registry.CurrentUser, @"Software\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects", "VisualFXSetting", 2, "Efeitos visuais definidos para perfil customizado/leve.", log);
+            log.AddRange(ApplyPerceivedResponsivenessTweaks());
 
             DisableServiceIfPresent("DiagTrack", "Connected User Experiences and Telemetry", log);
             DisableServiceIfPresent("dmwappushservice", "WAP Push Message Routing", log);
@@ -692,6 +694,109 @@ internal sealed class TweakService
     {
         return mutationExecutor.Execute(command, log, ProtectedRegistryWarning);
     }
+
+    private IReadOnlyList<string> ApplyPerceivedResponsivenessTweaks()
+    {
+        var log = new List<string>
+        {
+            "Responsividade visual: removendo atrasos de menu, animações e transparência para deixar o Windows mais seco."
+        };
+
+        TrySetString(Registry.CurrentUser, DesktopPath, "MenuShowDelay", "0", "MenuShowDelay=0: menus/contexto respondem sem atraso artificial.", log);
+        TrySetString(Registry.CurrentUser, WindowMetricsPath, "MinAnimate", "0", "MinAnimate=0: animações de minimizar/maximizar desativadas.", log);
+        TrySetDword(Registry.CurrentUser, @"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced", "TaskbarAnimations", 0, "TaskbarAnimations=0: barra de tarefas com menos transições.", log);
+        TrySetDword(Registry.CurrentUser, ThemesPersonalizePath, "EnableTransparency", 0, "EnableTransparency=0: transparência desligada para reduzir ruído visual e composição.", log);
+
+        if (BroadcastUserPreferenceChanges())
+        {
+            log.Add("Atualização visual notificada ao shell do Windows para aplicar parte das mudanças imediatamente.");
+        }
+        else
+        {
+            log.Add("[INFO] Parte das alterações visuais pode exigir sair da conta ou reiniciar o Explorer.");
+        }
+
+        return log;
+    }
+
+    private IReadOnlyList<string> ApplyEdgeNoiseReduction()
+    {
+        var log = new List<string>
+        {
+            "Edge: desativando Startup Boost e execução em segundo plano para reduzir preload no boot e ruído residente."
+        };
+
+        TrySetDword(Registry.LocalMachine, EdgePoliciesPath, "StartupBoostEnabled", 0, "Microsoft Edge Startup Boost desativado.", log);
+        TrySetDword(Registry.LocalMachine, EdgePoliciesPath, "BackgroundModeEnabled", 0, "Microsoft Edge impedido de continuar em segundo plano após fechar.", log);
+
+        return log;
+    }
+
+    private static void ApplyModernBestPerformanceOverlay(List<string> log)
+    {
+        if (WindowsPowerModeService.TryApplyBestPerformanceOverlay(out var actualState, out var diagnostic))
+        {
+            log.Add($"Windows 11 Power Mode ajustado para Best Performance ({actualState}).");
+            return;
+        }
+
+        if (WindowsPowerModeService.TryReadConfiguredPowerModes(out var acModeGuid, out var dcModeGuid, out _))
+        {
+            log.Add($"[INFO] Power Mode moderno preservado em {WindowsPowerModeService.FormatConfiguredPowerModes(acModeGuid, dcModeGuid)}. Detalhe: {diagnostic}");
+            return;
+        }
+
+        log.Add($"[INFO] Power Mode moderno indisponível neste hardware/Windows. Detalhe: {diagnostic}");
+    }
+
+    private static bool BroadcastUserPreferenceChanges()
+    {
+        try
+        {
+            var resultOne = SendMessageTimeout(
+                BroadcastHandle,
+                WindowSettingChange,
+                IntPtr.Zero,
+                "WindowMetrics",
+                SendMessageTimeoutFlags.AbortIfHung,
+                150,
+                out _);
+
+            var resultTwo = SendMessageTimeout(
+                BroadcastHandle,
+                WindowSettingChange,
+                IntPtr.Zero,
+                "ImmersiveColorSet",
+                SendMessageTimeoutFlags.AbortIfHung,
+                150,
+                out _);
+
+            return resultOne != IntPtr.Zero || resultTwo != IntPtr.Zero;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static readonly IntPtr BroadcastHandle = new(0xffff);
+    private const int WindowSettingChange = 0x001A;
+
+    [Flags]
+    private enum SendMessageTimeoutFlags : uint
+    {
+        AbortIfHung = 0x0002
+    }
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern IntPtr SendMessageTimeout(
+        IntPtr hWnd,
+        int msg,
+        IntPtr wParam,
+        string lParam,
+        SendMessageTimeoutFlags flags,
+        uint timeout,
+        out IntPtr result);
 
     private void DisableFullscreenOptimizations(string exePath, List<string> log)
     {

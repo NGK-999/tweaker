@@ -13,6 +13,14 @@ namespace Renomeador.Services;
 
 internal sealed class SystemDiagnosticsService
 {
+    private const string GraphicsDriversPath = @"SYSTEM\CurrentControlSet\Control\GraphicsDrivers";
+    private const string DwmPath = @"SOFTWARE\Microsoft\Windows\Dwm";
+    private const string EdgePoliciesPath = @"SOFTWARE\Policies\Microsoft\Edge";
+    private const string AppPrivacyPoliciesPath = @"SOFTWARE\Policies\Microsoft\Windows\AppPrivacy";
+    private const string DeliveryOptimizationConfigPath = @"SOFTWARE\Microsoft\Windows\CurrentVersion\DeliveryOptimization\Config";
+    private const string DesktopPath = @"Control Panel\Desktop";
+    private const string WindowMetricsPath = @"Control Panel\Desktop\WindowMetrics";
+    private const string ThemesPersonalizePath = @"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize";
     private readonly CommandRunner commandRunner = new();
     private readonly OptimizationEngine optimizationEngine = new();
 
@@ -34,8 +42,19 @@ internal sealed class SystemDiagnosticsService
             $"Classificacao: {FormatTier(recommendation.Tier)}",
             $"Preset recomendado: {FormatPreset(recommendation.RecommendedPreset)}",
             $"Motivo: {recommendation.Reason}",
+            $"Power Mode overlay: {GetCurrentPowerModeOverlay()}",
             $"Game Mode: {RegistryService.GetDword(Registry.CurrentUser, @"Software\Microsoft\GameBar", "AutoGameModeEnabled", 0)}",
             $"Game DVR: {RegistryService.GetDword(Registry.CurrentUser, @"System\GameConfigStore", "GameDVR_Enabled", 1)}",
+            $"HAGS solicitado: {FormatRequestedState(RegistryService.GetDword(Registry.LocalMachine, GraphicsDriversPath, "HwSchMode", -1), 2)}",
+            $"MPO fix: {FormatRequestedState(RegistryService.GetDword(Registry.LocalMachine, DwmPath, "OverlayTestMode", -1), 5)}",
+            $"Edge Startup Boost: {FormatDisabledState(RegistryService.GetDword(Registry.LocalMachine, EdgePoliciesPath, "StartupBoostEnabled", -1))}",
+            $"Edge em segundo plano: {FormatDisabledState(RegistryService.GetDword(Registry.LocalMachine, EdgePoliciesPath, "BackgroundModeEnabled", -1))}",
+            $"MenuShowDelay: {FormatStringState(ReadStringOrDefault(Registry.CurrentUser, DesktopPath, "MenuShowDelay"), "0")}",
+            $"Animacao de janela: {FormatStringState(ReadStringOrDefault(Registry.CurrentUser, WindowMetricsPath, "MinAnimate"), "0", disabledLabel: "desativada")}",
+            $"Animacao da taskbar: {FormatRequestedState(RegistryService.GetDword(Registry.CurrentUser, @"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced", "TaskbarAnimations", -1), 0, appliedLabel: "desativada")}",
+            $"Transparencia: {FormatRequestedState(RegistryService.GetDword(Registry.CurrentUser, ThemesPersonalizePath, "EnableTransparency", -1), 0, appliedLabel: "desativada")}",
+            $"Apps UWP em background: {FormatRequestedState(RegistryService.GetDword(Registry.LocalMachine, AppPrivacyPoliciesPath, "LetAppsRunInBackground", -1), 2)}",
+            $"Delivery Optimization: {FormatRequestedState(RegistryService.GetDword(Registry.LocalMachine, DeliveryOptimizationConfigPath, "DODownloadMode", -1), 0)}",
             $"VBS configurado: {RegistryService.GetDword(Registry.LocalMachine, @"SYSTEM\CurrentControlSet\Control\DeviceGuard", "EnableVirtualizationBasedSecurity", -1)}",
             $"Secure Boot: {RunPowerShellScalar("Confirm-SecureBootUEFI")}",
             $"TPM: {RunPowerShellScalar("(Get-Tpm).TpmPresent")}"
@@ -236,6 +255,64 @@ internal sealed class SystemDiagnosticsService
             PresetKind.Extreme => "Preset extremo",
             _ => "Preset competitivo"
         };
+    }
+
+    private static string GetCurrentPowerModeOverlay()
+    {
+        if (!WindowsPowerModeService.TryReadConfiguredPowerModes(out var acModeGuid, out var dcModeGuid, out _))
+        {
+            return "indisponível";
+        }
+
+        if (WindowsPowerModeService.IsBestPerformanceConfigured(acModeGuid, dcModeGuid))
+        {
+            return "Best Performance";
+        }
+
+        return WindowsPowerModeService.FormatConfiguredPowerModes(acModeGuid, dcModeGuid);
+    }
+
+    private static string FormatRequestedState(int actualValue, int expectedValue, string appliedLabel = "aplicado")
+    {
+        if (actualValue < 0)
+        {
+            return "indisponível";
+        }
+
+        return actualValue == expectedValue
+            ? $"{appliedLabel} ({actualValue})"
+            : $"fora do perfil ({actualValue})";
+    }
+
+    private static string FormatDisabledState(int actualValue)
+    {
+        if (actualValue < 0)
+        {
+            return "indisponível";
+        }
+
+        return actualValue == 0
+            ? "desativado"
+            : $"ativo ({actualValue})";
+    }
+
+    private static string ReadStringOrDefault(RegistryKey root, string path, string name)
+    {
+        return RegistryService.TryReadString(root, path, name, out var value) && !string.IsNullOrWhiteSpace(value)
+            ? value
+            : "indisponível";
+    }
+
+    private static string FormatStringState(string value, string expectedValue, string disabledLabel = "aplicado")
+    {
+        if (string.Equals(value, "indisponível", StringComparison.OrdinalIgnoreCase))
+        {
+            return value;
+        }
+
+        return string.Equals(value, expectedValue, StringComparison.Ordinal)
+            ? $"{disabledLabel} ({value})"
+            : $"fora do perfil ({value})";
     }
 
     private const int EnumCurrentSettings = -1;

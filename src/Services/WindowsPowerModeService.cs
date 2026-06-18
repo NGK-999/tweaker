@@ -25,21 +25,14 @@ internal static class WindowsPowerModeService
 
     public static string BestPerformanceGuidText => BestPerformanceModeGuid.ToString();
 
-    public static bool TryApplyBestPerformanceOverlay(out string actualState, out string diagnostic)
+    public static bool TryReadConfiguredPowerModes(out Guid acModeGuid, out Guid? dcModeGuid, out string diagnostic)
     {
-        actualState = string.Empty;
+        acModeGuid = Guid.Empty;
+        dcModeGuid = null;
         diagnostic = string.Empty;
 
         try
         {
-            var requestedAcMode = BestPerformanceModeGuid;
-            var acSetStatus = PowerSetUserConfiguredACPowerMode(ref requestedAcMode);
-            if (acSetStatus != 0)
-            {
-                diagnostic = $"PowerSetUserConfiguredACPowerMode retornou 0x{acSetStatus:X8}.";
-                return false;
-            }
-
             var acReadStatus = PowerGetUserConfiguredACPowerMode(out var actualAcMode);
             if (acReadStatus != 0)
             {
@@ -47,29 +40,17 @@ internal static class WindowsPowerModeService
                 return false;
             }
 
-            var requestedDcMode = BestPerformanceModeGuid;
-            var dcSetStatus = PowerSetUserConfiguredDCPowerMode(ref requestedDcMode);
+            acModeGuid = actualAcMode;
+
             var dcReadStatus = PowerGetUserConfiguredDCPowerMode(out var actualDcMode);
-
-            actualState = dcReadStatus == 0
-                ? $"AC={actualAcMode} | DC={actualDcMode}"
-                : $"AC={actualAcMode}";
-
-            if (actualAcMode != BestPerformanceModeGuid)
+            if (dcReadStatus == 0)
             {
-                diagnostic = $"Power Mode AC retornou {actualAcMode}, esperado {BestPerformanceModeGuid}.";
-                return false;
+                dcModeGuid = actualDcMode;
             }
 
-            if (dcSetStatus == 0 && dcReadStatus == 0 && actualDcMode != BestPerformanceModeGuid)
-            {
-                diagnostic = $"Power Mode DC retornou {actualDcMode}, esperado {BestPerformanceModeGuid}.";
-                return false;
-            }
-
-            diagnostic = dcSetStatus == 0
-                ? "Windows 11 Power Mode ajustado para Best Performance em AC/DC."
-                : $"Windows 11 Power Mode ajustado para Best Performance em AC. DC retornou 0x{dcSetStatus:X8}.";
+            diagnostic = dcReadStatus == 0
+                ? "Power Mode AC/DC lido com sucesso."
+                : $"Power Mode AC lido com sucesso. DC retornou 0x{dcReadStatus:X8}.";
             return true;
         }
         catch (DllNotFoundException ex)
@@ -87,6 +68,78 @@ internal static class WindowsPowerModeService
             diagnostic = ex.Message;
             return false;
         }
+    }
+
+    public static bool TryApplyBestPerformanceOverlay(out string actualState, out string diagnostic)
+    {
+        actualState = string.Empty;
+        diagnostic = string.Empty;
+
+        try
+        {
+            var requestedAcMode = BestPerformanceModeGuid;
+            var acSetStatus = PowerSetUserConfiguredACPowerMode(ref requestedAcMode);
+            if (acSetStatus != 0)
+            {
+                diagnostic = $"PowerSetUserConfiguredACPowerMode retornou 0x{acSetStatus:X8}.";
+                return false;
+            }
+
+            if (!TryReadConfiguredPowerModes(out var actualAcMode, out var actualDcMode, out diagnostic))
+            {
+                return false;
+            }
+
+            var requestedDcMode = BestPerformanceModeGuid;
+            var dcSetStatus = PowerSetUserConfiguredDCPowerMode(ref requestedDcMode);
+            _ = TryReadConfiguredPowerModes(out actualAcMode, out actualDcMode, out var readBackDiagnostic);
+            actualState = FormatConfiguredPowerModes(actualAcMode, actualDcMode);
+
+            if (actualAcMode != BestPerformanceModeGuid)
+            {
+                diagnostic = $"Power Mode AC retornou {actualAcMode}, esperado {BestPerformanceModeGuid}.";
+                return false;
+            }
+
+            if (dcSetStatus == 0 && actualDcMode.HasValue && actualDcMode.Value != BestPerformanceModeGuid)
+            {
+                diagnostic = $"Power Mode DC retornou {actualDcMode.Value}, esperado {BestPerformanceModeGuid}.";
+                return false;
+            }
+
+            diagnostic = dcSetStatus == 0
+                ? "Windows 11 Power Mode ajustado para Best Performance em AC/DC."
+                : $"Windows 11 Power Mode ajustado para Best Performance em AC. DC retornou 0x{dcSetStatus:X8}. {readBackDiagnostic}";
+            return true;
+        }
+        catch (DllNotFoundException ex)
+        {
+            diagnostic = ex.Message;
+            return false;
+        }
+        catch (EntryPointNotFoundException ex)
+        {
+            diagnostic = ex.Message;
+            return false;
+        }
+        catch (Exception ex)
+        {
+            diagnostic = ex.Message;
+            return false;
+        }
+    }
+
+    public static bool IsBestPerformanceConfigured(Guid acModeGuid, Guid? dcModeGuid)
+    {
+        return acModeGuid == BestPerformanceModeGuid &&
+               (!dcModeGuid.HasValue || dcModeGuid.Value == BestPerformanceModeGuid);
+    }
+
+    public static string FormatConfiguredPowerModes(Guid acModeGuid, Guid? dcModeGuid)
+    {
+        return dcModeGuid.HasValue
+            ? $"AC={acModeGuid} | DC={dcModeGuid.Value}"
+            : $"AC={acModeGuid}";
     }
 
     public static bool IsLegacyPowercfgSettingUnsupported(string? output)
