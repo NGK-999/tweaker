@@ -47,6 +47,13 @@ internal sealed record ProcessStateSnapshot(
     int? PriorityClass,
     int Sequence);
 
+internal sealed record CommandStateSnapshot(
+    string SnapshotId,
+    string RestoreHandler,
+    bool Exists,
+    string? Value,
+    int Sequence);
+
 internal sealed record TweakMutationSession(
     DateTime CreatedAtUtc,
     string OperationName,
@@ -57,8 +64,11 @@ internal sealed record TweakMutationSession(
     IReadOnlyList<PowerSettingSnapshot>? PowerSettingSnapshots,
     PowerSchemeSnapshot? PowerSnapshot,
     IReadOnlyList<ProcessStateSnapshot>? ProcessSnapshots,
+    IReadOnlyList<CommandStateSnapshot>? CommandSnapshots,
     string Status,
-    DateTime? RestoredAtUtc);
+    DateTime? RestoredAtUtc,
+    string? FailedCommandName,
+    string? FailureMessage);
 
 internal sealed class MutationSession
 {
@@ -73,6 +83,7 @@ internal sealed class MutationSession
         ServiceSnapshots = new Dictionary<string, ServiceStateSnapshot>(StringComparer.OrdinalIgnoreCase);
         PowerSettingSnapshots = new Dictionary<string, PowerSettingSnapshot>(StringComparer.OrdinalIgnoreCase);
         ProcessSnapshots = new Dictionary<string, ProcessStateSnapshot>(StringComparer.OrdinalIgnoreCase);
+        CommandSnapshots = new Dictionary<string, CommandStateSnapshot>(StringComparer.OrdinalIgnoreCase);
     }
 
     public DateTime CreatedAtUtc { get; }
@@ -91,20 +102,23 @@ internal sealed class MutationSession
 
     public Dictionary<string, ProcessStateSnapshot> ProcessSnapshots { get; }
 
+    public Dictionary<string, CommandStateSnapshot> CommandSnapshots { get; }
+
     public bool HasSnapshots =>
         RegistrySnapshots.Count > 0 ||
         BcdSnapshots.Count > 0 ||
         ServiceSnapshots.Count > 0 ||
         PowerSettingSnapshots.Count > 0 ||
         PowerSnapshot is not null ||
-        ProcessSnapshots.Count > 0;
+        ProcessSnapshots.Count > 0 ||
+        CommandSnapshots.Count > 0;
 
     public int NextSequence()
     {
         return Interlocked.Increment(ref sequence);
     }
 
-    public TweakMutationSession ToRecord(bool completed)
+    public TweakMutationSession ToRecord(bool completed, string? failedCommandName = null, string? failureMessage = null)
     {
         return new TweakMutationSession(
             CreatedAtUtc,
@@ -116,7 +130,10 @@ internal sealed class MutationSession
             [.. PowerSettingSnapshots.Values],
             PowerSnapshot,
             [.. ProcessSnapshots.Values],
+            [.. CommandSnapshots.Values],
             "Pending",
-            null);
+            null,
+            failedCommandName,
+            failureMessage);
     }
 }

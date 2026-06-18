@@ -17,6 +17,8 @@ internal sealed class BackupService
 {
     private const string PendingLedgerStatus = "Pending";
     private const string RestoredLedgerStatus = "Restored";
+    private const string MemoryCompressionRestoreHandler = "MMAgent.MemoryCompression";
+    private const string EdgeRemovalRestoreHandler = "MicrosoftEdge.SystemLevelRemoval";
     private readonly CommandRunner commandRunner = new();
     private Dictionary<string, string>? powerAliasCache;
 
@@ -257,7 +259,30 @@ internal sealed class BackupService
             session.NextSequence());
     }
 
-    public IReadOnlyList<string> CommitMutationSession(MutationSession session, bool completed)
+    public void CaptureCommandState(
+        MutationSession session,
+        string snapshotId,
+        string restoreHandler,
+        string? value)
+    {
+        if (session.CommandSnapshots.ContainsKey(snapshotId))
+        {
+            return;
+        }
+
+        session.CommandSnapshots[snapshotId] = new CommandStateSnapshot(
+            snapshotId,
+            restoreHandler,
+            value is not null,
+            value,
+            session.NextSequence());
+    }
+
+    public IReadOnlyList<string> CommitMutationSession(
+        MutationSession session,
+        bool completed,
+        string? failedCommandName = null,
+        string? failureMessage = null)
     {
         Directory.CreateDirectory(BackupDirectory);
         if (!session.HasSnapshots)
@@ -265,9 +290,9 @@ internal sealed class BackupService
             return ["Pipeline concluido sem snapshots persistentes."];
         }
 
-        var record = session.ToRecord(completed);
-        var fileName = $"mutation-{record.CreatedAtUtc:yyyyMMdd-HHmmss}-{SanitizeFileNameFragment(record.OperationName)}.json";
-        var path = Path.Combine(BackupDirectory, fileName);
+        var record = session.ToRecord(completed, failedCommandName, failureMessage);
+        var fileNameBase = $"mutation-{record.CreatedAtUtc:yyyyMMdd-HHmmss-fff}-{SanitizeFileNameFragment(record.OperationName)}";
+        var path = BuildUniqueMutationLedgerPath(fileNameBase);
         var json = JsonSerializer.Serialize(record, new JsonSerializerOptions { WriteIndented = true });
         File.WriteAllText(path, json);
 
@@ -277,6 +302,25 @@ internal sealed class BackupService
                 ? $"Snapshot real persistido: {path}"
                 : $"Snapshot parcial persistido apos falha/interrupcao: {path}"
         ];
+    }
+
+    private string BuildUniqueMutationLedgerPath(string fileNameBase)
+    {
+        var candidatePath = Path.Combine(BackupDirectory, $"{fileNameBase}.json");
+        if (!File.Exists(candidatePath))
+        {
+            return candidatePath;
+        }
+
+        var suffix = 1;
+        do
+        {
+            candidatePath = Path.Combine(BackupDirectory, $"{fileNameBase}-{suffix.ToString(CultureInfo.InvariantCulture)}.json");
+            suffix++;
+        }
+        while (File.Exists(candidatePath));
+
+        return candidatePath;
     }
 
     public IReadOnlyList<string> RestoreLatestMutationSession()
@@ -721,6 +765,11 @@ internal sealed class BackupService
             actions.Add((entry.Sequence, log => RestoreProcessSnapshot(entry, log)));
         }
 
+        foreach (var entry in session.CommandSnapshots ?? Array.Empty<CommandStateSnapshot>())
+        {
+            actions.Add((entry.Sequence, log => RestoreCommandSnapshot(entry, log)));
+        }
+
         if (session.PowerSnapshot is not null)
         {
             actions.Add((session.PowerSnapshot.Sequence, log => RestorePowerSnapshot(session.PowerSnapshot, log)));
@@ -829,6 +878,59 @@ internal sealed class BackupService
             : $"Falha ao restaurar energia {snapshot.SettingGuid}: {result.Output}");
     }
 
+    private static void RestoreCommandSnapshot(CommandStateSnapshot snapshot, List<string> log)
+    {
+        switch (snapshot.RestoreHandler)
+        {
+            case MemoryCompressionRestoreHandler:
+                RestoreMemoryCompressionSnapshot(snapshot, log);
+                return;
+            case EdgeRemovalRestoreHandler:
+                RestoreEdgeRemovalSnapshot(snapshot, log);
+                return;
+            default:
+                log.Add($"Snapshot de comando sem rotina de restore registrada: {snapshot.SnapshotId} ({snapshot.RestoreHandler}).");
+                return;
+        }
+    }
+
+    private static void RestoreMemoryCompressionSnapshot(CommandStateSnapshot snapshot, List<string> log)
+    {
+        if (!snapshot.Exists || string.IsNullOrWhiteSpace(snapshot.Value))
+        {
+            log.Add("Snapshot de Compressao de Memoria estava vazio. Estado atual preservado.");
+            return;
+        }
+
+        var enableCompression = snapshot.Value.Equals("true", StringComparison.OrdinalIgnoreCase);
+        var script = enableCompression
+            ? "try { Enable-MMAgent -mc -ErrorAction Stop } catch { Enable-MMAgent -MemoryCompression -ErrorAction Stop }; (Get-MMAgent).MemoryCompression.ToString().ToLowerInvariant()"
+            : "try { Disable-MMAgent -mc -ErrorAction Stop } catch { Disable-MMAgent -MemoryCompression -ErrorAction Stop }; (Get-MMAgent).MemoryCompression.ToString().ToLowerInvariant()";
+
+        var result = RunPowerShellScalar(script);
+        var normalized = result.Trim();
+        if (string.Equals(normalized, snapshot.Value, StringComparison.OrdinalIgnoreCase))
+        {
+            log.Add($"Compressao de memoria restaurada para {snapshot.Value}.");
+            return;
+        }
+
+        log.Add($"Falha ao restaurar compressao de memoria. Esperado={snapshot.Value}, Atual={normalized}.");
+    }
+
+    private static void RestoreEdgeRemovalSnapshot(CommandStateSnapshot snapshot, List<string> log)
+    {
+        if (!snapshot.Exists)
+        {
+            log.Add("Snapshot de remocao do Edge indica que o binario ja nao existia. Nenhuma acao de rollback foi necessaria.");
+            return;
+        }
+
+        log.Add(
+            "Rollback do Microsoft Edge nao e deterministico por script. " +
+            "Use o Ponto de Restauracao do Windows criado antes da mutacao ou reinstale manualmente o Edge.");
+    }
+
     private void RestoreBcdEntry(BcdBackupEntry entry, List<string> log)
     {
         var arguments = entry.Exists && !string.IsNullOrWhiteSpace(entry.Value)
@@ -897,6 +999,21 @@ internal sealed class BackupService
         }
 
         return normalized;
+    }
+
+    private static string RunPowerShellScalar(string script)
+    {
+        var escapedScript = script.Replace("\"", "\\\"");
+        var result = new CommandRunner().Run(
+            "powershell.exe",
+            $"-NoProfile -ExecutionPolicy Bypass -Command \"[Console]::OutputEncoding=[System.Text.UTF8Encoding]::new($false); {escapedScript}\"");
+
+        if (result.ExitCode != 0)
+        {
+            throw new InvalidOperationException(result.Output);
+        }
+
+        return result.Output.Trim();
     }
 
     private static string? ParseServiceStartMode(string output)

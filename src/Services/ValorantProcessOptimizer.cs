@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
+using ApexTweaker.NativeInterop;
 using Renomeador.Models;
 
 namespace Renomeador.Services;
@@ -12,8 +13,10 @@ internal sealed class ValorantProcessOptimizer
 {
     private const uint ProcessQueryLimitedInformation = 0x1000;
     private const uint ProcessSetInformation = 0x0200;
-    private const uint RequiredProcessAccess = ProcessQueryLimitedInformation | ProcessSetInformation;
+    private const uint MonitorProcessAccess = ProcessQueryLimitedInformation;
+    private const uint MutationProcessAccess = ProcessQueryLimitedInformation | ProcessSetInformation;
     private const uint HighPriorityClass = 0x00000080;
+    private const int ErrorAccessDenied = 5;
 
     private static readonly string[] ValorantProcessNames =
     [
@@ -44,15 +47,18 @@ internal sealed class ValorantProcessOptimizer
         return Task.Run(async () =>
         {
             var attemptedProcessIds = new HashSet<int>();
-            var affinityMask = BuildAffinityMask(hardware);
+            var affinityPlan = ResolveAffinityPlan(hardware);
 
-            writeLog($"Monitor VALORANT iniciado em modo baixo privilegio. Mascara de afinidade: 0x{affinityMask.ToInt64():X}");
+            writeLog(
+                "Monitor VALORANT iniciado em modo de conformidade anti-cheat. " +
+                "O polling usa apenas PROCESS_QUERY_LIMITED_INFORMATION; " +
+                $"afinidade alvo: {affinityPlan.Description}");
 
             while (!cancellationToken.IsCancellationRequested)
             {
                 foreach (var processName in ValorantProcessNames)
                 {
-                    ApplyOptimizationToProcesses(processName, affinityMask, attemptedProcessIds, writeLog);
+                    ApplyOptimizationToProcesses(processName, affinityPlan, attemptedProcessIds, writeLog);
                 }
 
                 await Task.Delay(TimeSpan.FromSeconds(3), cancellationToken);
@@ -64,13 +70,13 @@ internal sealed class ValorantProcessOptimizer
     {
         var log = new List<string>();
         var attemptedProcessIds = new HashSet<int>();
-        var affinityMask = BuildAffinityMask(hardware);
+        var affinityPlan = ResolveAffinityPlan(hardware);
 
-        log.Add($"Mascara de afinidade calculada: 0x{affinityMask.ToInt64():X}");
+        log.Add($"Plano de afinidade calculado: {affinityPlan.Description}");
 
         foreach (var processName in ValorantProcessNames)
         {
-            ApplyOptimizationToProcesses(processName, affinityMask, attemptedProcessIds, log.Add);
+            ApplyOptimizationToProcesses(processName, affinityPlan, attemptedProcessIds, log.Add);
         }
 
         if (attemptedProcessIds.Count == 0)
@@ -83,7 +89,7 @@ internal sealed class ValorantProcessOptimizer
 
     private static void ApplyOptimizationToProcesses(
         string processName,
-        IntPtr affinityMask,
+        AffinityPlan affinityPlan,
         HashSet<int> attemptedProcessIds,
         Action<string> writeLog)
     {
@@ -99,11 +105,28 @@ internal sealed class ValorantProcessOptimizer
                         continue;
                     }
 
-                    attemptedProcessIds.Add(processId);
-                    var result = TryApplyNativeProcessOptimization(processId, affinityMask);
-                    if (result.AffinityApplied || result.PriorityApplied)
+                    var detectionHandle = OpenProcess(MonitorProcessAccess, inheritHandle: false, processId);
+                    if (detectionHandle == IntPtr.Zero)
                     {
-                        writeLog($"{processName} ({processId}) otimizado em modo baixo privilegio: {result.Describe()}.");
+                        continue;
+                    }
+
+                    try
+                    {
+                        attemptedProcessIds.Add(processId);
+                        var result = TryApplyNativeProcessOptimization(processId, affinityPlan);
+                        if (result.PriorityApplied || result.AffinityApplied)
+                        {
+                            writeLog($"{processName} ({processId}) otimizado em tentativa unica: {result.Describe()}.");
+                        }
+                        else if (result.ProtectedByAntiCheatOrAcl)
+                        {
+                            writeLog($"{processName} ({processId}) protegido por anti-cheat/ACL. Scheduler nativo do Windows foi preservado sem insistencia.");
+                        }
+                    }
+                    finally
+                    {
+                        _ = CloseHandle(detectionHandle);
                     }
                 }
                 catch (Exception ex) when (
@@ -119,19 +142,31 @@ internal sealed class ValorantProcessOptimizer
         }
     }
 
-    private static NativeProcessOptimizationResult TryApplyNativeProcessOptimization(int processId, IntPtr affinityMask)
+    private static NativeProcessOptimizationResult TryApplyNativeProcessOptimization(int processId, AffinityPlan affinityPlan)
     {
-        var handle = OpenProcess(RequiredProcessAccess, inheritHandle: false, processId);
+        var handle = OpenProcess(MutationProcessAccess, inheritHandle: false, processId);
         if (handle == IntPtr.Zero)
         {
-            return NativeProcessOptimizationResult.None;
+            return Marshal.GetLastWin32Error() == ErrorAccessDenied
+                ? NativeProcessOptimizationResult.Protected
+                : NativeProcessOptimizationResult.None;
         }
 
         try
         {
             var priorityApplied = SetPriorityClass(handle, HighPriorityClass);
-            var affinityApplied = SetProcessAffinityMask(handle, affinityMask);
-            return new NativeProcessOptimizationResult(priorityApplied, affinityApplied);
+            var affinityApplied = affinityPlan.CanApplyAffinity &&
+                                  SetProcessAffinityMask(handle, affinityPlan.Mask);
+
+            var win32Error = Marshal.GetLastWin32Error();
+            if (!priorityApplied &&
+                !affinityApplied &&
+                win32Error == ErrorAccessDenied)
+            {
+                return NativeProcessOptimizationResult.Protected;
+            }
+
+            return new NativeProcessOptimizationResult(priorityApplied, affinityApplied, false);
         }
         finally
         {
@@ -139,7 +174,50 @@ internal sealed class ValorantProcessOptimizer
         }
     }
 
-    private static IntPtr BuildAffinityMask(HardwareInfo hardware)
+    private static AffinityPlan ResolveAffinityPlan(HardwareInfo hardware)
+    {
+        try
+        {
+            var status = NativeMethods.GetCpuTopology(out var topology, out _);
+            if (status == NativeStatus.Success &&
+                NativeMethods.BuildPreferredGameAffinityMask(topology, out var entries, out _) == NativeStatus.Success &&
+                entries.Length > 0)
+            {
+                if (entries.Length == 1 && entries[0].Group == 0 && entries[0].Mask != 0)
+                {
+                    return new AffinityPlan(
+                        new IntPtr(unchecked((long)entries[0].Mask)),
+                        true,
+                        $"0x{entries[0].Mask:X} via DLL nativa (grupo 0)");
+                }
+
+                return new AffinityPlan(
+                    IntPtr.Zero,
+                    false,
+                    "topologia multi-group detectada; afinidade de processo preservada para evitar truncamento");
+            }
+        }
+        catch (DllNotFoundException)
+        {
+            // Fallback local abaixo.
+        }
+        catch (EntryPointNotFoundException)
+        {
+            // Fallback local abaixo.
+        }
+        catch (BadImageFormatException)
+        {
+            // Fallback local abaixo.
+        }
+
+        var fallbackMask = BuildFallbackAffinityMask(hardware);
+        return new AffinityPlan(
+            fallbackMask,
+            true,
+            $"0x{fallbackMask.ToInt64():X} por heuristica local");
+    }
+
+    private static IntPtr BuildFallbackAffinityMask(HardwareInfo hardware)
     {
         var logicalCoresToUse = GetLogicalCoreCountForAffinity(hardware);
         long mask = 0;
@@ -217,11 +295,19 @@ internal sealed class ValorantProcessOptimizer
         return false;
     }
 
+    private readonly record struct AffinityPlan(
+        IntPtr Mask,
+        bool CanApplyAffinity,
+        string Description);
+
     private readonly record struct NativeProcessOptimizationResult(
         bool PriorityApplied,
-        bool AffinityApplied)
+        bool AffinityApplied,
+        bool ProtectedByAntiCheatOrAcl)
     {
-        public static NativeProcessOptimizationResult None => new(false, false);
+        public static NativeProcessOptimizationResult None => new(false, false, false);
+
+        public static NativeProcessOptimizationResult Protected => new(false, false, true);
 
         public string Describe()
         {

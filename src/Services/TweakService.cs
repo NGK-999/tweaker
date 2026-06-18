@@ -1,9 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Security;
 using System.Text.RegularExpressions;
-using System.Threading;
+using ApexTweaker.Core.Pipeline;
 using Microsoft.Win32;
 using Renomeador.Infrastructure;
 using Renomeador.Models;
@@ -22,7 +21,6 @@ internal sealed class TweakService
     private const string PriorityControlPath = @"SYSTEM\CurrentControlSet\Control\PriorityControl";
     private const string CoreParkingMinCoresPowerSettingPath = @"SYSTEM\CurrentControlSet\Control\Power\PowerSettings\54533251-82be-4824-96c1-47b60b740d00\0cc5b647-c1df-4637-891a-dec35c318583";
     private const string DeliveryOptimizationConfigPath = @"SOFTWARE\Microsoft\Windows\CurrentVersion\DeliveryOptimization\Config";
-    private const string NetworkClassPath = @"SYSTEM\CurrentControlSet\Control\Class\{4d36e972-e325-11ce-bfc1-08002be10318}";
     private const string MultimediaProfilePath = @"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile";
     private const string GamesTaskPath = MultimediaProfilePath + @"\Tasks\Games";
     private const string GraphicsDriversPath = @"SYSTEM\CurrentControlSet\Control\GraphicsDrivers";
@@ -36,7 +34,6 @@ internal sealed class TweakService
     private const string ProcessorEnergyPreference = "36687f9e-e3a5-4dbf-b1dc-15eb381c6863";
     private const string ProcessorCoreParkingMinCores = "0cc5b647-c1df-4637-891a-dec35c318583";
     private const string ProcessorCoreParkingMaxCores = "ea062031-0e34-4ff1-9b6d-eb1059334028";
-    private const string ProcessorIdleDisable = "5d76a2ca-e8c0-402f-a133-2158492d58ad";
     private const string PciExpressAspm = "ee12f906-d277-404b-b6da-e5fa1a576df5";
     private const string DiskIdle = "6738e2c4-e8a5-4a42-b16a-e040e769756e";
     private const string StandbyIdle = "29f6c1db-86da-48c5-9fdb-f2b67b1f44da";
@@ -47,29 +44,13 @@ internal sealed class TweakService
         "[ERRO] Chave bloqueada. Desative o Tamper Protection (Prote\u00e7\u00e3o contra Viola\u00e7\u00f5es) do Defender para aplicar este Tweak.";
     private readonly CommandRunner commandRunner = new();
     private readonly BackupService backupService = new();
+    private readonly MutationExecutor mutationExecutor;
     private readonly GpuOptimizationService gpuOptimizationService = new();
     private readonly OptimizationEngine optimizationEngine = new();
-    private readonly TweakManager validatedTweakManager = new();
-    private readonly AsyncLocal<MutationSession?> activeMutationSession = new();
 
-    public IReadOnlyList<TweakDefinition> GetValidatedTweakCatalog()
+    public TweakService()
     {
-        return validatedTweakManager.BuildCompleteCatalog();
-    }
-
-    public IReadOnlyList<TweakExecutionResult> ApplyValidatedModule(TweakModule module)
-    {
-        var tweaks = module switch
-        {
-            TweakModule.LatencyAndCpu => validatedTweakManager.BuildLatencyAndCpuCatalog(),
-            TweakModule.DebloatAndCleanup => validatedTweakManager.BuildDebloatAndCleanupCatalog(),
-            TweakModule.ClassicUxAndProductivity => validatedTweakManager.BuildClassicUxAndProductivityCatalog(),
-            TweakModule.ServicesAndTelemetry => validatedTweakManager.BuildServicesAndTelemetryCatalog(),
-            TweakModule.Hardcore => validatedTweakManager.BuildHardcoreCatalog(),
-            _ => []
-        };
-
-        return validatedTweakManager.ExecuteAll(tweaks);
+        mutationExecutor = new MutationExecutor(backupService);
     }
 
     public IReadOnlyList<string> CreateRestorePoint()
@@ -157,13 +138,12 @@ internal sealed class TweakService
                 RunPowercfgSetting($"/setacvalueindex {PowerSchemeCurrent} {SubProcessor} {ProcessorCoreParkingMaxCores} 100", "Core parking maximo em 100%.", log);
             }
 
-            RunPowercfgSetting($"/setacvalueindex {PowerSchemeCurrent} {SubProcessor} {ProcessorIdleDisable} 1", "Processor idle states desativados no plano atual.", log);
+            _ = ExecuteCommand(new ProcessorIdleStatesTweakCommand(), log);
             RunPowercfgSetting($"/setacvalueindex {PowerSchemeCurrent} {SubPciExpress} {PciExpressAspm} 0", "PCIe ASPM desligado para evitar economia de energia no barramento.", log);
             RunPowercfgSetting($"/setacvalueindex {PowerSchemeCurrent} {SubDisk} {DiskIdle} 0", "Disco configurado para nao desligar na tomada.", log);
             RunPowercfgSetting($"/setacvalueindex {PowerSchemeCurrent} {SubSleep} {StandbyIdle} 0", "Suspensao automatica desligada na tomada.", log);
             RunPowercfgSetting($"/setacvalueindex {PowerSchemeCurrent} {SubSleep} {HibernateIdle} 0", "Hibernacao automatica desligada na tomada.", log);
             RunPowercfgSetting("/hibernate off", "Hibernacao desligada.", log);
-            RunPowercfgSetting("/setactive SCHEME_CURRENT", "Plano atual reativado apos ajustes de latencia extrema.", log);
 
             BackupRegistryKey(@"HKLM\SOFTWARE\Microsoft\Windows\Dwm", "dwm", log);
             TrySetDword(Registry.LocalMachine, DwmPath, "RealTimeGamingResolution", 1, "DWM RealTimeGamingResolution=1 aplicado para priorizar janela 3D em foco.", log);
@@ -465,80 +445,14 @@ internal sealed class TweakService
 
     public IReadOnlyList<string> DisableNetworkInterruptModerationAndGreenEthernet()
     {
-        var log = new List<string> { "Rede/Driver: desativando Interrupt Moderation e Green Ethernet quando suportado pelo driver." };
+        return RunMutationPipeline(
+            "NIC Interrupt Moderation",
+            () => ExecuteSingleCommand(new NetworkInterruptModerationTweakCommand()));
+    }
 
-        BackupRegistryKey($@"HKLM\{NetworkClassPath}", "network-class", log);
-
-        try
-        {
-            using var networkClass = Registry.LocalMachine.OpenSubKey(NetworkClassPath, writable: true);
-            if (networkClass is null)
-            {
-                log.Add("Classe de adaptadores de rede nao encontrada no Registro.");
-                return log;
-            }
-
-            foreach (var subKeyName in networkClass.GetSubKeyNames())
-            {
-                RegistryKey? adapterKey;
-                try
-                {
-                    adapterKey = networkClass.OpenSubKey(subKeyName, writable: true);
-                }
-                catch (UnauthorizedAccessException)
-                {
-                    log.Add(ProtectedRegistryWarning);
-                    continue;
-                }
-                catch (SecurityException)
-                {
-                    log.Add(ProtectedRegistryWarning);
-                    continue;
-                }
-
-                using (adapterKey)
-                {
-                    if (adapterKey is null || !IsNetworkAdapterKey(adapterKey))
-                    {
-                        continue;
-                    }
-
-                    var adapterName = adapterKey.GetValue("DriverDesc")?.ToString() ?? $"Adaptador {subKeyName}";
-                    var changes = 0;
-
-                    changes += TrySetStringValue(adapterKey, "*InterruptModeration", "0", log, $"{adapterName}: Interrupt Moderation desativado.");
-                    changes += TrySetStringValue(adapterKey, "InterruptModeration", "0", log, $"{adapterName}: InterruptModeration=0 aplicado.");
-                    changes += TrySetStringValue(adapterKey, "ITR", "0", log, $"{adapterName}: ITR=0 aplicado.");
-                    changes += TrySetStringValue(adapterKey, "*EEE", "0", log, $"{adapterName}: Energy Efficient Ethernet desativado.");
-                    changes += TrySetStringValue(adapterKey, "EEE", "0", log, $"{adapterName}: EEE=0 aplicado.");
-                    changes += TrySetStringValue(adapterKey, "EnableGreenEthernet", "0", log, $"{adapterName}: Green Ethernet desativado.");
-                    changes += TrySetStringValue(adapterKey, "GreenEthernet", "0", log, $"{adapterName}: GreenEthernet=0 aplicado.");
-                    changes += TrySetStringValue(adapterKey, "S5WakeOnLan", "0", log, $"{adapterName}: S5 Wake-on-LAN desativado.");
-                    changes += TrySetStringValue(adapterKey, "ULPMode", "0", log, $"{adapterName}: Ultra Low Power Mode desativado.");
-
-                    if (changes == 0)
-                    {
-                        log.Add($"{adapterName}: nenhum parametro conhecido de Interrupt Moderation/Green Ethernet encontrado.");
-                    }
-                }
-            }
-
-            log.Add("Rede/Driver concluido. Reinicie o PC ou desative/ative o adaptador para o driver recarregar os parametros.");
-        }
-        catch (UnauthorizedAccessException)
-        {
-            log.Add(ProtectedRegistryWarning);
-        }
-        catch (SecurityException)
-        {
-            log.Add(ProtectedRegistryWarning);
-        }
-        catch (Exception ex)
-        {
-            log.Add($"Falha ao ajustar parametros de rede: {ex.Message}");
-        }
-
-        return log;
+    public IReadOnlyList<string> RemoveMicrosoftEdge()
+    {
+        return RunMutationPipeline("Edge removal", () => ExecuteSingleCommand(new EdgeRemovalTweakCommand()));
     }
 
     public IReadOnlyList<string> ApplyBackgroundTweaks()
@@ -684,6 +598,11 @@ internal sealed class TweakService
         return RunMutationPipeline("Timer resolution BCD", () => ExecuteSingleCommand(new TimerResolutionTweakCommand()));
     }
 
+    public IReadOnlyList<string> DisableMemoryCompression()
+    {
+        return RunMutationPipeline("Memory compression off", () => ExecuteSingleCommand(new MemoryCompressionTweakCommand()));
+    }
+
     public IReadOnlyList<string> ApplyMpoTweak()
     {
         return RunMutationPipeline("MPO off", () => ExecuteSingleCommand(new MpoTweakCommand()));
@@ -727,8 +646,17 @@ internal sealed class TweakService
 
     private void AddSystemRestorePointIfCurrentRootMutation(string expectedOperationName, List<string> log)
     {
-        var session = activeMutationSession.Value;
-        if (session is null ||
+        MutationSession session;
+        try
+        {
+            session = mutationExecutor.RequireActiveSession();
+        }
+        catch (InvalidOperationException)
+        {
+            return;
+        }
+
+        if (
             !string.Equals(session.OperationName, expectedOperationName, StringComparison.Ordinal))
         {
             return;
@@ -757,64 +685,12 @@ internal sealed class TweakService
 
     private IReadOnlyList<string> RunMutationPipeline(string operationName, Func<IReadOnlyList<string>> action)
     {
-        if (activeMutationSession.Value is not null)
-        {
-            return action();
-        }
-
-        var session = backupService.BeginMutationSession(operationName);
-        activeMutationSession.Value = session;
-        var pipelineLog = new List<string> { $"Pipeline unico: Validar -> Snapshot -> Executar -> Verify -> Logar ({operationName})" };
-        var completed = false;
-
-        try
-        {
-            pipelineLog.AddRange(action());
-            completed = true;
-            return pipelineLog;
-        }
-        finally
-        {
-            pipelineLog.AddRange(backupService.CommitMutationSession(session, completed));
-            activeMutationSession.Value = null;
-        }
-    }
-
-    private MutationSession RequireActiveMutationSession()
-    {
-        return activeMutationSession.Value
-            ?? throw new InvalidOperationException("Mutacao de SO fora do pipeline unico. Encapsule a chamada em RunMutationPipeline.");
+        return mutationExecutor.Run(operationName, action);
     }
 
     private bool ExecuteCommand(ISystemMutationCommand command, List<string> log)
     {
-        try
-        {
-            command.Validate();
-            command.Snapshot(backupService, RequireActiveMutationSession());
-            command.Execute();
-            command.Verify();
-            log.Add(command.SuccessMessage);
-            return true;
-        }
-        catch (UnauthorizedAccessException)
-        {
-            log.Add(ProtectedRegistryWarning);
-        }
-        catch (SecurityException)
-        {
-            log.Add(ProtectedRegistryWarning);
-        }
-        catch (NotSupportedException ex)
-        {
-            log.Add(ex.Message);
-        }
-        catch (Exception ex)
-        {
-            log.Add($"{command.FailurePrefix}: {ex.Message}");
-        }
-
-        return false;
+        return mutationExecutor.Execute(command, log, ProtectedRegistryWarning);
     }
 
     private void DisableFullscreenOptimizations(string exePath, List<string> log)
@@ -884,24 +760,6 @@ internal sealed class TweakService
         }
 
         return parts[1];
-    }
-
-    private static (RegistryKey Root, string Path) ResolveRegistryLocation(string keyName)
-    {
-        const string localMachinePrefix = "HKEY_LOCAL_MACHINE\\";
-        const string currentUserPrefix = "HKEY_CURRENT_USER\\";
-
-        if (keyName.StartsWith(localMachinePrefix, StringComparison.OrdinalIgnoreCase))
-        {
-            return (Registry.LocalMachine, keyName[localMachinePrefix.Length..]);
-        }
-
-        if (keyName.StartsWith(currentUserPrefix, StringComparison.OrdinalIgnoreCase))
-        {
-            return (Registry.CurrentUser, keyName[currentUserPrefix.Length..]);
-        }
-
-        throw new InvalidOperationException($"Colmeia de Registro nao suportada: {keyName}");
     }
 
     private void SnapshotPowercfgMutation(string arguments, MutationSession session)
@@ -1280,52 +1138,6 @@ internal sealed class TweakService
         {
             log.Add($"Falha ao criar backup de {registryPath}: {ex.Message}");
         }
-    }
-
-    private static bool IsNetworkAdapterKey(RegistryKey adapterKey)
-    {
-        var componentId = adapterKey.GetValue("ComponentId")?.ToString() ?? string.Empty;
-        var driverDesc = adapterKey.GetValue("DriverDesc")?.ToString() ?? string.Empty;
-        var characteristics = adapterKey.GetValue("Characteristics")?.ToString() ?? string.Empty;
-
-        if (string.IsNullOrWhiteSpace(driverDesc))
-        {
-            return false;
-        }
-
-        if (componentId.StartsWith("ms_", StringComparison.OrdinalIgnoreCase))
-        {
-            return false;
-        }
-
-        return !string.IsNullOrWhiteSpace(characteristics) || adapterKey.GetValue("NetCfgInstanceId") is not null;
-    }
-
-    private int TrySetStringValue(RegistryKey key, string name, string value, List<string> log, string successMessage)
-    {
-        if (key.GetValue(name) is null)
-        {
-            return 0;
-        }
-
-        var (root, path) = ResolveRegistryLocation(key.Name);
-        var succeeded = ExecuteCommand(
-            new SystemMutationCommand(
-                $"Registry string {path}\\{name}",
-                (_, session) => backupService.CaptureRegistryValue(session, root, path, name),
-                () => key.SetValue(name, value, RegistryValueKind.String),
-                () =>
-                {
-                    if (!RegistryService.TryReadString(root, path, name, out var actualValue) ||
-                        !string.Equals(actualValue, value, StringComparison.Ordinal))
-                    {
-                        throw new InvalidOperationException($"Read-back divergente para {path}\\{name}.");
-                    }
-                },
-                successMessage,
-                $"Falha ao definir {name}"),
-            log);
-        return succeeded ? 1 : 0;
     }
 
     private void TrySetDword(RegistryKey root, string path, string name, int value, string successMessage, List<string> log)
