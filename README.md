@@ -4,11 +4,21 @@ Windows Forms utility focused on Windows performance, frametime stability, telem
 
 ## Distribuicao
 
+Baixar instalador:
+
+[ApexTweaker-Setup.exe](https://github.com/NGK-999/tweaker/blob/main/release-installer/ApexTweaker-Setup.exe?raw=1)
+
+Baixar versao portatil:
+
+[ApexTweaker.exe](https://github.com/NGK-999/tweaker/blob/main/release-v2/ApexTweaker.exe?raw=1)
+
 Executavel oficial para distribuir aos clientes:
 
 `release-v2/ApexTweaker.exe`
 
-Esse e o artefato correto de distribuicao. O app e executado diretamente como `.exe` e ja solicita privilegios administrativos pelo manifesto quando necessario.
+Esse e o artefato portatil de distribuicao. O app e executado diretamente como `.exe` e ja solicita privilegios administrativos pelo manifesto quando necessario.
+
+Se o usuario preferir instalacao tradicional no Windows, use o `ApexTweaker-Setup.exe`.
 
 ## Fluxo recomendado
 
