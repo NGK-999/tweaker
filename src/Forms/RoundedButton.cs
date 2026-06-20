@@ -76,19 +76,51 @@ internal sealed class RoundedButton : Button
 
         var rect = new Rectangle(0, 0, Width - 1, Height - 1);
         using var path = CreateRoundedPath(rect, BorderRadius);
-        using var background = new SolidBrush(isHovering && HoverBackColor != Color.Empty ? HoverBackColor : BackColor);
+        var fillColor = isHovering && HoverBackColor != Color.Empty ? HoverBackColor : BackColor;
         using var border = new Pen(BorderColor, 1F);
 
-        e.Graphics.FillPath(background, path);
+        if (fillColor.A < 255)
+        {
+            using var clearBrush = new SolidBrush(Parent?.BackColor ?? SystemColors.Control);
+            e.Graphics.FillRectangle(clearBrush, ClientRectangle);
+        }
+
+        if (fillColor.A > 0)
+        {
+            using var background = new SolidBrush(fillColor);
+            e.Graphics.FillPath(background, path);
+        }
+
         e.Graphics.DrawPath(border, path);
 
-        var flags =
-            TextFormatFlags.HorizontalCenter |
-            TextFormatFlags.VerticalCenter |
-            TextFormatFlags.EndEllipsis |
-            TextFormatFlags.SingleLine;
+        var textRect = Rectangle.FromLTRB(
+            rect.Left + Padding.Left,
+            rect.Top + Padding.Top,
+            rect.Right - Padding.Right,
+            rect.Bottom - Padding.Bottom);
+        var flags = ResolveTextFlags(TextAlign);
+        TextRenderer.DrawText(e.Graphics, Text, Font, textRect, ForeColor, flags);
+    }
 
-        TextRenderer.DrawText(e.Graphics, Text, Font, rect, ForeColor, flags);
+    private static TextFormatFlags ResolveTextFlags(ContentAlignment alignment)
+    {
+        var flags = TextFormatFlags.EndEllipsis | TextFormatFlags.SingleLine;
+
+        flags |= alignment switch
+        {
+            ContentAlignment.TopLeft or ContentAlignment.MiddleLeft or ContentAlignment.BottomLeft => TextFormatFlags.Left,
+            ContentAlignment.TopRight or ContentAlignment.MiddleRight or ContentAlignment.BottomRight => TextFormatFlags.Right,
+            _ => TextFormatFlags.HorizontalCenter
+        };
+
+        flags |= alignment switch
+        {
+            ContentAlignment.TopLeft or ContentAlignment.TopCenter or ContentAlignment.TopRight => TextFormatFlags.Top,
+            ContentAlignment.BottomLeft or ContentAlignment.BottomCenter or ContentAlignment.BottomRight => TextFormatFlags.Bottom,
+            _ => TextFormatFlags.VerticalCenter
+        };
+
+        return flags;
     }
 
     private static GraphicsPath CreateRoundedPath(Rectangle rectangle, int radius)

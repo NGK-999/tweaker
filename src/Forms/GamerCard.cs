@@ -7,14 +7,15 @@ namespace Renomeador.Forms;
 
 internal sealed class GamerCard : Panel
 {
-    private static readonly Color CardBack = Color.FromArgb(26, 31, 44);
-    private static readonly Color CardBorder = Color.FromArgb(42, 50, 66);
+    private static readonly Color CardBack = Color.FromArgb(30, 30, 30);
+    private static readonly Color CardBorder = Color.FromArgb(45, 45, 45);
+    private const int CardCornerRadius = 10;
 
     public GamerCard()
     {
         BackColor = Color.Transparent;
         DoubleBuffered = true;
-        Padding = new Padding(14);
+        Padding = new Padding(16);
         Margin = new Padding(0, 0, 0, 12);
     }
 
@@ -31,7 +32,7 @@ internal sealed class GamerCard : Panel
         e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
         var bounds = new Rectangle(0, 0, Width - 1, Height - 1);
 
-        using var path = CreateRoundedRectangle(bounds, 12);
+        using var path = CreateRoundedRectangle(bounds, CardCornerRadius);
         using var fill = new SolidBrush(FillColor);
         using var border = new Pen(BorderColor, 1F);
 

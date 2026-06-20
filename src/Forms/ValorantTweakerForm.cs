@@ -2,18 +2,21 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.IO;
 using System.Net.NetworkInformation;
 using System.Reflection;
-using System.Runtime.InteropServices;
 using System.Security;
 using System.Text;
 using System.Threading;
 using System.Windows.Forms;
+using ApexTweaker.NativeInterop;
 using ApexTweaker.Service;
 using ApexTweaker.UI;
 using LibreHardwareMonitor.Hardware;
+using NightButton = ReaLTaiizor.Controls.NightButton;
 using Renomeador.Models;
+using Renomeador.Forms.Components;
 using Renomeador.Services;
 
 namespace Renomeador.Forms;
@@ -22,6 +25,12 @@ internal sealed class ValorantTweakerForm : Form
 {
     private const string AppTitle = "ApexTweaker";
     private const string RiotSupportUrl = "https://support-valorant.riotgames.com/";
+    private const string DashboardPageKey = "Dashboard";
+    private const string ModulesPageKey = "Modules";
+    private const string TelemetryPageKey = "Telemetry";
+    private const string UtilitiesPageKey = "Utilities";
+    private const int SidebarButtonWidth = 180;
+    private const int SidebarButtonHeight = 36;
     private static readonly string RuntimeLogPath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
         "ApexTweaker",
@@ -51,17 +60,21 @@ internal sealed class ValorantTweakerForm : Form
         float? RamLoadPercent,
         float? RamUsedGb);
 
-    private static readonly Color Bg = Color.FromArgb(17, 22, 37);
-    private static readonly Color SidebarBg = Color.FromArgb(17, 22, 37);
-    private static readonly Color Panel = Color.FromArgb(26, 31, 44);
-    private static readonly Color PanelSoft = Color.FromArgb(26, 31, 44);
-    private static readonly Color Border = Color.FromArgb(42, 50, 66);
+    private const int SidebarDividerThickness = 1;
+    private static readonly Color ConsoleSurface = Color.FromArgb(20, 20, 22);
+    private static readonly Color Bg = ColorTranslator.FromHtml("#1E1E1E");
+    private static readonly Color SidebarBg = ColorTranslator.FromHtml("#252525");
+    private static readonly Color Panel = ColorTranslator.FromHtml("#2A2A2A");
+    private static readonly Color PanelSoft = ColorTranslator.FromHtml("#2A2A2A");
+    private static readonly Color Border = ColorTranslator.FromHtml("#3A3A3C");
+    private static readonly Color GlassCardFill = ColorTranslator.FromHtml("#2A2A2A");
+    private static readonly Color GlassCardBorder = ColorTranslator.FromHtml("#3A3A3C");
     private static readonly Color NeonBlue = Color.FromArgb(0, 180, 216);
     private static readonly Color TextMain = Color.FromArgb(255, 255, 255);
     private static readonly Color TextMuted = Color.FromArgb(139, 148, 158);
     private static readonly Color Accent = Color.FromArgb(0, 180, 216);
     private static readonly Color Primary = Color.FromArgb(0, 180, 216);
-    private static readonly Color Danger = Color.FromArgb(230, 57, 70);
+    private static readonly Color Danger = ColorTranslator.FromHtml("#FF453A");
     private static readonly Color Success = Color.FromArgb(0, 180, 216);
     private static readonly Color OptimizedGreen = Color.FromArgb(0, 132, 160);
     private static readonly Color Warning = Color.FromArgb(250, 204, 21);
@@ -93,23 +106,34 @@ internal sealed class ValorantTweakerForm : Form
     private readonly Label statusLabel;
     private readonly Label creditsLabel;
     private readonly TableLayoutPanel rootLayout;
-    private readonly Panel contentHost = new() { Dock = DockStyle.Fill, BackColor = Bg };
+    private readonly Panel sidebarContainer = new();
+    private Control? sidebarHeader;
+    private readonly TransparentHostPanel contentHost = new() { Dock = DockStyle.Fill, BackColor = Bg };
+    private readonly TableLayoutPanel titleBar;
+    private readonly Label titleBarTitleLabel;
+    private readonly Label titleBarSubtitleLabel;
+    private readonly Button minimizeWindowButton;
+    private readonly Button maximizeWindowButton;
+    private readonly Button closeWindowButton;
     private Button? activeTabButton;
+    private CancellationTokenSource? _ctsTransition;
+    private readonly Dictionary<string, (Control? Instance, Func<Control> Factory)> _pageCache = new(StringComparer.OrdinalIgnoreCase);
+    private string? _activePageKey;
 
-    private readonly Button diagnoseButton;
+    private readonly NightButton diagnoseButton;
     private readonly Button btnAutoOptimize;
-    private readonly Button restorePointButton;
-    private readonly Button gpuProfileButton;
-    private readonly Button gpuRegistryButton;
+    private readonly NightButton restorePointButton;
+    private readonly NightButton gpuProfileButton;
+    private readonly NightButton gpuRegistryButton;
     private readonly Button btnABTest;
-    private readonly Button powerButton;
-    private readonly Button extremeLatencyButton;
-    private readonly Button cpuSchedulerButton;
-    private readonly Button gpuDisplayButton;
-    private readonly Button inputButton;
-    private readonly Button networkButton;
-    private readonly Button policyServicesButton;
-    private readonly Button backgroundButton;
+    private readonly NightButton powerButton;
+    private readonly NightButton extremeLatencyButton;
+    private readonly NightButton cpuSchedulerButton;
+    private readonly NightButton gpuDisplayButton;
+    private readonly NightButton inputButton;
+    private readonly NightButton networkButton;
+    private readonly NightButton policyServicesButton;
+    private readonly NightButton backgroundButton;
     private readonly Button revertButton;
     private readonly Button uninstallButton;
     private readonly Button aboutButton;
@@ -159,6 +183,7 @@ internal sealed class ValorantTweakerForm : Form
 
         Text = AppTitle;
         StartPosition = FormStartPosition.CenterScreen;
+        FormBorderStyle = FormBorderStyle.None;
         MinimumSize = new Size(1040, 680);
         ClientSize = new Size(1220, 760);
         Font = new Font("Segoe UI", 10F, FontStyle.Regular, GraphicsUnit.Point);
@@ -183,29 +208,29 @@ internal sealed class ValorantTweakerForm : Form
         telemetryPipeClient.Start();
         etwFrameTracker.Error += OnEtwFrameTrackerError;
 
-        diagnoseButton = CreatePrimaryButton("Diagnosticar");
+        diagnoseButton = CreateModuleButton("Diagnosticar");
         btnAutoOptimize = CreateAutoOptimizeButton();
-        restorePointButton = CreateSecondaryButton("Restore point");
-        gpuProfileButton = CreateSecondaryButton("GPU Windows");
-        gpuRegistryButton = CreateSecondaryButton("GPU regedit");
+        restorePointButton = CreateModuleButton("Restore point");
+        gpuProfileButton = CreateModuleButton("GPU Windows");
+        gpuRegistryButton = CreateModuleButton("GPU regedit");
         btnABTest = CreateSecondaryButton("Iniciar Teste (Antes da Otimização)");
         EnsureABTestButtonLayout("Iniciar Teste (Antes da Otimização)");
-        powerButton = CreateSecondaryButton("Energia");
-        extremeLatencyButton = CreateSecondaryButton("Latência extrema");
-        cpuSchedulerButton = CreateSecondaryButton("CPU/Scheduler");
-        gpuDisplayButton = CreateSecondaryButton("GPU/Display");
-        inputButton = CreateSecondaryButton("Input/USB");
-        networkButton = CreateSecondaryButton("Rede");
-        policyServicesButton = CreateSecondaryButton("Políticas/Serviços");
-        backgroundButton = CreateSecondaryButton("Background");
+        powerButton = CreateModuleButton("Energia");
+        extremeLatencyButton = CreateModuleButton("Latência extrema");
+        cpuSchedulerButton = CreateModuleButton("CPU/Scheduler");
+        gpuDisplayButton = CreateModuleButton("GPU/Display");
+        inputButton = CreateModuleButton("Input/USB");
+        networkButton = CreateModuleButton("Rede");
+        policyServicesButton = CreateModuleButton("Políticas/Serviços");
+        backgroundButton = CreateModuleButton("Background");
         revertButton = CreateUtilityDangerButton("Reverter");
         uninstallButton = CreateDangerTextButton("Desinstalar e Sair");
         aboutButton = CreateSecondaryButton("Sobre");
         openRiotSupportButton = CreateSecondaryButton("Suporte Riot");
-        dashboardTabButton = CreateTabButton("\uD83C\uDFE0 Dashboard");
-        modulesTabButton = CreateTabButton("\u26A1 Módulos");
-        telemetryTabButton = CreateTabButton("\uD83D\uDCCA Telemetria");
-        utilitiesTabButton = CreateTabButton("\u2699\uFE0F Utilidades");
+        dashboardTabButton = CreateTabButton("Dashboard", "\uE80F");
+        modulesTabButton = CreateTabButton("Módulos", "\uEA86");
+        telemetryTabButton = CreateTabButton("Telemetria", "\uE9D2");
+        utilitiesTabButton = CreateTabButton("Utilidades", "\uE713");
 
         nativeCpuLoadLabel = CreateMetricValueLabel();
         nativeCpuTempLabel = CreateMetricValueLabel();
@@ -216,22 +241,42 @@ internal sealed class ValorantTweakerForm : Form
         nativeDpcLatencyLabel = CreateMetricValueLabel("0 \u00B5s");
         nativeBoostDropLabel = CreateMetricValueLabel("0 MHz");
         nativeHardwareStatusLabel = CreateMetricValueLabel("Telemetria parcial - aguardando monitoramento");
+        titleBarTitleLabel = CreateHeaderLabel(AppTitle, 11.5F, FontStyle.Bold, TextMain);
+        titleBarSubtitleLabel = CreateHeaderLabel("Windows 11 Native UI | Mica | Telemetria assíncrona", 8.75F, FontStyle.Regular, TextMuted);
+        minimizeWindowButton = CreateWindowCommandButton("\u2014");
+        maximizeWindowButton = CreateWindowCommandButton("\u25A1");
+        closeWindowButton = CreateWindowCommandButton("\u2715", Danger, Color.FromArgb(192, 52, 64));
+        titleBar = CreateTitleBar();
+        InitializePageCache();
 
         rootLayout = CreateLayout();
         InitializeRuntimeLog();
         WireEvents();
 
         Controls.Add(rootLayout);
+        EnsureTransparentContentHost();
         ForceDoubleBuffering(rootLayout);
         TrySetDoubleBuffered(performanceChart);
         AcceptButton = btnAutoOptimize;
-        ShowPage(CreateDashboardPage(), dashboardTabButton);
+        ShowPage(GetOrCreatePage(DashboardPageKey), dashboardTabButton, DashboardPageKey);
     }
 
     protected override void Dispose(bool disposing)
     {
         if (disposing)
         {
+            _ctsTransition?.Cancel();
+            _ctsTransition?.Dispose();
+            foreach (var entry in _pageCache.Values)
+            {
+                if (entry.Instance is not null &&
+                    !entry.Instance.IsDisposed &&
+                    entry.Instance.Parent is null)
+                {
+                    entry.Instance.Dispose();
+                }
+            }
+
             CloseNativeHardwareMonitor();
             telemetryWatcherTimer.Stop();
             telemetryWatcherTimer.Dispose();
@@ -247,6 +292,15 @@ internal sealed class ValorantTweakerForm : Form
         }
 
         base.Dispose(disposing);
+    }
+
+    protected override void OnHandleCreated(EventArgs e)
+    {
+        base.OnHandleCreated(e);
+        MaximizedBounds = Screen.FromHandle(Handle).WorkingArea;
+        _ = NativeUiMethods.ApplyWindowCorners(Handle);
+        _ = NativeUiMethods.TryApplyModernWindowFrame(Handle);
+        EnsureTransparentContentHost();
     }
 
     private void WireEvents()
@@ -272,10 +326,14 @@ internal sealed class ValorantTweakerForm : Form
         uninstallButton.Click += async (_, _) => await UninstallAndExitAsync();
         aboutButton.Click += (_, _) => ShowAbout();
         openRiotSupportButton.Click += (_, _) => OpenUrl(RiotSupportUrl);
-        dashboardTabButton.Click += (_, _) => ShowPage(CreateDashboardPage(), dashboardTabButton);
-        modulesTabButton.Click += (_, _) => ShowPage(CreateModulesPage(), modulesTabButton);
-        telemetryTabButton.Click += (_, _) => ShowPage(CreateTelemetryPage(), telemetryTabButton);
-        utilitiesTabButton.Click += (_, _) => ShowUtilitiesPage();
+        dashboardTabButton.Click += async (_, _) => await ShowPageAsync(DashboardPageKey, dashboardTabButton);
+        modulesTabButton.Click += async (_, _) => await ShowPageAsync(ModulesPageKey, modulesTabButton);
+        telemetryTabButton.Click += async (_, _) => await ShowPageAsync(TelemetryPageKey, telemetryTabButton);
+        utilitiesTabButton.Click += async (_, _) => await ShowUtilitiesPageAsync();
+        minimizeWindowButton.Click += (_, _) => WindowState = FormWindowState.Minimized;
+        maximizeWindowButton.Click += (_, _) => ToggleWindowState();
+        closeWindowButton.Click += (_, _) => Close();
+        titleBar.DoubleClick += (_, _) => ToggleWindowState();
         Load -= ValorantTweakerForm_Load;
         Load += ValorantTweakerForm_Load;
         Resize += ValorantTweakerForm_Resize;
@@ -316,6 +374,8 @@ internal sealed class ValorantTweakerForm : Form
 
     private void ValorantTweakerForm_Resize(object? sender, EventArgs e)
     {
+        maximizeWindowButton.Text = WindowState == FormWindowState.Maximized ? "\u2752" : "\u25A1";
+
         var shouldSuspend = WindowState == FormWindowState.Minimized;
         if (_isUiSuspended == shouldSuspend)
         {
@@ -370,7 +430,7 @@ internal sealed class ValorantTweakerForm : Form
         {
             Dock = DockStyle.Fill,
             Padding = new Padding(0),
-            BackColor = Bg,
+            BackColor = Color.Transparent,
             ColumnCount = 2,
             RowCount = 1
         };
@@ -387,31 +447,89 @@ internal sealed class ValorantTweakerForm : Form
 
     private Control CreateSidebar()
     {
-        var sidebar = new TableLayoutPanel
+        sidebarContainer.SuspendLayout();
+        sidebarContainer.Controls.Clear();
+
+        sidebarContainer.Dock = DockStyle.Fill;
+        sidebarContainer.BackColor = SidebarBg;
+        sidebarContainer.Padding = new Padding(0);
+        sidebarContainer.Paint -= SidebarContainer_Paint;
+        sidebarContainer.Paint += SidebarContainer_Paint;
+
+        sidebarHeader = CreateSidebarHeader();
+        sidebarHeader.Dock = DockStyle.None;
+        sidebarHeader.Size = new Size(SidebarButtonWidth, 70);
+
+        ConfigureSidebarButton(dashboardTabButton);
+        ConfigureSidebarButton(modulesTabButton);
+        ConfigureSidebarButton(telemetryTabButton);
+        ConfigureSidebarButton(utilitiesTabButton);
+
+        creditsLabel.Dock = DockStyle.None;
+        creditsLabel.AutoSize = false;
+        creditsLabel.TextAlign = ContentAlignment.MiddleLeft;
+        creditsLabel.Size = new Size(SidebarButtonWidth, 32);
+        creditsLabel.Anchor = AnchorStyles.Left | AnchorStyles.Bottom;
+
+        sidebarContainer.Controls.Add(sidebarHeader);
+        sidebarContainer.Controls.Add(dashboardTabButton);
+        sidebarContainer.Controls.Add(modulesTabButton);
+        sidebarContainer.Controls.Add(telemetryTabButton);
+        sidebarContainer.Controls.Add(utilitiesTabButton);
+        sidebarContainer.Controls.Add(creditsLabel);
+
+        LayoutSidebarChrome(sidebarContainer);
+        sidebarContainer.Resize -= SidebarContainer_Resize;
+        sidebarContainer.Resize += SidebarContainer_Resize;
+        sidebarContainer.ResumeLayout(false);
+
+        return sidebarContainer;
+    }
+
+    private void SidebarContainer_Resize(object? sender, EventArgs e)
+    {
+        LayoutSidebarChrome(sidebarContainer);
+    }
+
+    private static void SidebarContainer_Paint(object? sender, PaintEventArgs e)
+    {
+        if (sender is not Control sidebar)
         {
-            Dock = DockStyle.Fill,
-            BackColor = SidebarBg,
-            ColumnCount = 1,
-            RowCount = 7,
-            Padding = new Padding(14)
-        };
+            return;
+        }
 
-        sidebar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
-        sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 84F));
-        sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 44F));
-        sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 44F));
-        sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 44F));
-        sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 44F));
-        sidebar.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
-        sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 44F));
+        using var dividerPen = new Pen(Color.FromArgb(45, 45, 45), SidebarDividerThickness);
+        var x = Math.Max(0, sidebar.ClientSize.Width - SidebarDividerThickness);
+        e.Graphics.DrawLine(dividerPen, x, 0, x, sidebar.ClientSize.Height);
+    }
 
-        sidebar.Controls.Add(CreateSidebarHeader(), 0, 0);
-        sidebar.Controls.Add(dashboardTabButton, 0, 1);
-        sidebar.Controls.Add(modulesTabButton, 0, 2);
-        sidebar.Controls.Add(telemetryTabButton, 0, 3);
-        sidebar.Controls.Add(utilitiesTabButton, 0, 4);
-        sidebar.Controls.Add(creditsLabel, 0, 6);
-        return sidebar;
+    private void LayoutSidebarChrome(Control sidebar)
+    {
+        var centeredX = Math.Max(12, ((sidebar.ClientSize.Width - SidebarDividerThickness) - SidebarButtonWidth) / 2);
+
+        if (sidebarHeader is not null)
+        {
+            sidebarHeader.Location = new Point(centeredX, 18);
+            sidebarHeader.Size = new Size(SidebarButtonWidth, 70);
+        }
+
+        dashboardTabButton.Location = new Point(centeredX, 104);
+        modulesTabButton.Location = new Point(centeredX, 148);
+        telemetryTabButton.Location = new Point(centeredX, 192);
+        utilitiesTabButton.Location = new Point(centeredX, 236);
+        creditsLabel.Location = new Point(centeredX, Math.Max(12, sidebar.ClientSize.Height - creditsLabel.Height - 18));
+    }
+
+    private static void ConfigureSidebarButton(Button button)
+    {
+        button.Size = new Size(SidebarButtonWidth, SidebarButtonHeight);
+        button.MinimumSize = new Size(SidebarButtonWidth, SidebarButtonHeight);
+        button.MaximumSize = new Size(SidebarButtonWidth, SidebarButtonHeight);
+        button.AutoSize = false;
+        button.Dock = DockStyle.None;
+        button.BringToFront();
+
+        ApplyRoundedRegion(button, 10);
     }
 
     private Control CreateSidebarHeader()
@@ -438,16 +556,73 @@ internal sealed class ValorantTweakerForm : Form
             Dock = DockStyle.Fill,
             BackColor = Bg,
             ColumnCount = 1,
-            RowCount = 2,
-            Padding = new Padding(16)
+            RowCount = 3,
+            Padding = new Padding(14, 12, 14, 12)
         };
 
         shell.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+        shell.RowStyles.Add(new RowStyle(SizeType.Absolute, 52F));
         shell.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
         shell.RowStyles.Add(new RowStyle(SizeType.Absolute, 32F));
-        shell.Controls.Add(contentHost, 0, 0);
-        shell.Controls.Add(statusLabel, 0, 1);
+        shell.Controls.Add(titleBar, 0, 0);
+        shell.Controls.Add(contentHost, 0, 1);
+        shell.Controls.Add(statusLabel, 0, 2);
         return shell;
+    }
+
+    private TableLayoutPanel CreateTitleBar()
+    {
+        var bar = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            BackColor = Bg,
+            ColumnCount = 2,
+            RowCount = 1,
+            Margin = new Padding(0, 0, 0, 12),
+            Padding = new Padding(12, 8, 8, 8)
+        };
+
+        bar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+        bar.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        bar.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+
+        var titleStack = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 2,
+            BackColor = Color.Transparent,
+            Margin = new Padding(0)
+        };
+
+        titleStack.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+        titleStack.RowStyles.Add(new RowStyle(SizeType.Absolute, 20F));
+        titleStack.RowStyles.Add(new RowStyle(SizeType.Absolute, 16F));
+        titleBarTitleLabel.Dock = DockStyle.Fill;
+        titleBarSubtitleLabel.Dock = DockStyle.Fill;
+        titleStack.Controls.Add(titleBarTitleLabel, 0, 0);
+        titleStack.Controls.Add(titleBarSubtitleLabel, 0, 1);
+
+        var windowButtons = new FlowLayoutPanel
+        {
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            Dock = DockStyle.Right,
+            FlowDirection = FlowDirection.LeftToRight,
+            WrapContents = false,
+            BackColor = Color.Transparent,
+            Margin = new Padding(0),
+            Padding = new Padding(0)
+        };
+
+        windowButtons.Controls.Add(minimizeWindowButton);
+        windowButtons.Controls.Add(maximizeWindowButton);
+        windowButtons.Controls.Add(closeWindowButton);
+
+        bar.Controls.Add(titleStack, 0, 0);
+        bar.Controls.Add(windowButtons, 1, 0);
+        ForceDoubleBuffering(bar);
+        return bar;
     }
 
     private Control CreateMainArea()
@@ -455,7 +630,7 @@ internal sealed class ValorantTweakerForm : Form
         var content = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
-            BackColor = Bg,
+            BackColor = Color.Transparent,
             ColumnCount = 2,
             RowCount = 1,
             Margin = new Padding(0),
@@ -501,8 +676,22 @@ internal sealed class ValorantTweakerForm : Form
             BorderStyle = BorderStyle.None
         };
 
-        frame.Controls.Add(logBox);
+        var surface = new OpaqueSurfacePanel
+        {
+            Dock = DockStyle.Fill,
+            BackColor = ConsoleSurface,
+            Padding = new Padding(0),
+            Margin = new Padding(0)
+        };
+
+        surface.Controls.Add(logBox);
+        frame.Controls.Add(surface);
         return frame;
+    }
+
+    private void LayoutSidebarFooter(Control sidebar)
+    {
+        creditsLabel.Location = new Point(12, Math.Max(12, sidebar.ClientSize.Height - creditsLabel.Height - 12));
     }
 
     private Control CreateHeader()
@@ -510,7 +699,7 @@ internal sealed class ValorantTweakerForm : Form
         var header = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
-            BackColor = Bg,
+            BackColor = Color.Transparent,
             ColumnCount = 1,
             RowCount = 2
         };
@@ -522,21 +711,149 @@ internal sealed class ValorantTweakerForm : Form
         return header;
     }
 
-    private void ShowPage(Control page, Button tabButton)
+    private void InitializePageCache()
     {
-        contentHost.SuspendLayout();
-        contentHost.Controls.Clear();
-        page.Dock = DockStyle.Fill;
-        ForceDoubleBuffering(page);
-        contentHost.Controls.Add(page);
-        contentHost.ResumeLayout();
-        SetActiveTab(tabButton);
+        _pageCache[DashboardPageKey] = (null, CreateDashboardPage);
+        _pageCache[ModulesPageKey] = (null, CreateModulesPage);
+        _pageCache[TelemetryPageKey] = (null, CreateTelemetryPage);
+        _pageCache[UtilitiesPageKey] = (null, CreateUtilitiesPage);
     }
 
-    private void ShowUtilitiesPage()
+    private Control GetOrCreatePage(string pageKey)
     {
-        ShowPage(CreateUtilitiesPage(), utilitiesTabButton);
+        if (!_pageCache.TryGetValue(pageKey, out var entry))
+        {
+            throw new ArgumentOutOfRangeException(nameof(pageKey), pageKey, "Página não registrada no cache.");
+        }
+
+        var page = entry.Instance;
+        if (page is null || page.IsDisposed)
+        {
+            page = entry.Factory();
+            ForceDoubleBuffering(page);
+            _pageCache[pageKey] = (page, entry.Factory);
+        }
+
+        try
+        {
+            _ = page.Handle;
+        }
+        catch (ObjectDisposedException)
+        {
+            page = entry.Factory();
+            ForceDoubleBuffering(page);
+            _pageCache[pageKey] = (page, entry.Factory);
+            _ = page.Handle;
+        }
+
+        return page;
+    }
+
+    private void ShowPage(Control page, Button tabButton, string pageKey)
+    {
+        EnsureTransparentContentHost();
+
+        if (!ReferenceEquals(page.Parent, contentHost))
+        {
+            RemoveHostedPages();
+        }
+
+        if (page.Parent is not null && !ReferenceEquals(page.Parent, contentHost))
+        {
+            page.Parent.Controls.Remove(page);
+        }
+
+        page.BackColor = Color.Transparent;
+        page.Dock = DockStyle.Fill;
+        if (!contentHost.Controls.Contains(page))
+        {
+            contentHost.Controls.Add(page);
+        }
+
+        page.BringToFront();
+        SetActiveTab(tabButton);
+        _activePageKey = pageKey;
+    }
+
+    private async System.Threading.Tasks.Task ShowPageAsync(string pageKey, Button tabButton)
+    {
+        if (string.Equals(_activePageKey, pageKey, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        var page = GetOrCreatePage(pageKey);
+        page.Dock = DockStyle.Fill;
+        ForceDoubleBuffering(page);
+        SetActiveTab(tabButton);
+
+        _ctsTransition?.Cancel();
+        _ctsTransition?.Dispose();
+        _ctsTransition = new CancellationTokenSource();
+
+        try
+        {
+            await UiAnimator.AnimatePageTransitionAsync(contentHost, page, _ctsTransition.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        catch (ObjectDisposedException)
+        {
+            AttachPageStatic(page, tabButton, pageKey);
+            return;
+        }
+        catch (Exception)
+        {
+            AttachPageStatic(page, tabButton, pageKey);
+            return;
+        }
+
+        _activePageKey = pageKey;
+    }
+
+    private async System.Threading.Tasks.Task ShowUtilitiesPageAsync()
+    {
+        await ShowPageAsync(UtilitiesPageKey, utilitiesTabButton);
         _ = EnsureNativeHardwareMonitorStartedAsync();
+    }
+
+    private void AttachPageStatic(Control page, Button tabButton, string pageKey)
+    {
+        EnsureTransparentContentHost();
+        RemoveHostedPages();
+        if (page.Parent is not null && !ReferenceEquals(page.Parent, contentHost))
+        {
+            page.Parent.Controls.Remove(page);
+        }
+
+        page.BackColor = Color.Transparent;
+        page.Dock = DockStyle.Fill;
+        contentHost.Controls.Add(page);
+        page.BringToFront();
+        SetActiveTab(tabButton);
+        _activePageKey = pageKey;
+    }
+
+    private void RemoveHostedPages()
+    {
+        for (var index = contentHost.Controls.Count - 1; index >= 0; index--)
+        {
+            contentHost.Controls.RemoveAt(index);
+        }
+    }
+
+    private void EnsureTransparentContentHost()
+    {
+        contentHost.BackColor = Bg;
+
+        if (contentHost.Parent is not null)
+        {
+            contentHost.Parent.BackColor = Bg;
+        }
+
+        contentHost.Invalidate();
     }
 
     private async System.Threading.Tasks.Task EnsureNativeHardwareMonitorStartedAsync()
@@ -551,17 +868,47 @@ internal sealed class ValorantTweakerForm : Form
         }
     }
 
-    private void SetActiveTab(Button tabButton)
+    private void SetActiveTab(Button selectedButton)
     {
-        if (activeTabButton is not null)
+        var inactiveTextColor = Color.FromArgb(200, 200, 200);
+        var sidebarButtons = new[]
         {
-            activeTabButton.BackColor = SidebarBg;
-            activeTabButton.ForeColor = TextMuted;
+            dashboardTabButton,
+            modulesTabButton,
+            telemetryTabButton,
+            utilitiesTabButton
+        };
+
+        foreach (var button in sidebarButtons)
+        {
+            button.BackColor = Color.Transparent;
+            button.ForeColor = inactiveTextColor;
+
+            if (button is SidebarNavButton navButton)
+            {
+                navButton.IsSelected = false;
+            }
+
+            button.Invalidate();
         }
 
-        activeTabButton = tabButton;
-        activeTabButton.BackColor = Panel;
-        activeTabButton.ForeColor = TextMain;
+        activeTabButton = selectedButton;
+        activeTabButton.ForeColor = Color.White;
+
+        if (activeTabButton is SidebarNavButton activeNavButton)
+        {
+            activeNavButton.IsSelected = true;
+        }
+
+        activeTabButton.Invalidate();
+        sidebarContainer.Invalidate();
+    }
+
+    private void ToggleWindowState()
+    {
+        WindowState = WindowState == FormWindowState.Maximized
+            ? FormWindowState.Normal
+            : FormWindowState.Maximized;
     }
 
     private void PostToUi(Action action)
@@ -578,6 +925,123 @@ internal sealed class ValorantTweakerForm : Form
         }
 
         action();
+    }
+
+    protected override void WndProc(ref Message m)
+    {
+        if (m.Msg == NativeUiMethods.WM_NCHITTEST)
+        {
+            base.WndProc(ref m);
+            if ((int)m.Result == NativeUiMethods.HTCLIENT)
+            {
+                var hitTest = ResolveChromeHitTest(m.LParam);
+                if (hitTest != NativeUiMethods.HTCLIENT)
+                {
+                    m.Result = (nint)hitTest;
+                    return;
+                }
+            }
+
+            return;
+        }
+
+        base.WndProc(ref m);
+    }
+
+    private int ResolveChromeHitTest(nint lParam)
+    {
+        if (WindowState == FormWindowState.Maximized)
+        {
+            return IsPointInTitleBar(GetScreenPointFromLParam(lParam))
+                ? NativeUiMethods.HTCAPTION
+                : NativeUiMethods.HTCLIENT;
+        }
+
+        const int resizeBorder = 8;
+        var screenPoint = GetScreenPointFromLParam(lParam);
+        var clientPoint = PointToClient(screenPoint);
+
+        var onLeft = clientPoint.X <= resizeBorder;
+        var onRight = clientPoint.X >= ClientSize.Width - resizeBorder;
+        var onTop = clientPoint.Y <= resizeBorder;
+        var onBottom = clientPoint.Y >= ClientSize.Height - resizeBorder;
+
+        if (onLeft && onTop)
+        {
+            return NativeUiMethods.HTTOPLEFT;
+        }
+
+        if (onRight && onTop)
+        {
+            return NativeUiMethods.HTTOPRIGHT;
+        }
+
+        if (onLeft && onBottom)
+        {
+            return NativeUiMethods.HTBOTTOMLEFT;
+        }
+
+        if (onRight && onBottom)
+        {
+            return NativeUiMethods.HTBOTTOMRIGHT;
+        }
+
+        if (onLeft)
+        {
+            return NativeUiMethods.HTLEFT;
+        }
+
+        if (onRight)
+        {
+            return NativeUiMethods.HTRIGHT;
+        }
+
+        if (onTop)
+        {
+            return NativeUiMethods.HTTOP;
+        }
+
+        if (onBottom)
+        {
+            return NativeUiMethods.HTBOTTOM;
+        }
+
+        return IsPointInTitleBar(screenPoint)
+            ? NativeUiMethods.HTCAPTION
+            : NativeUiMethods.HTCLIENT;
+    }
+
+    private bool IsPointInTitleBar(Point screenPoint)
+    {
+        if (!titleBar.Visible || !titleBar.IsHandleCreated)
+        {
+            return false;
+        }
+
+        var titleBounds = titleBar.RectangleToScreen(titleBar.ClientRectangle);
+        if (!titleBounds.Contains(screenPoint))
+        {
+            return false;
+        }
+
+        return !IsPointOverInteractiveControl(screenPoint, minimizeWindowButton) &&
+               !IsPointOverInteractiveControl(screenPoint, maximizeWindowButton) &&
+               !IsPointOverInteractiveControl(screenPoint, closeWindowButton);
+    }
+
+    private static bool IsPointOverInteractiveControl(Point screenPoint, Control control)
+    {
+        return control.Visible &&
+               control.IsHandleCreated &&
+               control.RectangleToScreen(control.ClientRectangle).Contains(screenPoint);
+    }
+
+    private static Point GetScreenPointFromLParam(nint lParam)
+    {
+        var value = lParam.ToInt64();
+        return new Point(
+            unchecked((short)(value & 0xFFFF)),
+            unchecked((short)((value >> 16) & 0xFFFF)));
     }
 
     private static void ForceDoubleBuffering(Control control)
@@ -607,28 +1071,94 @@ internal sealed class ValorantTweakerForm : Form
 
     private Control CreateDashboardPage()
     {
-        var page = CreatePageGrid(3);
-        page.RowStyles.Add(new RowStyle(SizeType.Absolute, 132F));
-        page.RowStyles.Add(new RowStyle(SizeType.Absolute, 132F));
-        page.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
-
-        page.Controls.Add(CreateCard("One-Click Auto-Tuning", CreateGlobalCommandPanel()), 0, 0);
-        page.Controls.Add(CreateCard("Segurança do Sistema", CreateButtonGridFilled(1, 1, restorePointButton)), 0, 1);
-        page.Controls.Add(CreateCard("Resumo", CreateSummaryText()), 0, 2);
-        return page;
+        return new DashboardPage(btnAutoOptimize, restorePointButton)
+        {
+            Dock = DockStyle.Fill,
+            Margin = new Padding(0)
+        };
     }
 
     private Control CreateModulesPage()
     {
-        var page = CreatePageGrid(3);
-        page.RowStyles.Add(new RowStyle(SizeType.Percent, 33.33F));
-        page.RowStyles.Add(new RowStyle(SizeType.Percent, 33.33F));
-        page.RowStyles.Add(new RowStyle(SizeType.Percent, 33.34F));
-
-        page.Controls.Add(CreateCard("Otimizações Core", CreateButtonGridFilled(1, 4, cpuSchedulerButton, gpuDisplayButton, powerButton, extremeLatencyButton)), 0, 0);
-        page.Controls.Add(CreateCard("Rede e Periféricos", CreateButtonGridFilled(1, 3, inputButton, networkButton, policyServicesButton)), 0, 1);
-        page.Controls.Add(CreateCard("GPU e Background", CreateButtonGridFilled(1, 3, gpuProfileButton, gpuRegistryButton, backgroundButton)), 0, 2);
+        var page = CreatePageGrid(1);
+        page.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+        page.Controls.Add(CreateCard("Módulos do Sistema", CreateGroupedModulesPanel()), 0, 0);
         return page;
+    }
+
+    private Control CreateGroupedModulesPanel()
+    {
+        var layout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            BackColor = Color.Transparent,
+            ColumnCount = 1,
+            RowCount = 5,
+            Margin = new Padding(0),
+            Padding = new Padding(0, 6, 0, 0)
+        };
+
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 82F));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 1F));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 82F));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 1F));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 82F));
+
+        layout.Controls.Add(CreateGroupedModuleSection(
+            "Otimizações Core",
+            4,
+            cpuSchedulerButton,
+            gpuDisplayButton,
+            powerButton,
+            extremeLatencyButton), 0, 0);
+        layout.Controls.Add(CreateSectionDivider(), 0, 1);
+        layout.Controls.Add(CreateGroupedModuleSection(
+            "Rede e Periféricos",
+            3,
+            inputButton,
+            networkButton,
+            policyServicesButton), 0, 2);
+        layout.Controls.Add(CreateSectionDivider(), 0, 3);
+        layout.Controls.Add(CreateGroupedModuleSection(
+            "GPU e Background",
+            3,
+            gpuProfileButton,
+            gpuRegistryButton,
+            backgroundButton), 0, 4);
+
+        return layout;
+    }
+
+    private static Control CreateGroupedModuleSection(string title, int columns, params Control[] buttons)
+    {
+        var layout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            BackColor = Color.Transparent,
+            ColumnCount = 1,
+            RowCount = 2,
+            Margin = new Padding(0),
+            Padding = new Padding(0, 8, 0, 8)
+        };
+
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 22F));
+        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+        layout.Controls.Add(CreateHeaderLabel(title, 10F, FontStyle.Bold, TextMain), 0, 0);
+        layout.Controls.Add(CreateButtonGridFilled(1, columns, buttons), 0, 1);
+        return layout;
+    }
+
+    private static Control CreateSectionDivider()
+    {
+        return new Panel
+        {
+            Dock = DockStyle.Fill,
+            Height = 1,
+            Margin = new Padding(0),
+            BackColor = Color.FromArgb(45, 45, 45)
+        };
     }
 
     private Control CreateTelemetryPage()
@@ -680,12 +1210,53 @@ internal sealed class ValorantTweakerForm : Form
     private Control CreateUtilitiesPage()
     {
         var page = CreatePageGrid(2);
-        page.RowStyles.Add(new RowStyle(SizeType.Absolute, 112F));
+        page.RowStyles.Add(new RowStyle(SizeType.Absolute, 208F));
         page.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
 
-        page.Controls.Add(CreateCard("Utilidades e Suporte", CreateButtonGridFilled(1, 4, revertButton, uninstallButton, aboutButton, openRiotSupportButton)), 0, 0);
+        page.Controls.Add(CreateCard("Utilidades e Suporte", CreateUtilitiesSupportPanel()), 0, 0);
         page.Controls.Add(CreateHardwareHub(), 0, 1);
         return page;
+    }
+
+    private Control CreateUtilitiesSupportPanel()
+    {
+        var host = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            BackColor = Color.Transparent,
+            Margin = new Padding(0),
+            Padding = new Padding(0, 6, 0, 0),
+            ColumnCount = 1,
+            RowCount = 7
+        };
+
+        host.SuspendLayout();
+        host.Controls.Clear();
+
+        host.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+        host.RowStyles.Add(new RowStyle(SizeType.Absolute, 36F));
+        host.RowStyles.Add(new RowStyle(SizeType.Absolute, 1F));
+        host.RowStyles.Add(new RowStyle(SizeType.Absolute, 36F));
+        host.RowStyles.Add(new RowStyle(SizeType.Absolute, 1F));
+        host.RowStyles.Add(new RowStyle(SizeType.Absolute, 36F));
+        host.RowStyles.Add(new RowStyle(SizeType.Absolute, 1F));
+        host.RowStyles.Add(new RowStyle(SizeType.Absolute, 36F));
+
+        ConfigureUtilityListButton(revertButton, Danger, Color.White);
+        ConfigureUtilityListButton(uninstallButton, Color.FromArgb(45, 45, 45), TextMain);
+        ConfigureUtilityListButton(aboutButton, Color.FromArgb(45, 45, 45), TextMain);
+        ConfigureUtilityListButton(openRiotSupportButton, Color.FromArgb(45, 45, 45), TextMain);
+
+        host.Controls.Add(revertButton, 0, 0);
+        host.Controls.Add(CreateSectionDivider(), 0, 1);
+        host.Controls.Add(uninstallButton, 0, 2);
+        host.Controls.Add(CreateSectionDivider(), 0, 3);
+        host.Controls.Add(aboutButton, 0, 4);
+        host.Controls.Add(CreateSectionDivider(), 0, 5);
+        host.Controls.Add(openRiotSupportButton, 0, 6);
+
+        host.ResumeLayout(false);
+        return host;
     }
 
     private Control CreateHardwareHub()
@@ -693,7 +1264,7 @@ internal sealed class ValorantTweakerForm : Form
         var grid = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
-            BackColor = Bg,
+            BackColor = Color.Transparent,
             ColumnCount = 2,
             RowCount = 2,
             Padding = new Padding(0),
@@ -705,33 +1276,37 @@ internal sealed class ValorantTweakerForm : Form
         grid.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
         grid.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
 
-        grid.Controls.Add(CreateCard(
+        grid.Controls.Add(CreateTelemetryCard(
             "CPU",
             CreateMetricPanel(
                 ("Uso total", nativeCpuLoadLabel),
                 ("Temperatura", nativeCpuTempLabel),
-                ("P-Core boost", nativeBoostDropLabel)),
-            Border), 0, 0);
+                ("P-Core boost", nativeBoostDropLabel))), 0, 0);
 
-        grid.Controls.Add(CreateCard(
+        grid.Controls.Add(CreateTelemetryCard(
             "GPU",
             CreateMetricPanel(
                 ("Uso 3D", nativeGpuLoadLabel),
-                ("Temperatura", nativeGpuTempLabel)),
-            Border), 1, 0);
+                ("Temperatura", nativeGpuTempLabel))), 1, 0);
 
-        grid.Controls.Add(CreateCard(
+        grid.Controls.Add(CreateTelemetryCard(
             "Memória",
             CreateMetricPanel(
                 ("Uso físico", nativeRamLoadLabel),
-                ("RAM usada", nativeRamUsedLabel)),
-            Border), 0, 1);
+                ("RAM usada", nativeRamUsedLabel))), 0, 1);
 
-        grid.Controls.Add(CreateCard(
+        grid.Controls.Add(CreateTelemetryCard(
             "Kernel / ETW",
-            CreateKernelTelemetryPanel(),
-            Border), 1, 1);
+            CreateKernelTelemetryPanel()), 1, 1);
         return grid;
+    }
+
+    private static Control CreateTelemetryCard(string title, Control content)
+    {
+        var card = (GamerCard)CreateCard(title, content, Border);
+        card.FillColor = Panel;
+        card.BackColor = Color.Transparent;
+        return card;
     }
 
     private Control CreateKernelTelemetryPanel()
@@ -857,7 +1432,7 @@ internal sealed class ValorantTweakerForm : Form
         var page = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
-            BackColor = Bg,
+            BackColor = Color.Transparent,
             ColumnCount = 1,
             RowCount = rows,
             Padding = new Padding(0)
@@ -872,8 +1447,8 @@ internal sealed class ValorantTweakerForm : Form
         var card = new GamerCard
         {
             Dock = DockStyle.Fill,
-            FillColor = Panel,
-            BorderColor = borderColor ?? Border
+            FillColor = GlassCardFill,
+            BorderColor = borderColor ?? GlassCardBorder
         };
 
         var layout = new TableLayoutPanel
@@ -894,7 +1469,7 @@ internal sealed class ValorantTweakerForm : Form
         return card;
     }
 
-    private static Control CreateButtonGridFilled(int rows, int columns, params Button[] buttons)
+    private static Control CreateButtonGridFilled(int rows, int columns, params Control[] buttons)
     {
         var grid = CreateButtonGrid(rows, columns);
         for (var i = 0; i < buttons.Length; i++)
@@ -925,7 +1500,7 @@ internal sealed class ValorantTweakerForm : Form
             Dock = DockStyle.Fill,
             ColumnCount = 1,
             RowCount = 1,
-            BackColor = Bg,
+            BackColor = Color.Transparent,
             Margin = new Padding(0),
             Padding = new Padding(0)
         };
@@ -952,7 +1527,7 @@ internal sealed class ValorantTweakerForm : Form
         panel.Controls.Add(CreateGlobalCommandPanel(), 0, 2);
         panel.Controls.Add(CreateHeaderLabel("Módulos por categoria", 10F, FontStyle.Bold, Accent), 0, 3);
         panel.Controls.Add(CreateCategoryGrid(), 0, 4);
-        panel.Controls.Add(CreateUtilityPanel(), 0, 5);
+        panel.Controls.Add(CreateUtilitiesSupportPanel(), 0, 5);
         return panel;
     }
 
@@ -1001,21 +1576,7 @@ internal sealed class ValorantTweakerForm : Form
         return grid;
     }
 
-    private Control CreateUtilityPanel()
-    {
-        var grid = CreateButtonGrid(1, 4);
-        revertButton.Dock = DockStyle.Fill;
-        uninstallButton.Dock = DockStyle.Fill;
-        aboutButton.Dock = DockStyle.Fill;
-        openRiotSupportButton.Dock = DockStyle.Fill;
-        grid.Controls.Add(revertButton, 0, 0);
-        grid.Controls.Add(uninstallButton, 1, 0);
-        grid.Controls.Add(aboutButton, 2, 0);
-        grid.Controls.Add(openRiotSupportButton, 3, 0);
-        return grid;
-    }
-
-    private static Control CreateCategoryPanel(string title, int columns, params Button[] buttons)
+    private static Control CreateCategoryPanel(string title, int columns, params Control[] buttons)
     {
         var panel = new TableLayoutPanel
         {
@@ -1070,6 +1631,33 @@ internal sealed class ValorantTweakerForm : Form
         }
     }
 
+    private static void ConfigureUtilityListButton(Button button, Color backColor, Color foreColor)
+    {
+        button.SuspendLayout();
+        button.Dock = DockStyle.Fill;
+        button.AutoSize = false;
+        button.Height = 36;
+        button.MinimumSize = new Size(140, 36);
+        button.MaximumSize = new Size(4096, 36);
+        button.Margin = new Padding(0);
+        button.Padding = new Padding(14, 0, 14, 0);
+        button.TextAlign = ContentAlignment.MiddleLeft;
+        button.BackColor = backColor;
+        button.ForeColor = foreColor;
+
+        if (button is RoundedButton rounded)
+        {
+            rounded.BorderRadius = 8;
+            rounded.BorderColor = Color.Transparent;
+            rounded.HoverBackColor = Color.FromArgb(
+                Math.Min(backColor.R + 10, 255),
+                Math.Min(backColor.G + 10, 255),
+                Math.Min(backColor.B + 10, 255));
+        }
+
+        button.ResumeLayout(false);
+    }
+
     private static TableLayoutPanel CreateButtonGrid(int rows, int columns)
     {
         var grid = new TableLayoutPanel
@@ -1103,7 +1691,7 @@ internal sealed class ValorantTweakerForm : Form
             Dock = DockStyle.Fill,
             Margin = new Padding(0),
             Padding = new Padding(14),
-            BackColor = Panel,
+            BackColor = Color.Transparent,
             ColumnCount = 1
         };
 
@@ -1134,7 +1722,7 @@ internal sealed class ValorantTweakerForm : Form
             Font = new Font("Segoe UI", 10.5F, FontStyle.Regular, GraphicsUnit.Point),
             ForeColor = Accent,
             Padding = new Padding(12, 0, 0, 0),
-            BackColor = Bg
+            BackColor = Color.Transparent
         };
     }
 
@@ -1174,10 +1762,11 @@ internal sealed class ValorantTweakerForm : Form
             DetectUrls = false,
             WordWrap = false,
             ScrollBars = RichTextBoxScrollBars.Vertical,
-            BackColor = Bg,
+            BackColor = ConsoleSurface,
             ForeColor = TerminalInfo,
             InnerPadding = 12,
-            Font = CreateTerminalFont()
+            Font = CreateTerminalFont(),
+            BorderStyle = BorderStyle.None
         };
     }
 
@@ -1298,42 +1887,149 @@ internal sealed class ValorantTweakerForm : Form
         return CreateButton(text, Panel, TextMain);
     }
 
-    private Button CreateTabButton(string text)
+    private static NightButton CreateModuleButton(string text)
+    {
+        var button = new NightButton
+        {
+            Text = text,
+            Height = 42,
+            Width = 170,
+            MinimumSize = new Size(110, 32),
+            Margin = new Padding(3),
+            Cursor = Cursors.Hand,
+            Font = new Font("Segoe UI", 9F, FontStyle.Bold, GraphicsUnit.Point),
+            ForeColor = TextMain,
+            BackColor = GlassCardFill,
+            NormalBackColor = GlassCardFill,
+            HoverBackColor = Color.FromArgb(30, 255, 255, 255),
+            PressedBackColor = Color.FromArgb(42, 0, 180, 216),
+            HoverForeColor = Color.White,
+            PressedForeColor = Color.White,
+            Radius = 8,
+            SmoothingType = System.Drawing.Drawing2D.SmoothingMode.AntiAlias
+        };
+
+        button.MouseEnter += (_, _) =>
+        {
+            button.ForeColor = Color.White;
+            button.Invalidate();
+        };
+        button.MouseLeave += (_, _) =>
+        {
+            button.ForeColor = TextMain;
+            button.Invalidate();
+        };
+
+        return button;
+    }
+
+    private static Button CreateWindowCommandButton(string text, Color? foreColor = null, Color? hoverBackColor = null)
     {
         var button = new Button
         {
             Text = text,
-            Dock = DockStyle.Fill,
-            TextAlign = ContentAlignment.MiddleLeft,
-            Padding = new Padding(14, 0, 0, 0),
-            Margin = new Padding(0, 0, 0, 6),
-            BackColor = SidebarBg,
-            ForeColor = TextMuted,
+            Width = 34,
+            Height = 28,
+            Margin = new Padding(4, 0, 0, 0),
             FlatStyle = FlatStyle.Flat,
+            BackColor = Panel,
+            ForeColor = foreColor ?? TextMain,
+            Font = new Font("Segoe UI Symbol", 9.5F, FontStyle.Bold, GraphicsUnit.Point),
             Cursor = Cursors.Hand,
-            UseVisualStyleBackColor = false,
-            Font = new Font("Segoe UI", 9.5F, FontStyle.Bold, GraphicsUnit.Point)
+            TabStop = false,
+            UseVisualStyleBackColor = false
         };
 
+        var normalBackColor = button.BackColor;
+        var hotBackColor = hoverBackColor ?? Color.FromArgb(36, 43, 58);
+
         button.FlatAppearance.BorderSize = 0;
+        button.FlatAppearance.MouseDownBackColor = hotBackColor;
+        button.FlatAppearance.MouseOverBackColor = hotBackColor;
+        button.MouseEnter += (_, _) =>
+        {
+            button.BackColor = hotBackColor;
+            button.ForeColor = Color.White;
+        };
+        button.MouseLeave += (_, _) =>
+        {
+            button.BackColor = normalBackColor;
+            button.ForeColor = foreColor ?? TextMain;
+        };
+
+        return button;
+    }
+
+    private Button CreateTabButton(string text, string iconGlyph)
+    {
+        var inactiveTextColor = Color.FromArgb(200, 200, 200);
+        var button = new SidebarNavButton
+        {
+            Text = text,
+            Dock = DockStyle.None,
+            AutoSize = false,
+            Anchor = AnchorStyles.None,
+            TextAlign = ContentAlignment.MiddleLeft,
+            Padding = new Padding(0),
+            Margin = new Padding(0),
+            BackColor = Color.Transparent,
+            ForeColor = inactiveTextColor,
+            Cursor = Cursors.Hand,
+            Font = new Font("Segoe UI", 9.5F, FontStyle.Regular, GraphicsUnit.Point),
+            Size = new Size(SidebarButtonWidth, SidebarButtonHeight),
+            MinimumSize = new Size(SidebarButtonWidth, SidebarButtonHeight),
+            MaximumSize = new Size(SidebarButtonWidth, SidebarButtonHeight),
+            IconGlyph = iconGlyph,
+            IconColor = inactiveTextColor,
+            SelectedFillColor = ColorTranslator.FromHtml("#383838"),
+            HoverFillColor = Color.FromArgb(48, 48, 48),
+            Radius = 10
+        };
+
         button.MouseEnter += (_, _) =>
         {
             if (!ReferenceEquals(activeTabButton, button))
             {
-                button.BackColor = Panel;
-                button.ForeColor = TextMain;
+                button.ForeColor = Color.White;
+                button.Invalidate();
             }
         };
         button.MouseLeave += (_, _) =>
         {
             if (!ReferenceEquals(activeTabButton, button))
             {
-                button.BackColor = SidebarBg;
-                button.ForeColor = TextMuted;
+                button.BackColor = Color.Transparent;
+                button.ForeColor = inactiveTextColor;
+                button.Invalidate();
             }
         };
 
         return button;
+    }
+
+    private static void ApplyRoundedRegion(Control control, int radius)
+    {
+        if (control.Width <= 0 || control.Height <= 0)
+        {
+            return;
+        }
+
+        using var path = new GraphicsPath();
+        var diameter = radius * 2;
+        var rect = new Rectangle(0, 0, control.Width - 1, control.Height - 1);
+        var arc = new Rectangle(rect.Location, new Size(diameter, diameter));
+
+        path.AddArc(arc, 180, 90);
+        arc.X = rect.Right - diameter;
+        path.AddArc(arc, 270, 90);
+        arc.Y = rect.Bottom - diameter;
+        path.AddArc(arc, 0, 90);
+        arc.X = rect.Left;
+        path.AddArc(arc, 90, 90);
+        path.CloseFigure();
+
+        control.Region?.Dispose();
+        control.Region = new Region(path);
     }
 
     private static Button CreateButton(string text, Color backColor, Color foreColor)
@@ -1548,7 +2244,7 @@ internal sealed class ValorantTweakerForm : Form
         }
     }
 
-    private IEnumerable<Button> EnumerateActionButtons()
+    private IEnumerable<Control> EnumerateActionButtons()
     {
         yield return diagnoseButton;
         yield return btnAutoOptimize;
@@ -2253,19 +2949,19 @@ internal sealed class ValorantTweakerForm : Form
 
     private static bool IsForegroundFullscreenWindow()
     {
-        var foreground = NativeMethods.GetForegroundWindow();
+        var foreground = NativeUiMethods.GetForegroundWindow();
         if (foreground == nint.Zero)
         {
             return false;
         }
 
-        _ = NativeMethods.GetWindowThreadProcessId(foreground, out var processId);
+        _ = NativeUiMethods.GetWindowThreadProcessId(foreground, out var processId);
         if (processId == Environment.ProcessId)
         {
             return false;
         }
 
-        if (!NativeMethods.GetWindowRect(foreground, out var rect))
+        if (!NativeUiMethods.GetWindowRect(foreground, out var rect))
         {
             return false;
         }
@@ -2560,7 +3256,10 @@ internal sealed class ValorantTweakerForm : Form
 
         if (shouldClear)
         {
+            logBox.BackColor = ConsoleSurface;
             logBox.Clear();
+            logBox.Invalidate();
+            logBox.Update();
         }
 
         foreach (var line in lines)
@@ -2597,7 +3296,10 @@ internal sealed class ValorantTweakerForm : Form
             return;
         }
 
+        logBox.BackColor = ConsoleSurface;
         logBox.Clear();
+        logBox.Invalidate();
+        logBox.Update();
     }
 
     private static Color ResolveTerminalColor(LogType type)
@@ -3069,28 +3771,6 @@ internal sealed class ValorantTweakerForm : Form
             "Sobre",
             MessageBoxButtons.OK,
             MessageBoxIcon.Information);
-    }
-
-    private static class NativeMethods
-    {
-        [DllImport("user32.dll")]
-        public static extern nint GetForegroundWindow();
-
-        [DllImport("user32.dll")]
-        public static extern uint GetWindowThreadProcessId(nint hWnd, out uint processId);
-
-        [DllImport("user32.dll")]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        public static extern bool GetWindowRect(nint hWnd, out RECT rect);
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    private readonly struct RECT
-    {
-        public readonly int Left;
-        public readonly int Top;
-        public readonly int Right;
-        public readonly int Bottom;
     }
 }
 
