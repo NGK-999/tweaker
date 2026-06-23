@@ -1,5 +1,5 @@
 #define MyAppName "ApexTweaker"
-#define MyAppVersion "2.0.0"
+#define MyAppVersion "2.0.1"
 #define MyAppPublisher "Igor Silva"
 #define MyAppExeName "ApexTweaker.exe"
 #define MyAppURL "https://github.com/NGK-999/tweaker"

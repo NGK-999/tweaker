@@ -30,6 +30,6 @@ O cliente so precisa executar:
 
 - Windows SmartScreen pode alertar enquanto o arquivo nao estiver assinado digitalmente.
 - Para distribuicao comercial, assine o executavel com certificado de code signing.
-- A versao atual e `2.0.0`.
+- A versao atual e `2.0.1`.
 - O app cria backups em `C:\ProgramData\ApexTweaker\Backups`.
 - O app nao depende de instalador `.exe`; a entrega oficial e o binario unico em `release-v2`.

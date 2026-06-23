@@ -12,8 +12,6 @@ using System.Threading;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using ApexTweaker.NativeInterop;
-using ApexTweaker.Service;
-using ApexTweaker.UI;
 using LibreHardwareMonitor.Hardware;
 using Renomeador.Models;
 using Renomeador.Forms.Components;
@@ -95,13 +93,11 @@ internal sealed class ValorantTweakerForm : Form
     private readonly GpuOptimizationService gpuOptimizationService = new();
     private readonly OptimizationEngine optimizationEngine = new();
     private readonly HardwareTelemetryService hardwareTelemetryService = new();
-    private readonly TelemetryPipeServer telemetryPipeServer;
-    private readonly TelemetryPipeClient telemetryPipeClient = new();
     private readonly EtwFrameTracker etwFrameTracker;
     private readonly PerformanceGamerChart performanceChart = new() { Dock = DockStyle.Fill };
     private readonly System.Windows.Forms.Timer telemetryWatcherTimer = new() { Interval = 250 };
     private readonly System.Windows.Forms.Timer nativeHardwareTimer = new() { Interval = 1000 };
-    private readonly System.Windows.Forms.Timer terminalFlushTimer = new() { Interval = 33 };
+    private readonly System.Windows.Forms.Timer terminalFlushTimer = new() { Interval = 90 };
 
     private readonly ConsoleControl consoleView;
     private readonly Control telemetryLogFrame;
@@ -206,14 +202,10 @@ internal sealed class ValorantTweakerForm : Form
         creditsLabel = CreateCreditsLabel();
         consoleView = new ConsoleControl();
         telemetryLogFrame = BuildLogFrame();
-        telemetryPipeServer = new TelemetryPipeServer(hardwareTelemetryService);
         etwFrameTracker = new EtwFrameTracker(hardwareTelemetryService);
         hardwareTelemetryService.TelemetryPointRecorded += OnTelemetryPointRecorded;
         hardwareTelemetryService.MetricsSnapshotUpdated += OnTelemetryMetricsSnapshotUpdated;
         hardwareTelemetryService.DiagnosticEventRecorded += OnTelemetryDiagnosticEventRecorded;
-        telemetryPipeServer.Start();
-        telemetryPipeClient.MetricsReceived += OnTelemetryPipeMetricsReceived;
-        telemetryPipeClient.Start();
         etwFrameTracker.Error += OnEtwFrameTrackerError;
 
         diagnoseButton = CreateModuleButton("Diagnosticar");
@@ -294,8 +286,6 @@ internal sealed class ValorantTweakerForm : Form
             terminalFlushTimer.Dispose();
             telemetryPulseTimer.Dispose();
             etwFrameTracker.Dispose();
-            telemetryPipeServer.Dispose();
-            telemetryPipeClient.Dispose();
             hardwareTelemetryService.Dispose();
             DisposeRuntimeLog();
             rootLayout.Dispose();
@@ -2031,8 +2021,8 @@ internal sealed class ValorantTweakerForm : Form
         button.Font = new Font("Segoe UI", 8.5F, FontStyle.Bold, GraphicsUnit.Point);
         if (button is RoundedButton rounded)
         {
-            rounded.BorderColor = Color.Transparent;
-            rounded.NormalBorderColor = Color.Transparent;
+            rounded.BorderColor = Color.FromArgb(50, 50, 52);
+            rounded.NormalBorderColor = Color.FromArgb(50, 50, 52);
             rounded.HoverBorderColor = Color.FromArgb(50, 50, 52);
             rounded.HoverBackColor = Color.FromArgb(34, 39, 54);
         }
@@ -2047,8 +2037,8 @@ internal sealed class ValorantTweakerForm : Form
         var button = CreateButton(text, Panel, TextMain);
         if (button is RoundedButton rounded)
         {
-            rounded.BorderColor = Color.Transparent;
-            rounded.NormalBorderColor = Color.Transparent;
+            rounded.BorderColor = Color.FromArgb(50, 50, 52);
+            rounded.NormalBorderColor = Color.FromArgb(50, 50, 52);
             rounded.HoverBorderColor = Color.FromArgb(50, 50, 52);
             rounded.HoverBackColor = Color.FromArgb(44, 44, 46);
         }
@@ -2223,9 +2213,10 @@ internal sealed class ValorantTweakerForm : Form
             ForeColor = foreColor,
             Cursor = Cursors.Hand,
             UseVisualStyleBackColor = false,
+            TabStop = false,
             Font = new Font("Segoe UI", 9F, FontStyle.Bold, GraphicsUnit.Point),
-            BorderColor = Color.Transparent,
-            NormalBorderColor = Color.Transparent,
+            BorderColor = Color.FromArgb(50, 50, 52),
+            NormalBorderColor = Color.FromArgb(50, 50, 52),
             HoverBorderColor = Color.FromArgb(50, 50, 52),
             HoverBackColor = Color.FromArgb(
                 Math.Min(backColor.R + 18, 255),
@@ -2819,31 +2810,6 @@ internal sealed class ValorantTweakerForm : Form
 
     private void OnTelemetryMetricsSnapshotUpdated(object? sender, HardwareTelemetryService.TelemetryMetricsUpdatedEventArgs e)
     {
-        if (telemetryPipeClient.IsConnected)
-        {
-            return;
-        }
-
-        if (IsDisposed || !IsHandleCreated)
-        {
-            return;
-        }
-
-        if (_isUiSuspended || telemetryUiSuspended)
-        {
-            return;
-        }
-
-        PostToUi(() =>
-        {
-            nativeDpcLatencyLabel.Text = FormatLatencyMicros(e.Snapshot.PeakDpcLatencyMicros);
-            nativeBoostDropLabel.Text = FormatMegahertz(e.Snapshot.BoostDropMhz);
-            nativeHardwareStatusLabel.Text = e.Snapshot.TelemetryStatusMessage;
-        });
-    }
-
-    private void OnTelemetryPipeMetricsReceived(object? sender, TelemetryPipeMetricsReceivedEventArgs e)
-    {
         if (IsDisposed || !IsHandleCreated)
         {
             return;
@@ -3304,9 +3270,9 @@ internal sealed class ValorantTweakerForm : Form
             lock (runtimeLogSync)
             {
                 runtimeLogWriter?.Dispose();
-                runtimeLogWriter = new StreamWriter(RuntimeLogPath, append: false, Encoding.UTF8)
+                runtimeLogWriter = new StreamWriter(RuntimeLogPath, append: false, Encoding.UTF8, 16 * 1024)
                 {
-                    AutoFlush = true
+                    AutoFlush = false
                 };
             }
         }
@@ -3414,6 +3380,7 @@ internal sealed class ValorantTweakerForm : Form
         }
 
         ApplyConsoleBatch(shouldClear, lines);
+        FlushRuntimeLog();
     }
 
     private void ClearTerminal()

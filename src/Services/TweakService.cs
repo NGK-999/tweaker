@@ -37,6 +37,9 @@ internal sealed class TweakService
     private const string SubUsb = "2a737441-1930-4402-8d77-b2bea5845741";
     private const string ProcessorBoostMode = "be337238-0d82-4146-a960-4f3749d470c7";
     private const string ProcessorEnergyPreference = "36687f9e-e3a5-4dbf-b1dc-15eb381c6863";
+    private const string ProcessorMinimumState = "893dee8e-2bef-41e0-89c6-b55d0929964c";
+    private const string ProcessorMaximumState = "bc5038f7-23e0-4960-96da-33abaf5935ec";
+    private const string ProcessorCoolingPolicy = "94d3a615-a899-4ac5-ae2b-e4d8f634367f";
     private const string ProcessorCoreParkingMinCores = "0cc5b647-c1df-4637-891a-dec35c318583";
     private const string ProcessorCoreParkingMaxCores = "ea062031-0e34-4ff1-9b6d-eb1059334028";
     private const string PciExpressAspm = "ee12f906-d277-404b-b6da-e5fa1a576df5";
@@ -254,9 +257,9 @@ internal sealed class TweakService
             log.AddRange(ActivateUltimatePerformanceOrFallback());
             ApplyThermalAwareProcessorBoostProfile(log);
 
-            RunPowercfgSetting("/setacvalueindex SCHEME_CURRENT SUB_PROCESSOR PROCTHROTTLEMIN 100", "CPU minimo em 100% na tomada.", log);
-            RunPowercfgSetting("/setacvalueindex SCHEME_CURRENT SUB_PROCESSOR PROCTHROTTLEMAX 100", "CPU maximo em 100% na tomada.", log);
-            RunPowercfgSetting("/setacvalueindex SCHEME_CURRENT SUB_PROCESSOR SYSCOOLPOL 1", "Politica de resfriamento ativa na tomada.", log);
+            RunPowercfgSetting($"/setacvalueindex {PowerSchemeCurrent} {SubProcessor} {ProcessorMinimumState} 100", "CPU minimo em 100% na tomada.", log);
+            RunPowercfgSetting($"/setacvalueindex {PowerSchemeCurrent} {SubProcessor} {ProcessorMaximumState} 100", "CPU maximo em 100% na tomada.", log);
+            RunPowercfgSetting($"/setacvalueindex {PowerSchemeCurrent} {SubProcessor} {ProcessorCoolingPolicy} 1", "Politica de resfriamento ativa na tomada.", log);
             RunPowercfgSetting($"/setacvalueindex {PowerSchemeCurrent} {SubUsb} {UsbSelectiveSuspend} 0", "Suspensao seletiva USB desativada na tomada via GUID absoluto.", log);
             RunPowercfgSetting("/setactive SCHEME_CURRENT", "Plano atual reativado apos ajustes de energia.", log);
 
@@ -1205,13 +1208,12 @@ internal sealed class TweakService
                 () =>
                 {
                     var state = commandRunner.Run("sc.exe", $"query \"{serviceName}\"");
-                    var config = commandRunner.Run("sc.exe", $"qc \"{serviceName}\"");
-                    if (state.ExitCode != 0 || config.ExitCode != 0)
+                    if (state.ExitCode != 0)
                     {
                         throw new InvalidOperationException($"Nao foi possivel verificar o servico {serviceName}.");
                     }
 
-                    var startMode = ParseServiceStartModeOutput(config.Output);
+                    var startMode = backupService.TryReadServiceStartMode(serviceName);
                     if (!string.Equals(startMode, "disabled", StringComparison.OrdinalIgnoreCase))
                     {
                         throw new InvalidOperationException($"Read-back divergente para {serviceName}. StartMode atual: {startMode}");

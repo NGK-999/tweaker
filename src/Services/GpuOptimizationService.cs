@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Management;
+using System.Security;
 using System.Text.Json;
 using Microsoft.Win32;
 using Renomeador.Infrastructure;
@@ -154,6 +155,14 @@ internal sealed class GpuOptimizationService
                     }
                 }
             }
+        }
+        catch (UnauthorizedAccessException)
+        {
+            intro.Add("[AVISO] Chave do driver de video protegida pelo Windows. Ajuste opcional de perfil via Registro foi ignorado.");
+        }
+        catch (SecurityException)
+        {
+            intro.Add("[AVISO] Chave do driver de video protegida pelo Windows. Ajuste opcional de perfil via Registro foi ignorado.");
         }
         catch (Exception ex)
         {

@@ -14,3 +14,7 @@ CONVERSA_APEXTWEAKER.txt
 
 TestResults/
 *.nupkg
+.cursor/
+native-msbuild-path.txt
+page0_render.bin
+pdf-pages/

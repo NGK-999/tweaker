@@ -24,7 +24,7 @@ internal sealed class SurfaceSectionCard : UserControl
 
         contentHost = new Panel
         {
-            BackColor = Color.Transparent,
+            BackColor = ColorTranslator.FromHtml("#2A2A2A"),
             Margin = new Padding(0),
             Padding = new Padding(0)
         };

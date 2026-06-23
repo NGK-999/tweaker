@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -21,6 +22,22 @@ internal sealed class BackupService
     private const string EdgeRemovalRestoreHandler = "MicrosoftEdge.SystemLevelRemoval";
     private readonly CommandRunner commandRunner = new();
     private Dictionary<string, string>? powerAliasCache;
+
+    [DllImport("powrprof.dll", SetLastError = true)]
+    private static extern uint PowerReadACValueIndex(
+        IntPtr rootPowerKey,
+        ref Guid schemeGuid,
+        ref Guid subgroupGuid,
+        ref Guid settingGuid,
+        out uint acValueIndex);
+
+    [DllImport("powrprof.dll", SetLastError = true)]
+    private static extern uint PowerReadDCValueIndex(
+        IntPtr rootPowerKey,
+        ref Guid schemeGuid,
+        ref Guid subgroupGuid,
+        ref Guid settingGuid,
+        out uint dcValueIndex);
 
     private static readonly (RegistryKey Root, string RootName, string Path, string Name)[] RegistryTargets =
     [
@@ -195,16 +212,10 @@ internal sealed class BackupService
             return;
         }
 
-        var config = commandRunner.Run("sc.exe", $"qc \"{serviceName}\"");
-        if (config.ExitCode != 0)
-        {
-            throw new InvalidOperationException($"Nao foi possivel ler configuracao do servico {serviceName}: {config.Output}");
-        }
-
         session.ServiceSnapshots[serviceName] = new ServiceStateSnapshot(
             serviceName,
             Exists: true,
-            StartMode: ParseServiceStartMode(config.Output),
+            StartMode: ReadServiceStartMode(serviceName),
             Status: ParseServiceStatus(query.Output),
             Sequence: session.NextSequence());
     }
@@ -406,6 +417,18 @@ internal sealed class BackupService
     public string? ReadActivePowerScheme()
     {
         return GetActivePowerScheme();
+    }
+
+    public string? TryReadServiceStartMode(string serviceName)
+    {
+        try
+        {
+            return ReadServiceStartMode(serviceName);
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     public IReadOnlyList<string> CreateBackup()
@@ -1016,45 +1039,6 @@ internal sealed class BackupService
         return result.Output.Trim();
     }
 
-    private static string? ParseServiceStartMode(string output)
-    {
-        foreach (var rawLine in output.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries))
-        {
-            var line = rawLine.Trim();
-            if (!line.StartsWith("START_TYPE", StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
-            if (line.Contains("AUTO_START", StringComparison.OrdinalIgnoreCase))
-            {
-                return "auto";
-            }
-
-            if (line.Contains("DEMAND_START", StringComparison.OrdinalIgnoreCase))
-            {
-                return "demand";
-            }
-
-            if (line.Contains("DISABLED", StringComparison.OrdinalIgnoreCase))
-            {
-                return "disabled";
-            }
-
-            if (line.Contains("SYSTEM_START", StringComparison.OrdinalIgnoreCase))
-            {
-                return "system";
-            }
-
-            if (line.Contains("BOOT_START", StringComparison.OrdinalIgnoreCase))
-            {
-                return "boot";
-            }
-        }
-
-        return null;
-    }
-
     private static string? ParseServiceStatus(string output)
     {
         foreach (var rawLine in output.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries))
@@ -1092,6 +1076,41 @@ internal sealed class BackupService
         out int value,
         out string error)
     {
+        if (Guid.TryParse(resolvedSchemeGuid, out var schemeGuid) &&
+            Guid.TryParse(resolvedSubgroupGuid, out var subgroupGuid) &&
+            Guid.TryParse(resolvedSettingGuid, out var settingGuid))
+        {
+            try
+            {
+                uint valueIndex;
+                uint apiStatus;
+
+                if (isAcValue)
+                {
+                    apiStatus = PowerReadACValueIndex(IntPtr.Zero, ref schemeGuid, ref subgroupGuid, ref settingGuid, out valueIndex);
+                }
+                else
+                {
+                    apiStatus = PowerReadDCValueIndex(IntPtr.Zero, ref schemeGuid, ref subgroupGuid, ref settingGuid, out valueIndex);
+                }
+
+                if (apiStatus == 0)
+                {
+                    value = unchecked((int)valueIndex);
+                    error = string.Empty;
+                    return true;
+                }
+            }
+            catch (DllNotFoundException)
+            {
+                // Fallback para powercfg /query quando a API nativa nao estiver disponivel.
+            }
+            catch (EntryPointNotFoundException)
+            {
+                // Fallback para powercfg /query quando a API nativa nao estiver disponivel.
+            }
+        }
+
         var result = commandRunner.Run(
             "powercfg",
             $"/query {resolvedSchemeGuid} {resolvedSubgroupGuid} {resolvedSettingGuid}");
@@ -1107,12 +1126,12 @@ internal sealed class BackupService
             ? new[]
             {
                 @"Current AC Power Setting Index:\s*0x([0-9a-fA-F]+)",
-                @"(?im)^.*\bAC\b.*0x([0-9a-fA-F]+)\s*$"
+                @"(?im)^.*(?:\bAC\b|\bCA\b).*(?:0x([0-9a-fA-F]+))\s*$"
             }
             : new[]
             {
                 @"Current DC Power Setting Index:\s*0x([0-9a-fA-F]+)",
-                @"(?im)^.*\bDC\b.*0x([0-9a-fA-F]+)\s*$"
+                @"(?im)^.*\bDC\b.*(?:0x([0-9a-fA-F]+))\s*$"
             };
 
         Match match = Match.Empty;
@@ -1135,6 +1154,26 @@ internal sealed class BackupService
         value = int.Parse(match.Groups[1].Value, NumberStyles.HexNumber, CultureInfo.InvariantCulture);
         error = string.Empty;
         return true;
+    }
+
+    private static string? ReadServiceStartMode(string serviceName)
+    {
+        using var key = Registry.LocalMachine.OpenSubKey($@"SYSTEM\CurrentControlSet\Services\{serviceName}");
+        var rawValue = key?.GetValue("Start");
+        if (rawValue is not int startMode)
+        {
+            return null;
+        }
+
+        return startMode switch
+        {
+            0 => "boot",
+            1 => "system",
+            2 => "auto",
+            3 => "demand",
+            4 => "disabled",
+            _ => null
+        };
     }
 
     private string ResolvePowerSchemeGuid(string schemeGuidOrAlias)

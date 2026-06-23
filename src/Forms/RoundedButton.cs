@@ -10,10 +10,14 @@ internal sealed class RoundedButton : Button
 {
     private bool isHovering;
 
+    protected override bool ShowFocusCues => false;
+
     public RoundedButton()
     {
         BorderRadius = 8;
         BorderColor = Color.FromArgb(42, 50, 66);
+        NormalBorderColor = BorderColor;
+        HoverBorderColor = BorderColor;
         FlatStyle = FlatStyle.Flat;
         FlatAppearance.BorderSize = 0;
         UseVisualStyleBackColor = false;
@@ -35,11 +39,20 @@ internal sealed class RoundedButton : Button
 
     [Browsable(false)]
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+    public Color NormalBorderColor { get; set; }
+
+    [Browsable(false)]
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+    public Color HoverBorderColor { get; set; }
+
+    [Browsable(false)]
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public Color HoverBackColor { get; set; }
 
     protected override void OnMouseEnter(EventArgs e)
     {
         isHovering = true;
+        BorderColor = HoverBorderColor;
         Invalidate();
         base.OnMouseEnter(e);
     }
@@ -47,6 +60,7 @@ internal sealed class RoundedButton : Button
     protected override void OnMouseLeave(EventArgs e)
     {
         isHovering = false;
+        BorderColor = NormalBorderColor;
         Invalidate();
         base.OnMouseLeave(e);
     }
@@ -64,6 +78,18 @@ internal sealed class RoundedButton : Button
         Region = new Region(path);
     }
 
+    protected override void OnGotFocus(EventArgs e)
+    {
+        base.OnGotFocus(e);
+        Invalidate();
+    }
+
+    protected override void OnLostFocus(EventArgs e)
+    {
+        base.OnLostFocus(e);
+        Invalidate();
+    }
+
     protected override void OnPaint(PaintEventArgs e)
     {
         if (Width <= 0 || Height <= 0)
@@ -73,17 +99,13 @@ internal sealed class RoundedButton : Button
         }
 
         e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+        e.Graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
 
         var rect = new Rectangle(0, 0, Width - 1, Height - 1);
         using var path = CreateRoundedPath(rect, BorderRadius);
         var fillColor = isHovering && HoverBackColor != Color.Empty ? HoverBackColor : BackColor;
         using var border = new Pen(BorderColor, 1F);
-
-        if (fillColor.A < 255)
-        {
-            using var clearBrush = new SolidBrush(Parent?.BackColor ?? SystemColors.Control);
-            e.Graphics.FillRectangle(clearBrush, ClientRectangle);
-        }
+        e.Graphics.Clear(ResolveBackgroundColor(Parent));
 
         if (fillColor.A > 0)
         {
@@ -99,6 +121,11 @@ internal sealed class RoundedButton : Button
             rect.Right - Padding.Right,
             rect.Bottom - Padding.Bottom);
         var flags = ResolveTextFlags(TextAlign);
+        if (!UsesIconFont(Font))
+        {
+            flags |= TextFormatFlags.NoPadding;
+        }
+
         TextRenderer.DrawText(e.Graphics, Text, Font, textRect, ForeColor, flags);
     }
 
@@ -139,5 +166,27 @@ internal sealed class RoundedButton : Button
         path.CloseFigure();
 
         return path;
+    }
+
+    private static bool UsesIconFont(Font font)
+    {
+        var family = font.FontFamily.Name;
+        return family.Equals("Segoe Fluent Icons", StringComparison.OrdinalIgnoreCase) ||
+               family.Equals("Segoe MDL2 Assets", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static Color ResolveBackgroundColor(Control? control)
+    {
+        while (control is not null)
+        {
+            if (control.BackColor.A == 255 && control.BackColor != Color.Transparent)
+            {
+                return control.BackColor;
+            }
+
+            control = control.Parent;
+        }
+
+        return Color.FromArgb(42, 42, 42);
     }
 }

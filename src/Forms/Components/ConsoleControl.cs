@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
-using System.Text;
+using System.Runtime.InteropServices;
 using System.Windows.Forms;
 
 namespace Renomeador.Forms.Components;
@@ -10,10 +10,10 @@ internal sealed class ConsoleControl : UserControl
 {
     private static readonly Color ConsoleBackColor = Color.FromArgb(20, 20, 22);
     private static readonly Color ConsoleTextColor = Color.FromArgb(224, 224, 224);
+    private const int WmSetRedraw = 0x000B;
 
     private readonly Panel consoleHost;
-    private readonly TextBox terminalBox;
-    private readonly StringBuilder textBuffer = new(16 * 1024);
+    private readonly RichTextBox terminalBox;
 
     public ConsoleControl()
     {
@@ -36,19 +36,21 @@ internal sealed class ConsoleControl : UserControl
             BackColor = ConsoleBackColor
         };
 
-        terminalBox = new TextBox
+        terminalBox = new RichTextBox
         {
             Dock = DockStyle.Fill,
             Margin = new Padding(0),
             ReadOnly = true,
             WordWrap = false,
             Multiline = true,
-            ScrollBars = ScrollBars.Both,
+            ScrollBars = RichTextBoxScrollBars.Both,
             BackColor = ConsoleBackColor,
             ForeColor = ConsoleTextColor,
             Font = CreateTerminalFont(),
             BorderStyle = BorderStyle.None,
-            ShortcutsEnabled = true
+            ShortcutsEnabled = true,
+            DetectUrls = false,
+            HideSelection = false
         };
 
         consoleHost.Controls.Add(terminalBox);
@@ -64,28 +66,34 @@ internal sealed class ConsoleControl : UserControl
             return;
         }
 
+        BeginUpdate();
         try
         {
-            textBuffer.Clear();
-            textBuffer.EnsureCapacity(Math.Max(256, lines.Count * 64));
+            terminalBox.Clear();
 
             foreach (var line in lines)
             {
-                textBuffer.Append(NormalizeConsoleText(line.Text));
+                var normalizedText = NormalizeConsoleText(line.Text);
+                if (normalizedText.Length == 0)
+                {
+                    continue;
+                }
+
+                terminalBox.SelectionStart = terminalBox.TextLength;
+                terminalBox.SelectionLength = 0;
+                terminalBox.SelectionColor = line.Color.IsEmpty ? ConsoleTextColor : line.Color;
+                terminalBox.AppendText(normalizedText);
             }
 
-            terminalBox.SuspendLayout();
-            terminalBox.Text = textBuffer.ToString();
+            terminalBox.SelectionColor = ConsoleTextColor;
             terminalBox.SelectionStart = terminalBox.TextLength;
             terminalBox.SelectionLength = 0;
             terminalBox.ScrollToCaret();
         }
         finally
         {
-            terminalBox.ResumeLayout();
+            EndUpdate();
         }
-
-        RefreshSurface();
     }
 
     public void ClearEntries()
@@ -95,17 +103,15 @@ internal sealed class ConsoleControl : UserControl
             return;
         }
 
+        BeginUpdate();
         try
         {
-            terminalBox.SuspendLayout();
             terminalBox.Clear();
         }
         finally
         {
-            terminalBox.ResumeLayout();
+            EndUpdate();
         }
-
-        RefreshSurface();
     }
 
     public void RefreshSurface()
@@ -143,6 +149,30 @@ internal sealed class ConsoleControl : UserControl
         e.Graphics.Clear(ConsoleBackColor);
     }
 
+    private void BeginUpdate()
+    {
+        if (!terminalBox.IsHandleCreated)
+        {
+            return;
+        }
+
+        terminalBox.SuspendLayout();
+        _ = SendMessage(terminalBox.Handle, WmSetRedraw, IntPtr.Zero, IntPtr.Zero);
+    }
+
+    private void EndUpdate()
+    {
+        if (!terminalBox.IsHandleCreated)
+        {
+            return;
+        }
+
+        _ = SendMessage(terminalBox.Handle, WmSetRedraw, new IntPtr(1), IntPtr.Zero);
+        terminalBox.ResumeLayout();
+        terminalBox.Invalidate();
+        terminalBox.Update();
+    }
+
     private static string NormalizeConsoleText(string text)
     {
         if (string.IsNullOrEmpty(text))
@@ -167,4 +197,6 @@ internal sealed class ConsoleControl : UserControl
         }
     }
 
+    [DllImport("user32.dll", CharSet = CharSet.Auto)]
+    private static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
 }
