@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
@@ -160,7 +161,7 @@ internal sealed class HardwareTelemetryService : IDisposable
                         // Cleanup is best-effort and must never block app startup.
                     }
                 }
-            });
+            }).ConfigureAwait(false);
         }
         catch
         {
@@ -170,8 +171,8 @@ internal sealed class HardwareTelemetryService : IDisposable
 
     public static async Task InitializeBenchmarkSessionsAsync()
     {
-        BaselineSession = await LoadSessionDataAsync(BaselineSessionFilePath) ?? new TelemetrySessionData();
-        OptimizedSession = await LoadSessionDataAsync(OptimizedSessionFilePath) ?? new TelemetrySessionData();
+        BaselineSession = await LoadSessionDataAsync(BaselineSessionFilePath).ConfigureAwait(false) ?? new TelemetrySessionData();
+        OptimizedSession = await LoadSessionDataAsync(OptimizedSessionFilePath).ConfigureAwait(false) ?? new TelemetrySessionData();
 
         BenchmarkState = HasSessionData(BaselineSession)
             ? HasSessionData(OptimizedSession) ? BenchmarkState.Finished : BenchmarkState.OptimizedPending
@@ -186,7 +187,7 @@ internal sealed class HardwareTelemetryService : IDisposable
         {
             BaselineSession = session;
             OptimizedSession = new TelemetrySessionData();
-            await SaveSessionAsync(BaselineSessionFilePath, BaselineSession);
+            await SaveSessionAsync(BaselineSessionFilePath, BaselineSession).ConfigureAwait(false);
             TryDeleteFile(OptimizedSessionFilePath);
             BenchmarkState = BenchmarkState.OptimizedPending;
             return;
@@ -195,7 +196,7 @@ internal sealed class HardwareTelemetryService : IDisposable
         if (captureState == BenchmarkState.OptimizedPending)
         {
             OptimizedSession = session;
-            await SaveSessionAsync(OptimizedSessionFilePath, OptimizedSession);
+            await SaveSessionAsync(OptimizedSessionFilePath, OptimizedSession).ConfigureAwait(false);
             BenchmarkState = HasSessionData(BaselineSession)
                 ? BenchmarkState.Finished
                 : BenchmarkState.BaselinePending;
@@ -213,9 +214,9 @@ internal sealed class HardwareTelemetryService : IDisposable
         OptimizedSession.RecalculateFrameStats();
 
         var builder = new StringBuilder();
-        builder.AppendLine("+--------------------------+-----------------+-----------------+------------+");
+        builder.AppendLine("Comparativo A/B de Estabilidade");
         builder.AppendLine("| Métrica                  | Antes (Sujo)    | Depois (Apex)   | Ganho (Δ)  |");
-        builder.AppendLine("+--------------------------+-----------------+-----------------+------------+");
+        builder.AppendLine($"1% Low: {BaselineSession.OnePercentLowFps:0.0} FPS -> {OptimizedSession.OnePercentLowFps:0.0} FPS ({FormatPercentDelta(BaselineSession.OnePercentLowFps, OptimizedSession.OnePercentLowFps)})");
         builder.AppendLine(ComparisonRow(
             "FPS Médio",
             $"{BaselineSession.AverageFps:0.0} FPS",
@@ -268,7 +269,7 @@ internal sealed class HardwareTelemetryService : IDisposable
             FileShare.Read,
             bufferSize: 16 * 1024,
             useAsync: true);
-        await JsonSerializer.SerializeAsync(stream, session, JsonOptions);
+        await JsonSerializer.SerializeAsync(stream, session, JsonOptions).ConfigureAwait(false);
     }
 
     private static void TryDeleteFile(string path)
@@ -418,13 +419,13 @@ internal sealed class HardwareTelemetryService : IDisposable
             return;
         }
 
-        await monitorCancellation.CancelAsync();
+        await monitorCancellation.CancelAsync().ConfigureAwait(false);
 
         if (monitorTask is not null)
         {
             try
             {
-                await monitorTask;
+                await monitorTask.ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {
@@ -435,7 +436,7 @@ internal sealed class HardwareTelemetryService : IDisposable
         monitorCancellation.Dispose();
         monitorCancellation = null;
         monitorTask = null;
-        await SaveCurrentSessionAsync();
+        await SaveCurrentSessionAsync().ConfigureAwait(false);
         StopKernelLatencyTracker();
         CloseComputer();
         UpdateTelemetryStatus("Telemetria encerrada.");
@@ -481,7 +482,7 @@ internal sealed class HardwareTelemetryService : IDisposable
         }
 
         var destination = path ?? SessionFilePath;
-        await SaveSessionAsync(destination, copy);
+        await SaveSessionAsync(destination, copy).ConfigureAwait(false);
     }
 
     public static async Task<TelemetrySessionData?> LoadSessionDataAsync(string? path = null)
@@ -493,7 +494,7 @@ internal sealed class HardwareTelemetryService : IDisposable
         }
 
         await using var stream = File.OpenRead(source);
-        var session = await JsonSerializer.DeserializeAsync<TelemetrySessionData>(stream, JsonOptions);
+        var session = await JsonSerializer.DeserializeAsync<TelemetrySessionData>(stream, JsonOptions).ConfigureAwait(false);
         session?.RecalculateFrameStats();
         return session;
     }
@@ -2117,22 +2118,48 @@ public sealed record TelemetrySessionData
             return;
         }
 
-        var averageFrameTime = FrameTimesMs.Average();
+        var sampleCount = FrameTimesMs.Count;
+        double frametimeSum = 0;
+        for (var index = 0; index < sampleCount; index++)
+        {
+            frametimeSum += FrameTimesMs[index];
+        }
+
+        var averageFrameTime = frametimeSum / sampleCount;
         AverageFps = averageFrameTime > 0 ? Math.Round(1000D / averageFrameTime, 2) : 0;
 
-        var orderedWorstFirst = FrameTimesMs
-            .OrderByDescending(value => value)
-            .ToArray();
+        var rented = ArrayPool<double>.Shared.Rent(sampleCount);
+        try
+        {
+            for (var index = 0; index < sampleCount; index++)
+            {
+                rented[index] = FrameTimesMs[index];
+            }
 
-        OnePercentLowFps = CalculateLowFps(orderedWorstFirst, 0.01D);
-        ZeroPointOnePercentLowFps = CalculateLowFps(orderedWorstFirst, 0.001D);
+            Array.Sort(rented, 0, sampleCount);
+
+            OnePercentLowFps = CalculateLowFps(rented, sampleCount, 0.01D);
+            ZeroPointOnePercentLowFps = CalculateLowFps(rented, sampleCount, 0.001D);
+        }
+        finally
+        {
+            ArrayPool<double>.Shared.Return(rented, clearArray: false);
+        }
+
         frameStatsDirty = false;
     }
 
-    private static double CalculateLowFps(IReadOnlyList<double> orderedWorstFirst, double percentile)
+    private static double CalculateLowFps(double[] orderedAscending, int sampleCount, double percentile)
     {
-        var count = Math.Max(1, (int)Math.Ceiling(orderedWorstFirst.Count * percentile));
-        var averageWorstFrameTime = orderedWorstFirst.Take(count).Average();
+        var count = Math.Max(1, (int)Math.Ceiling(sampleCount * percentile));
+        double frametimeSum = 0;
+
+        for (var index = sampleCount - count; index < sampleCount; index++)
+        {
+            frametimeSum += orderedAscending[index];
+        }
+
+        var averageWorstFrameTime = frametimeSum / count;
         return averageWorstFrameTime > 0 ? Math.Round(1000D / averageWorstFrameTime, 2) : 0;
     }
 }

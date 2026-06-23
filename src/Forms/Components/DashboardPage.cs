@@ -1,4 +1,3 @@
-using System;
 using System.Drawing;
 using System.Windows.Forms;
 
@@ -57,25 +56,79 @@ internal sealed class DashboardPage : UserControl
             TextAlign = ContentAlignment.TopLeft
         };
 
-        ConfigureActionButton(this.autoOptimizeButton, true);
-        ConfigureActionButton(this.restorePointButton, false);
-
-        autoTuningCard.ContentHost.Controls.Add(this.autoOptimizeButton);
-        recoveryCard.ContentHost.Controls.Add(summaryLabel);
-        recoveryCard.ContentHost.Controls.Add(this.restorePointButton);
+        ConfigureActionButton(this.autoOptimizeButton);
+        ConfigureActionButton(this.restorePointButton);
 
         Controls.Add(heroBannerCard);
         Controls.Add(autoTuningCard);
         Controls.Add(recoveryCard);
-        Resize += (_, _) => LayoutCards();
+
+        EnsureHostedControls();
         LayoutCards();
+    }
+
+    public void RestoreVisualState()
+    {
+        EnsureHostedControls();
+
+        heroBannerCard.Visible = true;
+        autoTuningCard.Visible = true;
+        recoveryCard.Visible = true;
+        autoOptimizeButton.Visible = true;
+        restorePointButton.Visible = true;
+        summaryLabel.Visible = true;
+
+        heroBannerCard.BringToFront();
+        autoTuningCard.BringToFront();
+        recoveryCard.BringToFront();
+        autoOptimizeButton.BringToFront();
+        restorePointButton.BringToFront();
+        summaryLabel.BringToFront();
+
+        PerformLayout();
+        LayoutCards();
+        Invalidate();
+        Update();
+    }
+
+    protected override void OnLayout(LayoutEventArgs levent)
+    {
+        base.OnLayout(levent);
+        LayoutCards();
+    }
+
+    private void EnsureHostedControls()
+    {
+        if (!ReferenceEquals(autoOptimizeButton.Parent, autoTuningCard.ContentHost))
+        {
+            autoOptimizeButton.Parent?.Controls.Remove(autoOptimizeButton);
+            autoTuningCard.ContentHost.Controls.Add(autoOptimizeButton);
+        }
+
+        if (!ReferenceEquals(summaryLabel.Parent, recoveryCard.ContentHost))
+        {
+            summaryLabel.Parent?.Controls.Remove(summaryLabel);
+            recoveryCard.ContentHost.Controls.Add(summaryLabel);
+        }
+
+        if (!ReferenceEquals(restorePointButton.Parent, recoveryCard.ContentHost))
+        {
+            restorePointButton.Parent?.Controls.Remove(restorePointButton);
+            recoveryCard.ContentHost.Controls.Add(restorePointButton);
+        }
     }
 
     private void LayoutCards()
     {
-        var sidePadding = 8;
-        var gap = 16;
-        var heroHeight = 188;
+        if (Width <= 0 || Height <= 0)
+        {
+            return;
+        }
+
+        const int sidePadding = 8;
+        const int gap = 16;
+        const int heroHeight = 188;
+
         var lowerTop = heroHeight + gap;
         var lowerHeight = Math.Max(180, Height - lowerTop);
         var availableWidth = Math.Max(0, Width - (sidePadding * 2) - gap);
@@ -95,7 +148,7 @@ internal sealed class DashboardPage : UserControl
         restorePointButton.Size = new Size(Math.Max(180, recoveryCard.ContentHost.Width), 38);
     }
 
-    private static void ConfigureActionButton(Control control, bool primary)
+    private static void ConfigureActionButton(Control control)
     {
         control.Dock = DockStyle.None;
         control.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;

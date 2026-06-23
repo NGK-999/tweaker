@@ -9,12 +9,12 @@ using System.Reflection;
 using System.Security;
 using System.Text;
 using System.Threading;
+using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using ApexTweaker.NativeInterop;
 using ApexTweaker.Service;
 using ApexTweaker.UI;
 using LibreHardwareMonitor.Hardware;
-using NightButton = ReaLTaiizor.Controls.NightButton;
 using Renomeador.Models;
 using Renomeador.Forms.Components;
 using Renomeador.Services;
@@ -101,14 +101,16 @@ internal sealed class ValorantTweakerForm : Form
     private readonly PerformanceGamerChart performanceChart = new() { Dock = DockStyle.Fill };
     private readonly System.Windows.Forms.Timer telemetryWatcherTimer = new() { Interval = 250 };
     private readonly System.Windows.Forms.Timer nativeHardwareTimer = new() { Interval = 1000 };
+    private readonly System.Windows.Forms.Timer terminalFlushTimer = new() { Interval = 33 };
 
-    private readonly PaddedRichTextBox logBox;
+    private readonly ConsoleControl consoleView;
+    private readonly Control telemetryLogFrame;
     private readonly Label statusLabel;
     private readonly Label creditsLabel;
     private readonly TableLayoutPanel rootLayout;
     private readonly Panel sidebarContainer = new();
     private Control? sidebarHeader;
-    private readonly TransparentHostPanel contentHost = new() { Dock = DockStyle.Fill, BackColor = Bg };
+    private readonly Panel contentHost = new() { Dock = DockStyle.Fill, BackColor = Bg };
     private readonly TableLayoutPanel titleBar;
     private readonly Label titleBarTitleLabel;
     private readonly Label titleBarSubtitleLabel;
@@ -119,21 +121,23 @@ internal sealed class ValorantTweakerForm : Form
     private CancellationTokenSource? _ctsTransition;
     private readonly Dictionary<string, (Control? Instance, Func<Control> Factory)> _pageCache = new(StringComparer.OrdinalIgnoreCase);
     private string? _activePageKey;
+    private string? _lastTerminalLine;
+    private long _lastTerminalLineTimestamp;
 
-    private readonly NightButton diagnoseButton;
+    private readonly Button diagnoseButton;
     private readonly Button btnAutoOptimize;
-    private readonly NightButton restorePointButton;
-    private readonly NightButton gpuProfileButton;
-    private readonly NightButton gpuRegistryButton;
+    private readonly Button restorePointButton;
+    private readonly Button gpuProfileButton;
+    private readonly Button gpuRegistryButton;
     private readonly Button btnABTest;
-    private readonly NightButton powerButton;
-    private readonly NightButton extremeLatencyButton;
-    private readonly NightButton cpuSchedulerButton;
-    private readonly NightButton gpuDisplayButton;
-    private readonly NightButton inputButton;
-    private readonly NightButton networkButton;
-    private readonly NightButton policyServicesButton;
-    private readonly NightButton backgroundButton;
+    private readonly Button powerButton;
+    private readonly Button extremeLatencyButton;
+    private readonly Button cpuSchedulerButton;
+    private readonly Button gpuDisplayButton;
+    private readonly Button inputButton;
+    private readonly Button networkButton;
+    private readonly Button policyServicesButton;
+    private readonly Button backgroundButton;
     private readonly Button revertButton;
     private readonly Button uninstallButton;
     private readonly Button aboutButton;
@@ -168,7 +172,10 @@ internal sealed class ValorantTweakerForm : Form
     private readonly object pendingTerminalSync = new();
     private readonly object runtimeLogSync = new();
     private readonly Queue<(string Text, Color Color)> pendingTerminalLines = [];
+    private readonly List<(string Text, Color Color)> renderedTerminalLines = [];
     private bool pendingTerminalClear;
+    private bool terminalFlushScheduled;
+    private int renderedTerminalCharCount;
     private StreamWriter? runtimeLogWriter;
 
     public ValorantTweakerForm()
@@ -197,7 +204,8 @@ internal sealed class ValorantTweakerForm : Form
 
         statusLabel = CreateStatusLabel();
         creditsLabel = CreateCreditsLabel();
-        logBox = CreateLogBox();
+        consoleView = new ConsoleControl();
+        telemetryLogFrame = BuildLogFrame();
         telemetryPipeServer = new TelemetryPipeServer(hardwareTelemetryService);
         etwFrameTracker = new EtwFrameTracker(hardwareTelemetryService);
         hardwareTelemetryService.TelemetryPointRecorded += OnTelemetryPointRecorded;
@@ -243,9 +251,9 @@ internal sealed class ValorantTweakerForm : Form
         nativeHardwareStatusLabel = CreateMetricValueLabel("Telemetria parcial - aguardando monitoramento");
         titleBarTitleLabel = CreateHeaderLabel(AppTitle, 11.5F, FontStyle.Bold, TextMain);
         titleBarSubtitleLabel = CreateHeaderLabel("Windows 11 Native UI | Mica | Telemetria assíncrona", 8.75F, FontStyle.Regular, TextMuted);
-        minimizeWindowButton = CreateWindowCommandButton("\u2014");
-        maximizeWindowButton = CreateWindowCommandButton("\u25A1");
-        closeWindowButton = CreateWindowCommandButton("\u2715", Danger, Color.FromArgb(192, 52, 64));
+        minimizeWindowButton = CreateWindowCommandButton("\uE921");
+        maximizeWindowButton = CreateWindowCommandButton("\uE922");
+        closeWindowButton = CreateWindowCommandButton("\uE8BB", Danger, Color.FromArgb(192, 52, 64));
         titleBar = CreateTitleBar();
         InitializePageCache();
 
@@ -258,7 +266,7 @@ internal sealed class ValorantTweakerForm : Form
         ForceDoubleBuffering(rootLayout);
         TrySetDoubleBuffered(performanceChart);
         AcceptButton = btnAutoOptimize;
-        ShowPage(GetOrCreatePage(DashboardPageKey), dashboardTabButton, DashboardPageKey);
+        ShowFreshDashboardPage();
     }
 
     protected override void Dispose(bool disposing)
@@ -282,6 +290,8 @@ internal sealed class ValorantTweakerForm : Form
             telemetryWatcherTimer.Dispose();
             nativeHardwareTimer.Stop();
             nativeHardwareTimer.Dispose();
+            terminalFlushTimer.Stop();
+            terminalFlushTimer.Dispose();
             telemetryPulseTimer.Dispose();
             etwFrameTracker.Dispose();
             telemetryPipeServer.Dispose();
@@ -314,6 +324,7 @@ internal sealed class ValorantTweakerForm : Form
         telemetryPulseTimer.Tick += (_, _) => PulseTelemetryButton();
         telemetryWatcherTimer.Tick += async (_, _) => await TickTelemetryWatcherAsync();
         nativeHardwareTimer.Tick += async (_, _) => await TickNativeHardwareMonitorAsync();
+        terminalFlushTimer.Tick += (_, _) => FlushPendingTerminalLines();
         powerButton.Click += async (_, _) => await RunTweakAsync("Energia", () => tweakService.ApplyPowerTweaks());
         extremeLatencyButton.Click += async (_, _) => await ApplyExtremeLatencyTweaksAsync();
         cpuSchedulerButton.Click += async (_, _) => await RunTweakAsync("CPU/Scheduler", () => tweakService.ApplyCpuSchedulerTweaks());
@@ -326,7 +337,7 @@ internal sealed class ValorantTweakerForm : Form
         uninstallButton.Click += async (_, _) => await UninstallAndExitAsync();
         aboutButton.Click += (_, _) => ShowAbout();
         openRiotSupportButton.Click += (_, _) => OpenUrl(RiotSupportUrl);
-        dashboardTabButton.Click += async (_, _) => await ShowPageAsync(DashboardPageKey, dashboardTabButton);
+        dashboardTabButton.Click += (_, _) => ShowFreshDashboardPage();
         modulesTabButton.Click += async (_, _) => await ShowPageAsync(ModulesPageKey, modulesTabButton);
         telemetryTabButton.Click += async (_, _) => await ShowPageAsync(TelemetryPageKey, telemetryTabButton);
         utilitiesTabButton.Click += async (_, _) => await ShowUtilitiesPageAsync();
@@ -374,7 +385,7 @@ internal sealed class ValorantTweakerForm : Form
 
     private void ValorantTweakerForm_Resize(object? sender, EventArgs e)
     {
-        maximizeWindowButton.Text = WindowState == FormWindowState.Maximized ? "\u2752" : "\u25A1";
+        maximizeWindowButton.Text = WindowState == FormWindowState.Maximized ? "\uE923" : "\uE922";
 
         var shouldSuspend = WindowState == FormWindowState.Minimized;
         if (_isUiSuspended == shouldSuspend)
@@ -561,7 +572,7 @@ internal sealed class ValorantTweakerForm : Form
         };
 
         shell.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
-        shell.RowStyles.Add(new RowStyle(SizeType.Absolute, 52F));
+        shell.RowStyles.Add(new RowStyle(SizeType.Absolute, 60F));
         shell.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
         shell.RowStyles.Add(new RowStyle(SizeType.Absolute, 32F));
         shell.Controls.Add(titleBar, 0, 0);
@@ -578,8 +589,8 @@ internal sealed class ValorantTweakerForm : Form
             BackColor = Bg,
             ColumnCount = 2,
             RowCount = 1,
-            Margin = new Padding(0, 0, 0, 12),
-            Padding = new Padding(12, 8, 8, 8)
+            Margin = new Padding(0, 0, 0, 8),
+            Padding = new Padding(12, 6, 8, 6)
         };
 
         bar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
@@ -611,7 +622,7 @@ internal sealed class ValorantTweakerForm : Form
             FlowDirection = FlowDirection.LeftToRight,
             WrapContents = false,
             BackColor = Color.Transparent,
-            Margin = new Padding(0),
+            Margin = new Padding(0, 1, 0, 0),
             Padding = new Padding(0)
         };
 
@@ -667,31 +678,23 @@ internal sealed class ValorantTweakerForm : Form
 
     private Control CreateLogFrame()
     {
-        var frame = new Panel
-        {
-            Dock = DockStyle.Fill,
-            BackColor = Border,
-            Padding = new Padding(1),
-            Margin = new Padding(0),
-            BorderStyle = BorderStyle.None
-        };
+        return telemetryLogFrame;
+    }
 
-        var surface = new OpaqueSurfacePanel
+    private Control BuildLogFrame()
+    {
+        var frame = new OpaqueSurfacePanel
         {
             Dock = DockStyle.Fill,
             BackColor = ConsoleSurface,
-            Padding = new Padding(0),
+            Padding = new Padding(1),
             Margin = new Padding(0)
         };
 
-        surface.Controls.Add(logBox);
-        frame.Controls.Add(surface);
+        consoleView.Dock = DockStyle.Fill;
+        consoleView.BackColor = ConsoleSurface;
+        frame.Controls.Add(consoleView);
         return frame;
-    }
-
-    private void LayoutSidebarFooter(Control sidebar)
-    {
-        creditsLabel.Location = new Point(12, Math.Max(12, sidebar.ClientSize.Height - creditsLabel.Height - 12));
     }
 
     private Control CreateHeader()
@@ -770,13 +773,21 @@ internal sealed class ValorantTweakerForm : Form
             contentHost.Controls.Add(page);
         }
 
+        _activePageKey = pageKey;
+        RestorePageVisualState(pageKey, page);
         page.BringToFront();
         SetActiveTab(tabButton);
-        _activePageKey = pageKey;
+        contentHost.Refresh();
     }
 
     private async System.Threading.Tasks.Task ShowPageAsync(string pageKey, Button tabButton)
     {
+        if (string.Equals(pageKey, DashboardPageKey, StringComparison.Ordinal))
+        {
+            ShowFreshDashboardPage();
+            return;
+        }
+
         if (string.Equals(_activePageKey, pageKey, StringComparison.Ordinal))
         {
             return;
@@ -786,6 +797,12 @@ internal sealed class ValorantTweakerForm : Form
         page.Dock = DockStyle.Fill;
         ForceDoubleBuffering(page);
         SetActiveTab(tabButton);
+
+        if (RequiresStaticPageSwap(pageKey))
+        {
+            AttachPageStatic(page, tabButton, pageKey);
+            return;
+        }
 
         _ctsTransition?.Cancel();
         _ctsTransition?.Dispose();
@@ -810,7 +827,67 @@ internal sealed class ValorantTweakerForm : Form
             return;
         }
 
+        RestorePageVisualState(pageKey, page);
         _activePageKey = pageKey;
+        contentHost.Refresh();
+    }
+
+    private bool RequiresStaticPageSwap(string pageKey)
+    {
+        return string.Equals(pageKey, TelemetryPageKey, StringComparison.Ordinal) ||
+               string.Equals(pageKey, DashboardPageKey, StringComparison.Ordinal) ||
+               string.Equals(_activePageKey, TelemetryPageKey, StringComparison.Ordinal) ||
+               string.Equals(_activePageKey, DashboardPageKey, StringComparison.Ordinal);
+    }
+
+    private void ShowFreshDashboardPage()
+    {
+        EnsureTransparentContentHost();
+
+        _ctsTransition?.Cancel();
+        _ctsTransition?.Dispose();
+        _ctsTransition = null;
+
+        DashboardPage? previousDashboard = null;
+        if (_pageCache.TryGetValue(DashboardPageKey, out var cachedEntry) &&
+            cachedEntry.Instance is DashboardPage cachedDashboard &&
+            !cachedDashboard.IsDisposed)
+        {
+            previousDashboard = cachedDashboard;
+        }
+
+        var dashboard = CreateDashboardPage();
+        dashboard.Dock = DockStyle.Fill;
+        dashboard.Visible = true;
+        ForceDoubleBuffering(dashboard);
+        _pageCache[DashboardPageKey] = (dashboard, CreateDashboardPage);
+
+        contentHost.SuspendLayout();
+        try
+        {
+            contentHost.Controls.Clear();
+            contentHost.Controls.Add(dashboard);
+            dashboard.BringToFront();
+            SetActiveTab(dashboardTabButton);
+            _activePageKey = DashboardPageKey;
+        }
+        finally
+        {
+            contentHost.ResumeLayout(true);
+        }
+
+        RestorePageVisualState(DashboardPageKey, dashboard);
+
+        if (previousDashboard is not null &&
+            !ReferenceEquals(previousDashboard, dashboard) &&
+            !previousDashboard.IsDisposed)
+        {
+            previousDashboard.Dispose();
+        }
+
+        contentHost.Invalidate();
+        contentHost.Update();
+        contentHost.Refresh();
     }
 
     private async System.Threading.Tasks.Task ShowUtilitiesPageAsync()
@@ -830,10 +907,12 @@ internal sealed class ValorantTweakerForm : Form
 
         page.BackColor = Color.Transparent;
         page.Dock = DockStyle.Fill;
+        _activePageKey = pageKey;
         contentHost.Controls.Add(page);
+        RestorePageVisualState(pageKey, page);
         page.BringToFront();
         SetActiveTab(tabButton);
-        _activePageKey = pageKey;
+        contentHost.Refresh();
     }
 
     private void RemoveHostedPages()
@@ -854,6 +933,39 @@ internal sealed class ValorantTweakerForm : Form
         }
 
         contentHost.Invalidate();
+    }
+
+    private void RestorePageVisualState(string pageKey, Control page)
+    {
+        if (string.Equals(pageKey, DashboardPageKey, StringComparison.Ordinal) &&
+            page is DashboardPage dashboardPage)
+        {
+            dashboardPage.RestoreVisualState();
+            contentHost.Invalidate();
+            contentHost.Update();
+        }
+
+        if (string.Equals(pageKey, TelemetryPageKey, StringComparison.Ordinal))
+        {
+            FlushPendingTerminalLines();
+            RestoreConsoleBuffer();
+            RefreshConsoleSurface();
+            performanceChart.Invalidate();
+            contentHost.Invalidate();
+            contentHost.Update();
+        }
+    }
+
+    private void RestoreConsoleBuffer()
+    {
+        consoleView.CreateControl();
+
+        if (!consoleView.IsSurfaceReady || renderedTerminalLines.Count == 0)
+        {
+            return;
+        }
+
+        consoleView.SetEntries(renderedTerminalLines);
     }
 
     private async System.Threading.Tasks.Task EnsureNativeHardwareMonitorStartedAsync()
@@ -1093,17 +1205,18 @@ internal sealed class ValorantTweakerForm : Form
             Dock = DockStyle.Fill,
             BackColor = Color.Transparent,
             ColumnCount = 1,
-            RowCount = 5,
+            RowCount = 6,
             Margin = new Padding(0),
             Padding = new Padding(0, 6, 0, 0)
         };
 
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
-        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 82F));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 94F));
         layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 1F));
-        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 82F));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 94F));
         layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 1F));
-        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 82F));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 94F));
+        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
 
         layout.Controls.Add(CreateGroupedModuleSection(
             "Otimizações Core",
@@ -1126,6 +1239,12 @@ internal sealed class ValorantTweakerForm : Form
             gpuProfileButton,
             gpuRegistryButton,
             backgroundButton), 0, 4);
+        layout.Controls.Add(new Panel
+        {
+            Dock = DockStyle.Fill,
+            BackColor = Color.Transparent,
+            Margin = new Padding(0)
+        }, 0, 5);
 
         return layout;
     }
@@ -1143,11 +1262,51 @@ internal sealed class ValorantTweakerForm : Form
         };
 
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
-        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 22F));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 24F));
         layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
         layout.Controls.Add(CreateHeaderLabel(title, 10F, FontStyle.Bold, TextMain), 0, 0);
-        layout.Controls.Add(CreateButtonGridFilled(1, columns, buttons), 0, 1);
+        layout.Controls.Add(CreateModuleButtonRow(columns, buttons), 0, 1);
         return layout;
+    }
+
+    private static Control CreateModuleButtonRow(int columns, params Control[] buttons)
+    {
+        var normalizedColumns = Math.Max(1, columns);
+        var row = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            BackColor = Color.Transparent,
+            ColumnCount = normalizedColumns,
+            RowCount = 1,
+            Margin = new Padding(0),
+            Padding = new Padding(0, 6, 0, 0)
+        };
+
+        for (var column = 0; column < normalizedColumns; column++)
+        {
+            row.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F / normalizedColumns));
+        }
+
+        row.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+
+        for (var index = 0; index < buttons.Length; index++)
+        {
+            var button = buttons[index];
+            ConfigureModuleActionButton(button);
+
+            var host = new Panel
+            {
+                Dock = DockStyle.Fill,
+                BackColor = Panel,
+                Margin = index < buttons.Length - 1 ? new Padding(0, 0, 12, 0) : new Padding(0),
+                Padding = new Padding(0)
+            };
+
+            host.Controls.Add(button);
+            row.Controls.Add(host, index, 0);
+        }
+
+        return row;
     }
 
     private static Control CreateSectionDivider()
@@ -1210,7 +1369,7 @@ internal sealed class ValorantTweakerForm : Form
     private Control CreateUtilitiesPage()
     {
         var page = CreatePageGrid(2);
-        page.RowStyles.Add(new RowStyle(SizeType.Absolute, 208F));
+        page.RowStyles.Add(new RowStyle(SizeType.Absolute, 124F));
         page.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
 
         page.Controls.Add(CreateCard("Utilidades e Suporte", CreateUtilitiesSupportPanel()), 0, 0);
@@ -1220,41 +1379,27 @@ internal sealed class ValorantTweakerForm : Form
 
     private Control CreateUtilitiesSupportPanel()
     {
-        var host = new TableLayoutPanel
+        var host = new Panel
         {
             Dock = DockStyle.Fill,
-            BackColor = Color.Transparent,
+            BackColor = Panel,
             Margin = new Padding(0),
-            Padding = new Padding(0, 6, 0, 0),
-            ColumnCount = 1,
-            RowCount = 7
+            Padding = new Padding(0, 8, 0, 8),
+            MinimumSize = new Size(0, 48)
         };
 
         host.SuspendLayout();
         host.Controls.Clear();
 
-        host.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
-        host.RowStyles.Add(new RowStyle(SizeType.Absolute, 36F));
-        host.RowStyles.Add(new RowStyle(SizeType.Absolute, 1F));
-        host.RowStyles.Add(new RowStyle(SizeType.Absolute, 36F));
-        host.RowStyles.Add(new RowStyle(SizeType.Absolute, 1F));
-        host.RowStyles.Add(new RowStyle(SizeType.Absolute, 36F));
-        host.RowStyles.Add(new RowStyle(SizeType.Absolute, 1F));
-        host.RowStyles.Add(new RowStyle(SizeType.Absolute, 36F));
+        ConfigureUtilityActionButton(revertButton, Danger, Color.White, new Point(12, 10));
+        ConfigureUtilityActionButton(uninstallButton, Color.FromArgb(38, 38, 40), TextMain, new Point(178, 10));
+        ConfigureUtilityActionButton(aboutButton, Color.FromArgb(38, 38, 40), TextMain, new Point(344, 10));
+        ConfigureUtilityActionButton(openRiotSupportButton, Color.FromArgb(38, 38, 40), TextMain, new Point(510, 10));
 
-        ConfigureUtilityListButton(revertButton, Danger, Color.White);
-        ConfigureUtilityListButton(uninstallButton, Color.FromArgb(45, 45, 45), TextMain);
-        ConfigureUtilityListButton(aboutButton, Color.FromArgb(45, 45, 45), TextMain);
-        ConfigureUtilityListButton(openRiotSupportButton, Color.FromArgb(45, 45, 45), TextMain);
-
-        host.Controls.Add(revertButton, 0, 0);
-        host.Controls.Add(CreateSectionDivider(), 0, 1);
-        host.Controls.Add(uninstallButton, 0, 2);
-        host.Controls.Add(CreateSectionDivider(), 0, 3);
-        host.Controls.Add(aboutButton, 0, 4);
-        host.Controls.Add(CreateSectionDivider(), 0, 5);
-        host.Controls.Add(openRiotSupportButton, 0, 6);
-
+        host.Controls.Add(revertButton);
+        host.Controls.Add(uninstallButton);
+        host.Controls.Add(aboutButton);
+        host.Controls.Add(openRiotSupportButton);
         host.ResumeLayout(false);
         return host;
     }
@@ -1631,28 +1776,61 @@ internal sealed class ValorantTweakerForm : Form
         }
     }
 
-    private static void ConfigureUtilityListButton(Button button, Color backColor, Color foreColor)
+    private static void ConfigureUtilityActionButton(Button button, Color backColor, Color foreColor, Point location)
     {
         button.SuspendLayout();
-        button.Dock = DockStyle.Fill;
+        button.Dock = DockStyle.None;
         button.AutoSize = false;
-        button.Height = 36;
-        button.MinimumSize = new Size(140, 36);
-        button.MaximumSize = new Size(4096, 36);
+        button.Size = new Size(148, 30);
+        button.MinimumSize = new Size(148, 30);
+        button.MaximumSize = new Size(148, 30);
+        button.Location = location;
         button.Margin = new Padding(0);
-        button.Padding = new Padding(14, 0, 14, 0);
-        button.TextAlign = ContentAlignment.MiddleLeft;
+        button.Padding = new Padding(0);
+        button.TextAlign = ContentAlignment.MiddleCenter;
         button.BackColor = backColor;
         button.ForeColor = foreColor;
 
         if (button is RoundedButton rounded)
         {
-            rounded.BorderRadius = 8;
-            rounded.BorderColor = Color.Transparent;
+            rounded.BorderRadius = 9;
+            rounded.BorderColor = ColorTranslator.FromHtml("#333333");
+            rounded.NormalBorderColor = ColorTranslator.FromHtml("#333333");
+            rounded.HoverBorderColor = Color.FromArgb(72, 72, 74);
             rounded.HoverBackColor = Color.FromArgb(
                 Math.Min(backColor.R + 10, 255),
                 Math.Min(backColor.G + 10, 255),
                 Math.Min(backColor.B + 10, 255));
+        }
+
+        button.ResumeLayout(false);
+    }
+
+    private static void ConfigureModuleActionButton(Control button)
+    {
+        button.SuspendLayout();
+        button.Size = new Size(160, 45);
+        button.MinimumSize = new Size(0, 45);
+        button.MaximumSize = Size.Empty;
+        button.AutoSize = false;
+        button.Dock = DockStyle.Fill;
+        button.Margin = new Padding(0);
+        button.BackColor = Color.FromArgb(38, 38, 40);
+        button.ForeColor = Color.White;
+
+        if (button is Button standardButton)
+        {
+            standardButton.TextAlign = ContentAlignment.MiddleCenter;
+            standardButton.UseVisualStyleBackColor = false;
+        }
+
+        if (button is RoundedButton rounded)
+        {
+            rounded.BorderRadius = 10;
+            rounded.BorderColor = Color.FromArgb(50, 50, 52);
+            rounded.NormalBorderColor = Color.FromArgb(50, 50, 52);
+            rounded.HoverBorderColor = Color.FromArgb(72, 72, 74);
+            rounded.HoverBackColor = Color.FromArgb(48, 48, 50);
         }
 
         button.ResumeLayout(false);
@@ -1753,35 +1931,6 @@ internal sealed class ValorantTweakerForm : Form
         };
     }
 
-    private static PaddedRichTextBox CreateLogBox()
-    {
-        return new PaddedRichTextBox
-        {
-            Dock = DockStyle.Fill,
-            ReadOnly = true,
-            DetectUrls = false,
-            WordWrap = false,
-            ScrollBars = RichTextBoxScrollBars.Vertical,
-            BackColor = ConsoleSurface,
-            ForeColor = TerminalInfo,
-            InnerPadding = 12,
-            Font = CreateTerminalFont(),
-            BorderStyle = BorderStyle.None
-        };
-    }
-
-    private static Font CreateTerminalFont()
-    {
-        try
-        {
-            return new Font("Cascadia Code", 9.5F, FontStyle.Regular, GraphicsUnit.Point);
-        }
-        catch
-        {
-            return new Font("Consolas", 9.5F, FontStyle.Regular, GraphicsUnit.Point);
-        }
-    }
-
     private static Button CreatePrimaryButton(string text)
     {
         return CreateButton(text, Primary, Color.White);
@@ -1849,6 +1998,8 @@ internal sealed class ValorantTweakerForm : Form
         if (btnAutoOptimize is RoundedButton rounded)
         {
             rounded.BorderColor = borderColor;
+            rounded.NormalBorderColor = borderColor;
+            rounded.HoverBorderColor = Accent;
             rounded.HoverBackColor = hoverBackColor;
         }
 
@@ -1864,6 +2015,13 @@ internal sealed class ValorantTweakerForm : Form
     {
         var button = CreateButton(text, Danger, Color.White);
         button.Font = new Font("Segoe UI", 8.5F, FontStyle.Bold, GraphicsUnit.Point);
+        if (button is RoundedButton rounded)
+        {
+            rounded.BorderColor = Danger;
+            rounded.NormalBorderColor = Danger;
+            rounded.HoverBorderColor = Danger;
+        }
+
         return button;
     }
 
@@ -1874,6 +2032,8 @@ internal sealed class ValorantTweakerForm : Form
         if (button is RoundedButton rounded)
         {
             rounded.BorderColor = Color.Transparent;
+            rounded.NormalBorderColor = Color.Transparent;
+            rounded.HoverBorderColor = Color.FromArgb(50, 50, 52);
             rounded.HoverBackColor = Color.FromArgb(34, 39, 54);
         }
 
@@ -1884,64 +2044,70 @@ internal sealed class ValorantTweakerForm : Form
 
     private static Button CreateSecondaryButton(string text)
     {
-        return CreateButton(text, Panel, TextMain);
+        var button = CreateButton(text, Panel, TextMain);
+        if (button is RoundedButton rounded)
+        {
+            rounded.BorderColor = Color.Transparent;
+            rounded.NormalBorderColor = Color.Transparent;
+            rounded.HoverBorderColor = Color.FromArgb(50, 50, 52);
+            rounded.HoverBackColor = Color.FromArgb(44, 44, 46);
+        }
+
+        return button;
     }
 
-    private static NightButton CreateModuleButton(string text)
+    private static Button CreateModuleButton(string text)
     {
-        var button = new NightButton
-        {
-            Text = text,
-            Height = 42,
-            Width = 170,
-            MinimumSize = new Size(110, 32),
-            Margin = new Padding(3),
-            Cursor = Cursors.Hand,
-            Font = new Font("Segoe UI", 9F, FontStyle.Bold, GraphicsUnit.Point),
-            ForeColor = TextMain,
-            BackColor = GlassCardFill,
-            NormalBackColor = GlassCardFill,
-            HoverBackColor = Color.FromArgb(30, 255, 255, 255),
-            PressedBackColor = Color.FromArgb(42, 0, 180, 216),
-            HoverForeColor = Color.White,
-            PressedForeColor = Color.White,
-            Radius = 8,
-            SmoothingType = System.Drawing.Drawing2D.SmoothingMode.AntiAlias
-        };
+        var button = CreateButton(text, Color.FromArgb(38, 38, 40), Color.White);
+        button.Height = 45;
+        button.Width = 160;
+        button.MinimumSize = new Size(160, 45);
+        button.MaximumSize = new Size(160, 45);
+        button.Margin = new Padding(0, 0, 12, 0);
+        button.AutoSize = false;
+        button.Dock = DockStyle.None;
+        button.Cursor = Cursors.Hand;
+        button.Font = new Font("Segoe UI", 9F, FontStyle.Bold, GraphicsUnit.Point);
+        button.ForeColor = Color.White;
+        button.BackColor = Color.FromArgb(38, 38, 40);
 
-        button.MouseEnter += (_, _) =>
+        if (button is RoundedButton rounded)
         {
-            button.ForeColor = Color.White;
-            button.Invalidate();
-        };
-        button.MouseLeave += (_, _) =>
-        {
-            button.ForeColor = TextMain;
-            button.Invalidate();
-        };
+            rounded.BorderRadius = 10;
+            rounded.BorderColor = Color.FromArgb(50, 50, 52);
+            rounded.NormalBorderColor = Color.FromArgb(50, 50, 52);
+            rounded.HoverBorderColor = Color.FromArgb(72, 72, 74);
+            rounded.HoverBackColor = Color.FromArgb(48, 48, 50);
+        }
 
         return button;
     }
 
     private static Button CreateWindowCommandButton(string text, Color? foreColor = null, Color? hoverBackColor = null)
     {
-        var button = new Button
+        var button = new RoundedButton
         {
             Text = text,
-            Width = 34,
-            Height = 28,
-            Margin = new Padding(4, 0, 0, 0),
+            Width = 40,
+            Height = 32,
+            Margin = new Padding(8, 0, 0, 0),
             FlatStyle = FlatStyle.Flat,
-            BackColor = Panel,
-            ForeColor = foreColor ?? TextMain,
-            Font = new Font("Segoe UI Symbol", 9.5F, FontStyle.Bold, GraphicsUnit.Point),
+            BackColor = PanelSoft,
+            ForeColor = foreColor ?? TextMuted,
+            Font = CreateWindowCommandFont(),
             Cursor = Cursors.Hand,
             TabStop = false,
-            UseVisualStyleBackColor = false
+            UseVisualStyleBackColor = false,
+            BorderRadius = 8,
+            BorderColor = Border,
+            NormalBorderColor = Border,
+            HoverBorderColor = Color.FromArgb(80, 80, 84),
+            Padding = new Padding(0, 1, 0, 0),
+            TextAlign = ContentAlignment.MiddleCenter
         };
 
         var normalBackColor = button.BackColor;
-        var hotBackColor = hoverBackColor ?? Color.FromArgb(36, 43, 58);
+        var hotBackColor = hoverBackColor ?? Color.FromArgb(55, 55, 57);
 
         button.FlatAppearance.BorderSize = 0;
         button.FlatAppearance.MouseDownBackColor = hotBackColor;
@@ -1954,10 +2120,22 @@ internal sealed class ValorantTweakerForm : Form
         button.MouseLeave += (_, _) =>
         {
             button.BackColor = normalBackColor;
-            button.ForeColor = foreColor ?? TextMain;
+            button.ForeColor = foreColor ?? TextMuted;
         };
 
         return button;
+    }
+
+    private static Font CreateWindowCommandFont()
+    {
+        try
+        {
+            return new Font("Segoe Fluent Icons", 9F, FontStyle.Regular, GraphicsUnit.Point);
+        }
+        catch
+        {
+            return new Font("Segoe MDL2 Assets", 9F, FontStyle.Regular, GraphicsUnit.Point);
+        }
     }
 
     private Button CreateTabButton(string text, string iconGlyph)
@@ -2047,6 +2225,8 @@ internal sealed class ValorantTweakerForm : Form
             UseVisualStyleBackColor = false,
             Font = new Font("Segoe UI", 9F, FontStyle.Bold, GraphicsUnit.Point),
             BorderColor = Color.Transparent,
+            NormalBorderColor = Color.Transparent,
+            HoverBorderColor = Color.FromArgb(50, 50, 52),
             HoverBackColor = Color.FromArgb(
                 Math.Min(backColor.R + 18, 255),
                 Math.Min(backColor.G + 18, 255),
@@ -2062,11 +2242,6 @@ internal sealed class ValorantTweakerForm : Form
                 return;
             }
 
-            if (button is RoundedButton rounded)
-            {
-                rounded.BorderColor = NeonBlue;
-            }
-
             button.ForeColor = Color.White;
             button.Invalidate();
         };
@@ -2075,11 +2250,6 @@ internal sealed class ValorantTweakerForm : Form
             if (button.Tag is TelemetryVisualState state && state != TelemetryVisualState.Stopped)
             {
                 return;
-            }
-
-            if (button is RoundedButton rounded)
-            {
-                rounded.BorderColor = Color.Transparent;
             }
 
             button.ForeColor = foreColor;
@@ -2730,40 +2900,55 @@ internal sealed class ValorantTweakerForm : Form
     private void WriteBenchmarkComparisonReport()
     {
         WriteSection("Comparativo A/B de Estabilidade");
+        var baseline = HardwareTelemetryService.BaselineSession;
+        var optimized = HardwareTelemetryService.OptimizedSession;
 
-        foreach (var line in HardwareTelemetryService.GenerateAbeComparisonReport().Split([Environment.NewLine], StringSplitOptions.None))
-        {
-            if (string.IsNullOrWhiteSpace(line))
-            {
-                continue;
-            }
+        baseline.RecalculateFrameStats();
+        optimized.RecalculateFrameStats();
 
-            LogToTerminal(line, ResolveBenchmarkComparisonType(line));
-        }
+        WriteBenchmarkMetricLine("FPS médio", baseline.AverageFps, optimized.AverageFps);
+        WriteBenchmarkMetricLine("1% Low", baseline.OnePercentLowFps, optimized.OnePercentLowFps);
+        WriteBenchmarkMetricLine("0.1% Low", baseline.ZeroPointOnePercentLowFps, optimized.ZeroPointOnePercentLowFps);
+        WriteBenchmarkMetricLine("Stutters severos", baseline.SevereStutterCount, optimized.SevereStutterCount, invertImprovement: true);
+    }
+
+    private void WriteBenchmarkMetricLine(string metric, double before, double after, bool invertImprovement = false)
+    {
+        var deltaPercent = before <= 0D
+            ? (after > 0D ? 100D : 0D)
+            : ((after - before) / before) * 100D;
+
+        var isImprovement = invertImprovement ? deltaPercent <= 0D : deltaPercent >= 0D;
+        var sign = deltaPercent >= 0D ? "+" : string.Empty;
+        var type = isImprovement ? LogType.Success : LogType.Bottleneck;
+        var beforeText = metric.Contains("Stutters", StringComparison.OrdinalIgnoreCase)
+            ? before.ToString("0")
+            : $"{before:0.0}";
+        var afterText = metric.Contains("Stutters", StringComparison.OrdinalIgnoreCase)
+            ? after.ToString("0")
+            : $"{after:0.0}";
+
+        LogToTerminal($"{metric}: {beforeText} -> {afterText} ({sign}{deltaPercent:0.0}%)", type);
     }
 
     private static LogType ResolveBenchmarkComparisonType(string line)
     {
         var normalized = line.ToUpperInvariant();
-        if (!normalized.StartsWith("|", StringComparison.Ordinal))
+        if (normalized.Contains("STUTTERS", StringComparison.Ordinal))
         {
-            return LogType.Info;
+            return normalized.Contains("(-", StringComparison.Ordinal) || normalized.Contains("(0.0%", StringComparison.Ordinal)
+                ? LogType.Success
+                : LogType.Bottleneck;
         }
 
-        if (normalized.Contains("1% LOW") && normalized.Contains(" -", StringComparison.Ordinal))
+        if (normalized.Contains("1% LOW", StringComparison.Ordinal) ||
+            normalized.Contains("0.1% LOW", StringComparison.Ordinal) ||
+            normalized.Contains("FPS MEDIO", StringComparison.Ordinal) ||
+            normalized.Contains("FPS MÉDIO", StringComparison.Ordinal))
         {
-            return LogType.Bottleneck;
-        }
-
-        if (normalized.Contains("STUTTERS") && normalized.Contains(" +", StringComparison.Ordinal))
-        {
-            return LogType.Bottleneck;
-        }
-
-        if (normalized.Contains(" +", StringComparison.Ordinal) ||
-            normalized.Contains("STUTTERS") && normalized.Contains(" -", StringComparison.Ordinal))
-        {
-            return LogType.Success;
+            return normalized.Contains("(+", StringComparison.Ordinal) || normalized.Contains("(0.0%", StringComparison.Ordinal)
+                ? LogType.Success
+                : LogType.Bottleneck;
         }
 
         return LogType.Info;
@@ -2832,21 +3017,16 @@ internal sealed class ValorantTweakerForm : Form
             ? endedAt - session.StartedAtUtc
             : TimeSpan.Zero;
 
-        LogToTerminal(SummaryDivider(), LogType.Info);
-        LogToTerminal(SummaryRow("APEXTWEAKER V2", "POST-GAME DIAGNOSTIC"), LogType.Info);
-        LogToTerminal(SummaryDivider(), LogType.Info);
-        LogToTerminal(SummaryRow("Processo", string.IsNullOrWhiteSpace(session.TargetProcess) ? "Jogo detectado dinamicamente" : session.TargetProcess), LogType.Info);
-        LogToTerminal(SummaryRow("Duracao", duration.ToString(@"hh\:mm\:ss")), LogType.Info);
-        LogToTerminal(SummaryRow("Amostras", $"{session.Points.Count} pontos / {session.FrameTimesMs.Count} frames"), LogType.Info);
-        LogToTerminal(SummaryDivider(), LogType.Info);
-        LogToTerminal(SummaryRow("FPS medio", $"{session.AverageFps:0.0} FPS"), LogType.Success);
-        LogToTerminal(SummaryRow("1% Low", $"{session.OnePercentLowFps:0.0} FPS"), ResolveLowFpsType(session.AverageFps, session.OnePercentLowFps));
-        LogToTerminal(SummaryRow("0.1% Low", $"{session.ZeroPointOnePercentLowFps:0.0} FPS"), ResolveLowFpsType(session.AverageFps, session.ZeroPointOnePercentLowFps));
-        LogToTerminal(SummaryRow("Stutters severos", session.SevereStutterCount.ToString()), session.SevereStutterCount == 0 ? LogType.Success : LogType.Warning);
-        LogToTerminal(SummaryDivider(), LogType.Info);
-        LogToTerminal(SummaryRow("Score", $"{score}/100"), verdictType);
-        LogToTerminal(SummaryRow("Veredito", verdict), verdictType);
-        LogToTerminal(SummaryDivider(), LogType.Info);
+        LogToTerminal("Resumo da sessão encerrada", LogType.Info);
+        LogToTerminal($"Processo: {(string.IsNullOrWhiteSpace(session.TargetProcess) ? "Jogo detectado dinamicamente" : session.TargetProcess)}", LogType.Info);
+        LogToTerminal($"Duração: {duration:hh\\:mm\\:ss}", LogType.Info);
+        LogToTerminal($"Amostras: {session.Points.Count} pontos / {session.FrameTimesMs.Count} frames", LogType.Info);
+        LogToTerminal($"FPS médio: {session.AverageFps:0.0} FPS", LogType.Success);
+        LogToTerminal($"1% Low: {session.OnePercentLowFps:0.0} FPS", ResolveLowFpsType(session.AverageFps, session.OnePercentLowFps));
+        LogToTerminal($"0.1% Low: {session.ZeroPointOnePercentLowFps:0.0} FPS", ResolveLowFpsType(session.AverageFps, session.ZeroPointOnePercentLowFps));
+        LogToTerminal($"Stutters severos: {session.SevereStutterCount}", session.SevereStutterCount == 0 ? LogType.Success : LogType.Warning);
+        LogToTerminal($"Score: {score}/100", verdictType);
+        LogToTerminal($"Veredito: {verdict}", verdictType);
     }
 
     private static LogType ResolveLowFpsType(double averageFps, double lowFps)
@@ -2873,26 +3053,6 @@ internal sealed class ValorantTweakerForm : Form
             >= 65 => ("ATENCAO - revisar gargalos", LogType.Warning),
             _ => ("GARGALO - stutter relevante", LogType.Bottleneck)
         };
-    }
-
-    private static string SummaryDivider()
-    {
-        return "+" + new string('-', 26) + "+" + new string('-', 43) + "+";
-    }
-
-    private static string SummaryRow(string label, string value)
-    {
-        return $"| {TrimToWidth(label, 24).PadRight(24)} | {TrimToWidth(value, 41).PadRight(41)} |";
-    }
-
-    private static string TrimToWidth(string value, int width)
-    {
-        if (value.Length <= width)
-        {
-            return value;
-        }
-
-        return value[..Math.Max(0, width - 3)] + "...";
     }
 
     private async System.Threading.Tasks.Task TickTelemetryWatcherAsync()
@@ -3111,14 +3271,21 @@ internal sealed class ValorantTweakerForm : Form
     private void WriteLine(string text)
     {
         var message = NormalizeTerminalMessage(text);
+
+        if (ShouldSuppressTerminalDuplicate(message))
+        {
+            return;
+        }
+
         LogToTerminal(message, ResolveLogType(message));
     }
 
     private void LogToTerminal(string message, LogType type)
     {
-        var text = message.EndsWith(Environment.NewLine, StringComparison.Ordinal)
-            ? message
-            : message + Environment.NewLine;
+        var normalizedMessage = NormalizeConsolePayload(message);
+        var text = normalizedMessage.EndsWith(Environment.NewLine, StringComparison.Ordinal)
+            ? normalizedMessage
+            : normalizedMessage + Environment.NewLine;
 
         AppendRuntimeLog(text);
         AppendLog(text, ResolveTerminalColor(type));
@@ -3183,37 +3350,15 @@ internal sealed class ValorantTweakerForm : Form
 
     private void AppendLog(string text, Color color)
     {
+        text = NormalizeConsolePayload(text);
+
         if (IsDisposed)
         {
             return;
         }
 
-        if (_isUiSuspended)
-        {
-            QueueTerminalLine(text, color);
-            return;
-        }
-
-        if (InvokeRequired)
-        {
-            if (IsHandleCreated)
-            {
-                BeginInvoke(new Action(() => AppendLog(text, color)));
-            }
-
-            return;
-        }
-
-        logBox.SelectionStart = logBox.TextLength;
-        logBox.SelectionLength = 0;
-        logBox.SelectionColor = color;
-        logBox.AppendText(text);
-        logBox.SelectionColor = logBox.ForeColor;
-        logBox.SelectionStart = logBox.TextLength;
-        logBox.SelectionLength = 0;
-        logBox.ScrollToCaret();
-        logBox.Invalidate();
-        logBox.Update();
+        QueueTerminalLine(text, color);
+        ScheduleTerminalFlush();
     }
 
     private void QueueTerminalLine(string text, Color color)
@@ -3241,6 +3386,9 @@ internal sealed class ValorantTweakerForm : Form
             return;
         }
 
+        terminalFlushTimer.Stop();
+        terminalFlushScheduled = false;
+
         List<(string Text, Color Color)> lines = [];
         var shouldClear = false;
         lock (pendingTerminalSync)
@@ -3254,18 +3402,18 @@ internal sealed class ValorantTweakerForm : Form
             }
         }
 
-        if (shouldClear)
+        if (shouldClear && lines.Count == 0)
         {
-            logBox.BackColor = ConsoleSurface;
-            logBox.Clear();
-            logBox.Invalidate();
-            logBox.Update();
+            ClearConsoleCore();
+            return;
         }
 
-        foreach (var line in lines)
+        if (!shouldClear && lines.Count == 0)
         {
-            AppendLog(line.Text, line.Color);
+            return;
         }
+
+        ApplyConsoleBatch(shouldClear, lines);
     }
 
     private void ClearTerminal()
@@ -3275,7 +3423,7 @@ internal sealed class ValorantTweakerForm : Form
             return;
         }
 
-        if (_isUiSuspended)
+        if (_isUiSuspended || !IsTelemetryConsoleVisible())
         {
             lock (pendingTerminalSync)
             {
@@ -3296,10 +3444,85 @@ internal sealed class ValorantTweakerForm : Form
             return;
         }
 
-        logBox.BackColor = ConsoleSurface;
-        logBox.Clear();
-        logBox.Invalidate();
-        logBox.Update();
+        _lastTerminalLine = null;
+        _lastTerminalLineTimestamp = 0;
+        ClearConsoleCore();
+    }
+
+    private void RefreshConsoleSurface()
+    {
+        consoleView.RefreshSurface();
+    }
+
+    private void ScheduleTerminalFlush()
+    {
+        if (IsDisposed)
+        {
+            return;
+        }
+
+        if (_isUiSuspended || !IsTelemetryConsoleVisible())
+        {
+            return;
+        }
+
+        if (InvokeRequired)
+        {
+            if (IsHandleCreated)
+            {
+                BeginInvoke(new Action(ScheduleTerminalFlush));
+            }
+
+            return;
+        }
+
+        if (terminalFlushScheduled)
+        {
+            return;
+        }
+
+        terminalFlushScheduled = true;
+        terminalFlushTimer.Start();
+    }
+
+    private void ApplyConsoleBatch(bool clearBeforeAppend, List<(string Text, Color Color)> lines)
+    {
+        const int maxConsoleChars = 12000;
+
+        if (clearBeforeAppend)
+        {
+            renderedTerminalLines.Clear();
+            renderedTerminalCharCount = 0;
+        }
+
+        foreach (var line in lines)
+        {
+            renderedTerminalLines.Add(line);
+            renderedTerminalCharCount += line.Text.Length;
+        }
+
+        while (renderedTerminalCharCount > maxConsoleChars && renderedTerminalLines.Count > 0)
+        {
+            renderedTerminalCharCount -= renderedTerminalLines[0].Text.Length;
+            renderedTerminalLines.RemoveAt(0);
+        }
+
+        consoleView.SetEntries(renderedTerminalLines);
+    }
+
+    private void ClearConsoleCore()
+    {
+        renderedTerminalLines.Clear();
+        renderedTerminalCharCount = 0;
+        consoleView.ClearEntries();
+    }
+
+    private bool IsTelemetryConsoleVisible()
+    {
+        return string.Equals(_activePageKey, TelemetryPageKey, StringComparison.Ordinal) &&
+               !Disposing &&
+               !IsDisposed &&
+               consoleView.IsSurfaceReady;
     }
 
     private static Color ResolveTerminalColor(LogType type)
@@ -3524,6 +3747,59 @@ internal sealed class ValorantTweakerForm : Form
         }
 
         return text;
+    }
+
+    private static string NormalizeConsolePayload(string text)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            return string.Empty;
+        }
+
+        var normalized = text.Replace("\r\n", "\n", StringComparison.Ordinal)
+            .Replace('\r', '\n');
+
+        var builder = new StringBuilder(normalized.Length + 8);
+        foreach (var ch in normalized)
+        {
+            if (ch == '\n')
+            {
+                builder.Append(Environment.NewLine);
+                continue;
+            }
+
+            if (ch == '\t')
+            {
+                builder.Append("    ");
+                continue;
+            }
+
+            if (!char.IsControl(ch))
+            {
+                builder.Append(ch);
+            }
+        }
+
+        return builder.ToString();
+    }
+
+    private bool ShouldSuppressTerminalDuplicate(string message)
+    {
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            return false;
+        }
+
+        var now = Environment.TickCount64;
+        if (string.Equals(_lastTerminalLine, message, StringComparison.Ordinal) &&
+            now - _lastTerminalLineTimestamp < 1200)
+        {
+            return true;
+        }
+
+        _lastTerminalLine = message;
+        _lastTerminalLineTimestamp = now;
+        return false;
     }
 
     private async System.Threading.Tasks.Task StartNativeHardwareMonitorAsync()

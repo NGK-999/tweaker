@@ -56,7 +56,7 @@ internal sealed class EtwFrameTracker : IDisposable
             return;
         }
 
-        await cancellation.CancelAsync();
+        await cancellation.CancelAsync().ConfigureAwait(false);
 
         lock (sync)
         {
@@ -70,7 +70,7 @@ internal sealed class EtwFrameTracker : IDisposable
         {
             try
             {
-                await processingTask;
+                await processingTask.ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {

@@ -4,7 +4,7 @@
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>
     <AssemblyName>ApexTweaker</AssemblyName>
-    <RootNamespace>Renomeador</RootNamespace>
+    <RootNamespace>ApexTweaker</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>assets\app-icon.ico</ApplicationIcon>
     <Version>2.0.0</Version>
@@ -20,6 +20,8 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <Optimize>true</Optimize>
+    <LangVersion>preview</LangVersion>
     <DebugType>none</DebugType>
     <DebugSymbols>false</DebugSymbols>
     <PublishSingleFile>true</PublishSingleFile>
@@ -40,8 +42,12 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Dapper" Version="2.1.79" />
     <PackageReference Include="LibreHardwareMonitorLib" Version="0.9.6" />
+    <PackageReference Include="LiveChartsCore.SkiaSharpView.WinForms" Version="2.0.0-rc2" />
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="6.1.1" />
     <PackageReference Include="Microsoft.Diagnostics.Tracing.TraceEvent" Version="3.1.21" />
+    <PackageReference Include="ReaLTaiizor" Version="3.8.1.8" />
     <PackageReference Include="System.Management" Version="10.0.2" />
   </ItemGroup>
 
@@ -61,9 +67,7 @@
 
     <Error Condition="'$(NativeMsBuildExe)' == ''" Text="MSBuild.exe do Visual Studio nao foi localizado via vswhere." />
 
-    <Exec
-      Command="&quot;$(NativeMsBuildExe)&quot; &quot;$(NativeProjectPath)&quot; /m /nologo /p:Configuration=$(NativeBuildConfiguration);Platform=$(NativeBuildPlatform)"
-      WorkingDirectory="$(NativeProjectDir)" />
+    <Exec Command="&quot;$(NativeMsBuildExe)&quot; &quot;$(NativeProjectPath)&quot; /m /nologo /p:Configuration=$(NativeBuildConfiguration);Platform=$(NativeBuildPlatform)" WorkingDirectory="$(NativeProjectDir)" />
 
     <Error Condition="!Exists('$(NativeDllPath)')" Text="A compilacao nativa terminou sem gerar '$(NativeDllPath)'." />
   </Target>

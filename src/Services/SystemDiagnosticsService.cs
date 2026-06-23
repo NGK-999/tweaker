@@ -21,6 +21,8 @@ internal sealed class SystemDiagnosticsService
     private const string DesktopPath = @"Control Panel\Desktop";
     private const string WindowMetricsPath = @"Control Panel\Desktop\WindowMetrics";
     private const string ThemesPersonalizePath = @"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize";
+    private const int EnumCurrentSettings = -1;
+
     private readonly CommandRunner commandRunner = new();
     private readonly OptimizationEngine optimizationEngine = new();
 
@@ -59,30 +61,6 @@ internal sealed class SystemDiagnosticsService
             $"Secure Boot: {RunPowerShellScalar("Confirm-SecureBootUEFI")}",
             $"TPM: {RunPowerShellScalar("(Get-Tpm).TpmPresent")}"
         ];
-    }
-
-    private static string GetPrimaryMonitorRefreshRate()
-    {
-        try
-        {
-            var devMode = CreateDevMode();
-            if (!EnumDisplaySettings(null, EnumCurrentSettings, ref devMode))
-            {
-                return "indisponivel";
-            }
-
-            var refreshRate = devMode.dmDisplayFrequency;
-            if (refreshRate <= 0)
-            {
-                refreshRate = 60;
-            }
-
-            return $"{refreshRate} Hz";
-        }
-        catch
-        {
-            return "60 Hz";
-        }
     }
 
     public HardwareInfo GetHardwareInfo()
@@ -146,6 +124,30 @@ internal sealed class SystemDiagnosticsService
             processorWmiAvailable && DetectHeterogeneousArchitecture(processorName, physicalCoreCount, logicalCoreCount));
     }
 
+    private static string GetPrimaryMonitorRefreshRate()
+    {
+        try
+        {
+            var devMode = CreateDevMode();
+            if (!EnumDisplaySettings(null, EnumCurrentSettings, ref devMode))
+            {
+                return "indisponivel";
+            }
+
+            var refreshRate = devMode.dmDisplayFrequency;
+            if (refreshRate <= 0)
+            {
+                refreshRate = 60;
+            }
+
+            return $"{refreshRate} Hz";
+        }
+        catch
+        {
+            return "60 Hz";
+        }
+    }
+
     private static bool DetectHeterogeneousArchitecture(string processorName, int physicalCoreCount, int logicalCoreCount)
     {
         var normalized = processorName.ToUpperInvariant();
@@ -185,8 +187,6 @@ internal sealed class SystemDiagnosticsService
             return false;
         }
 
-        // Intel hibrido costuma quebrar o padrao homogeneo 2:1 de SMT.
-        // Ex.: P-cores com HT + E-cores sem HT deixam logicos entre fisicos e 2x fisicos.
         return physicalCoreCount >= 8 &&
                logicalCoreCount > physicalCoreCount &&
                logicalCoreCount < physicalCoreCount * 2;
@@ -315,8 +315,6 @@ internal sealed class SystemDiagnosticsService
             : $"fora do perfil ({value})";
     }
 
-    private const int EnumCurrentSettings = -1;
-
     [DllImport("user32.dll", CharSet = CharSet.Ansi)]
     private static extern bool EnumDisplaySettings(string? deviceName, int modeNum, ref DevMode devMode);
 
@@ -334,7 +332,6 @@ internal sealed class SystemDiagnosticsService
         [FieldOffset(36)]
         public short dmSize;
 
-        // DEVMODEA: 32 bpp fica no offset 104. A frequencia real fica em 120.
         [FieldOffset(104)]
         public int dmBitsPerPel;
 
