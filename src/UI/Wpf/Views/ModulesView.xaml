@@ -1,0 +1,95 @@
+<UserControl x:Class="ApexTweaker.UI.Wpf.Views.ModulesView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="Transparent">
+    <UserControl.Resources>
+        <Style x:Key="CardStyle" TargetType="Border">
+            <Setter Property="Background" Value="#2A2A2A" />
+            <Setter Property="BorderBrush" Value="#3A3A3C" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="14" />
+            <Setter Property="Padding" Value="20" />
+        </Style>
+        <Style x:Key="ModuleButtonStyle" TargetType="Button">
+            <Setter Property="Width" Value="180" />
+            <Setter Property="Height" Value="44" />
+            <Setter Property="Margin" Value="0,0,12,12" />
+            <Setter Property="Background" Value="#323234" />
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="BorderBrush" Value="#404044" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="RootBorder"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="10">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="RootBorder" Property="Background" Value="#3A3A3C" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="RootBorder" Property="Opacity" Value="0.86" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="RootBorder" Property="Opacity" Value="0.5" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <Border Style="{StaticResource CardStyle}">
+            <StackPanel>
+                <TextBlock Text="Módulos do Sistema"
+                           Foreground="#00B4D8"
+                           FontSize="24"
+                           FontWeight="Bold" />
+
+                <TextBlock Margin="0,18,0,10"
+                           Foreground="White"
+                           FontSize="18"
+                           FontWeight="SemiBold"
+                           Text="Otimizações Core" />
+                <WrapPanel x:Name="CoreButtonsPanel">
+                    <Button Style="{StaticResource ModuleButtonStyle}" Tag="CPU/Scheduler" Content="CPU/Scheduler" Click="ModuleButton_OnClick" />
+                    <Button Style="{StaticResource ModuleButtonStyle}" Tag="GPU/Display" Content="GPU/Display" Click="ModuleButton_OnClick" />
+                    <Button Style="{StaticResource ModuleButtonStyle}" Tag="Energia" Content="Energia" Click="ModuleButton_OnClick" />
+                    <Button Style="{StaticResource ModuleButtonStyle}" Tag="Latência extrema" Content="Latência extrema" Click="ModuleButton_OnClick" />
+                </WrapPanel>
+
+                <TextBlock Margin="0,10,0,10"
+                           Foreground="White"
+                           FontSize="18"
+                           FontWeight="SemiBold"
+                           Text="Rede e Periféricos" />
+                <WrapPanel x:Name="PeripheralButtonsPanel">
+                    <Button Style="{StaticResource ModuleButtonStyle}" Tag="Input/USB" Content="Input/USB" Click="ModuleButton_OnClick" />
+                    <Button Style="{StaticResource ModuleButtonStyle}" Tag="Rede" Content="Rede" Click="ModuleButton_OnClick" />
+                    <Button Style="{StaticResource ModuleButtonStyle}" Tag="Políticas/Serviços" Content="Políticas/Serviços" Click="ModuleButton_OnClick" />
+                </WrapPanel>
+
+                <TextBlock Margin="0,10,0,10"
+                           Foreground="White"
+                           FontSize="18"
+                           FontWeight="SemiBold"
+                           Text="GPU e Background" />
+                <WrapPanel x:Name="GpuButtonsPanel">
+                    <Button Style="{StaticResource ModuleButtonStyle}" Tag="GPU Windows" Content="GPU Windows" Click="ModuleButton_OnClick" />
+                    <Button Style="{StaticResource ModuleButtonStyle}" Tag="GPU regedit" Content="GPU regedit" Click="ModuleButton_OnClick" />
+                    <Button Style="{StaticResource ModuleButtonStyle}" Tag="Background" Content="Background" Click="ModuleButton_OnClick" />
+                </WrapPanel>
+            </StackPanel>
+        </Border>
+    </ScrollViewer>
+</UserControl>

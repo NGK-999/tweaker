@@ -1,0 +1,82 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <AssemblyName>ApexTweaker</AssemblyName>
+    <RootNamespace>ApexTweaker</RootNamespace>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>assets\app-icon.ico</ApplicationIcon>
+    <Version>2.0.1</Version>
+    <FileVersion>2.0.1.0</FileVersion>
+    <AssemblyVersion>2.0.1.0</AssemblyVersion>
+    <Product>ApexTweaker</Product>
+    <Title>ApexTweaker</Title>
+    <Description>Windows optimization utility focused on system performance, low latency, and frametime consistency.</Description>
+    <Company>Igor Silva</Company>
+    <Authors>Igor Silva</Authors>
+    <Copyright>Copyright 2026 Igor Silva</Copyright>
+    <UseWindowsForms>true</UseWindowsForms>
+    <UseWPF>true</UseWPF>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <Optimize>true</Optimize>
+    <LangVersion>preview</LangVersion>
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+    <PublishSingleFile>true</PublishSingleFile>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <PublishReadyToRun>true</PublishReadyToRun>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <NativeProjectDir>$(MSBuildProjectDirectory)\native\ApexTweaker.Native\</NativeProjectDir>
+    <NativeProjectPath>$(NativeProjectDir)ApexTweaker.Native.vcxproj</NativeProjectPath>
+    <NativeBuildConfiguration>Release</NativeBuildConfiguration>
+    <NativeBuildPlatform>x64</NativeBuildPlatform>
+    <NativeOutputDir>$(NativeProjectDir)bin\$(NativeBuildConfiguration)\$(NativeBuildPlatform)\</NativeOutputDir>
+    <NativeDllPath>$(NativeOutputDir)ApexTweaker.Native.dll</NativeDllPath>
+    <VsWherePath>$(MSBuildProgramFiles32)\Microsoft Visual Studio\Installer\vswhere.exe</VsWherePath>
+    <NativeMsBuildPathFile>$(IntermediateOutputPath)native-msbuild-path.txt</NativeMsBuildPathFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="LibreHardwareMonitorLib" Version="0.9.6" />
+    <PackageReference Include="LiveChartsCore.SkiaSharpView.WinForms" Version="2.0.0-rc2" />
+    <PackageReference Include="Microsoft.Diagnostics.Tracing.TraceEvent" Version="3.1.21" />
+    <PackageReference Include="ReaLTaiizor" Version="3.8.1.8" />
+    <PackageReference Include="System.Management" Version="10.0.2" />
+  </ItemGroup>
+
+  <Target Name="BuildNativeDll" BeforeTargets="BeforeBuild">
+    <Error Condition="!Exists('$(NativeProjectPath)')" Text="Projeto nativo nao encontrado em '$(NativeProjectPath)'." />
+    <Error Condition="!Exists('$(VsWherePath)')" Text="vswhere.exe nao encontrado em '$(VsWherePath)'. Instale o Visual Studio Build Tools com suporte a C++." />
+
+    <MakeDir Directories="$(IntermediateOutputPath)" />
+    <Exec Command="&quot;$(VsWherePath)&quot; -latest -products * -requires Microsoft.Component.MSBuild -find MSBuild\**\Bin\MSBuild.exe &gt; &quot;$(NativeMsBuildPathFile)&quot;" />
+    <ReadLinesFromFile File="$(NativeMsBuildPathFile)">
+      <Output TaskParameter="Lines" ItemName="NativeMsBuildCandidate" />
+    </ReadLinesFromFile>
+
+    <PropertyGroup>
+      <NativeMsBuildExe>@(NativeMsBuildCandidate->'%(Identity)')</NativeMsBuildExe>
+    </PropertyGroup>
+
+    <Error Condition="'$(NativeMsBuildExe)' == ''" Text="MSBuild.exe do Visual Studio nao foi localizado via vswhere." />
+
+    <Exec Command="&quot;$(NativeMsBuildExe)&quot; &quot;$(NativeProjectPath)&quot; /m /nologo /p:Configuration=$(NativeBuildConfiguration);Platform=$(NativeBuildPlatform)" WorkingDirectory="$(NativeProjectDir)" />
+
+    <Error Condition="!Exists('$(NativeDllPath)')" Text="A compilacao nativa terminou sem gerar '$(NativeDllPath)'." />
+  </Target>
+
+  <Target Name="CopyNativeDllToBuildOutput" AfterTargets="Build" Condition="Exists('$(NativeDllPath)')">
+    <Copy SourceFiles="$(NativeDllPath)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+  </Target>
+
+  <Target Name="CopyNativeDllToRelease" AfterTargets="Publish" Condition="Exists('$(NativeDllPath)')">
+    <Copy SourceFiles="$(NativeDllPath)" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" />
+  </Target>
+
+</Project>
