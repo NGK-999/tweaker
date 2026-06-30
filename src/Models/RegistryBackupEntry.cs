@@ -1,4 +1,4 @@
-namespace Renomeador.Models;
+namespace ApexTweaker.Models;
 
 internal sealed record RegistryBackupEntry(
     string Root,

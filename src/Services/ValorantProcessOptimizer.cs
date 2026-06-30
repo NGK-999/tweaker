@@ -5,9 +5,9 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using ApexTweaker.NativeInterop;
-using Renomeador.Models;
+using ApexTweaker.Models;
 
-namespace Renomeador.Services;
+namespace ApexTweaker.Services;
 
 internal sealed class ValorantProcessOptimizer
 {

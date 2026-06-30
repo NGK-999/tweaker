@@ -16,7 +16,7 @@ using LibreHardwareMonitor.Hardware;
 using Microsoft.Diagnostics.Tracing.Parsers.Kernel;
 using Microsoft.Diagnostics.Tracing.Session;
 
-namespace Renomeador.Services;
+namespace ApexTweaker.Services;
 
 public enum BenchmarkState
 {

@@ -1,53 +1,100 @@
-# Botoes do Valorant Tweaker
+# Funcionalidades do ApexTweaker
 
-O objetivo do app e otimizar o Windows para jogos, principalmente VALORANT, mantendo as alteracoes rastreaveis e reversiveis.
+O objetivo do app e otimizar o Windows para jogos, principalmente VALORANT, mantendo alteracoes rastreaveis e reversiveis.
 
-## Diagnosticar
+Versao: **2.0.1** · Shell ativa: **WPF** (`MainWindow`).
 
-Mostra informacoes do sistema:
+## Mapa da interface WPF
+
+### Dashboard
+
+| Acao | Backend |
+|------|---------|
+| **OTIMIZAR SISTEMA AO MAXIMO** | `TweakService.ApplyAutonomousOptimization()` via `OptimizationEngine` |
+| **Criar ponto de restauracao** | `SystemRestoreService.CreatePreOptimizationRestorePoint()` |
+| **Resumo** | `SystemDiagnosticsService.GetHardwareInfo()` + perfil de CPU |
+
+Backup automatico e criado antes de qualquer otimizacao iniciada pela UI. Nao ha botao manual de backup.
+
+### Modulos
+
+| Botao | Metodo |
+|-------|--------|
+| CPU/Scheduler | `ApplyCpuSchedulerTweaks()` |
+| GPU/Display | `ApplyGpuDisplayTweaks()` |
+| Energia | `ApplyPowerTweaks()` |
+| Latencia extrema | `ApplyExtremeLatencyTweaks()` |
+| Input/USB | `ApplyInputTweaks()` |
+| Rede | `ApplyNetworkTweaks()` |
+| Politicas/Servicos | `ApplyPolicyAndServiceTweaks()` |
+| GPU Windows | `ApplyGpuWindowsProfile()` |
+| GPU regedit | `ApplyGpuDriverRegistryProfile()` |
+| Background | `ApplyBackgroundTweaks()` |
+
+### Telemetria
+
+| Acao | Backend |
+|------|---------|
+| Iniciar/Parar teste A/B | `HardwareTelemetryService` + `EtwFrameTracker` |
+| Grafico FPS / 1% low | Amostras via ETW e sensores LHM |
+| Metricas DPC, boost, temperatura | `TelemetryMetricsSnapshot` |
+| Console | Log da sessao em tempo real |
+
+Sessoes salvas em `C:\ProgramData\ApexTweaker\Backups` (`Sessao_Baseline.json`, `Sessao_Optimized.json`).
+
+### Utilidades
+
+| Botao | Funcao |
+|-------|--------|
+| **Reverter** | `MasterRollbackService.ExecuteAsync()` — rollback LIFO dos snapshots pendentes |
+| **Desinstalar e Sair** | Restaura ultimo estado, limpa `ProgramData\ApexTweaker`, encerra |
+| **Sobre** | Versao, creditos, caminho de backups |
+| **Suporte Riot** | Abre URL oficial de suporte do VALORANT |
+
+---
+
+## Diagnostico
+
+Exibido no Dashboard (resumo) e no console ao iniciar:
 
 - permissao de administrador
 - versao/build do Windows
 - arquitetura 64-bit
-- Game Mode
-- Game DVR
-- VBS configurado
-- Secure Boot
-- TPM
-- caminho do executavel do VALORANT
-- fullscreen optimizations do VALORANT
+- CPU, nucleos fisicos/logicos, RAM
+- perfil de arquitetura heterogenea (P/E cores)
 - classificacao do PC: Low-End, Mid-Range ou High-End
 - preset recomendado pelo `OptimizationEngine`
+- deteccao de sistema ja otimizado
+
+Relatorio completo disponivel via `SystemDiagnosticsService.BuildDiagnosticReport()` (Game Mode, Game DVR, VBS, Secure Boot, TPM, HAGS, MPO, etc.).
 
 ## OptimizationEngine
 
-O app usa uma camada leve de regras, sem IA pesada:
+Camada leve de regras, sem IA:
 
-- RAM menor que 16 GB ou CPU com menos de 6 nucleos fisicos: `Low-End`
-- RAM de 16 GB ou mais, CPU com 8+ nucleos fisicos e processador recente: `High-End`
-- demais casos: `Mid-Range`
+- RAM menor que 16 GB **ou** CPU com menos de 6 nucleos fisicos: **Low-End**
+- RAM de 16 GB ou mais, CPU com 8+ nucleos fisicos e processador recente: **High-End**
+- demais casos: **Mid-Range**
 
 Protecoes:
 
-- `Low-End`: libera apenas `Preset seguro`
-- `Low-End`: bloqueia `Preset competitivo`, `Preset extremo` e `Latencia extrema`
-- `High-End`: libera `Preset competitivo` e `Latencia extrema`
+- **Low-End**: libera apenas preset seguro / Auto-Tuning conservador
+- **Low-End**: bloqueia preset competitivo, extremo e latencia extrema
+- **High-End**: libera preset competitivo e latencia extrema
 
-Objetivo: evitar aplicar tweaks agressivos em maquinas que podem sofrer com superaquecimento, throttling ou instabilidade.
+Objetivo: evitar tweaks agressivos em maquinas sujeitas a superaquecimento, throttling ou instabilidade.
 
 ## Criar restore point
 
-Executa `Checkpoint-Computer` pelo PowerShell.
+Executa `Checkpoint-Computer` via PowerShell.
 
-Use antes de qualquer preset agressivo. Pode falhar se o app nao estiver como Administrador ou se a Restauracao do Sistema estiver desativada.
+Use antes de pacotes agressivos. Pode falhar sem Administrador ou com Restauracao do Sistema desativada.
 
-## Backup
+## Backup e rollback
 
-Cria backup granular em:
+Diretorio: `C:\ProgramData\ApexTweaker\Backups`
 
-`C:\ProgramData\ValorantTweaker\Backups`
-
-Salva:
+O `BackupService` salva:
 
 - plano de energia ativo
 - valores de Registro alterados pelo app
@@ -55,16 +102,19 @@ Salva:
 - mouse/teclado
 - scheduler/MMCSS
 - HAGS
+- snapshots de mutacao (`mutation-*.json`) para rollback transacional
 
-O botao Reverter usa o backup mais recente.
+**Reverter** (Utilidades) executa `MasterRollbackService` em ordem LIFO sobre snapshots pendentes no ledger.
+
+Backup manual e criado automaticamente antes de cada otimizacao iniciada pela UI.
 
 ## Preset seguro
 
-Aplica ajustes conservadores:
+Ajustes conservadores:
 
 - Game Mode
 - Game DVR/captura desligados
-- plano Alto desempenho
+- plano Alto desempenho (ou Ultimate Performance quando disponivel)
 - fullscreen optimizations do VALORANT quando encontrado
 
 ## Preset competitivo
@@ -80,9 +130,11 @@ Aplica em sequencia:
 
 Nao desativa idle states nem hibernacao.
 
-## Preset extremo
+## Preset extremo / Auto-Tuning
 
-Executa em sequencia:
+O **Auto-Tuning** do Dashboard escolhe o perfil ideal via `OptimizationEngine` e aplica o pacote correspondente.
+
+Preset extremo executa em sequencia:
 
 - Energia
 - Latencia extrema
@@ -92,7 +144,7 @@ Executa em sequencia:
 - Rede
 - Background
 
-Nao mexe no Vanguard, nao injeta codigo, nao aplica patch de kernel, nao desativa Defender e nao altera BCDEdit automaticamente.
+Nao mexe no Vanguard, nao injeta codigo, nao aplica patch de kernel, nao desativa Defender e nao altera BCDEdit automaticamente no fluxo padrao.
 
 ## Perfil GPU
 
@@ -102,19 +154,19 @@ Detecta placas via `Win32_VideoController` e mostra recomendacoes por vendor:
 - AMD/Radeon
 - Intel/Arc
 
-O app aplica automaticamente apenas ajustes expostos pelo Windows, como HAGS/Game Mode/Game DVR. Configuracoes do painel NVIDIA/AMD/Intel sao exibidas como checklist porque cada vendor usa APIs, banco de dados ou software proprietario.
+O app aplica automaticamente ajustes expostos pelo Windows (HAGS, Game Mode, Game DVR). Configuracoes do painel NVIDIA/AMD/Intel sao exibidas como checklist quando aplicavel — cada vendor usa APIs ou software proprietario.
 
 ## GPU regedit
 
-Detecta adaptadores na classe:
+Detecta adaptadores em:
 
 `HKLM\SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}`
 
 Antes de alterar, exporta backup `.reg` para:
 
-`C:\ProgramData\ValorantTweaker\Backups`
+`C:\ProgramData\ApexTweaker\Backups`
 
-NVIDIA:
+**NVIDIA:**
 
 - `PerfLevelSrc = 0x2222`
 - `PowerMizerEnable = 0`
@@ -122,46 +174,44 @@ NVIDIA:
 - `PowerMizerLevelAC = 0`
 - `DisableDynamicPstate = 1`
 
-AMD/Radeon:
+**AMD/Radeon:**
 
 - `EnableUlps = 0`
 - `EnableUlps_NA = 0`
 - `PP_SclkDeepSleepDisable = 1`
 
-MSI/Interrupt Policy:
+**MSI/Interrupt Policy:**
 
-- localiza adaptadores de video via `Win32_PnPEntity`
-- usa o caminho `HKLM\SYSTEM\CurrentControlSet\Enum\...`
-- aplica `MSISupported = 1`
-- aplica `Interrupt Management\Affinity Policy\DevicePriority = 3` (High)
-- exporta backup `.reg` do dispositivo antes da alteracao
+- localiza adaptadores via `Win32_PnPEntity`
+- caminho `HKLM\SYSTEM\CurrentControlSet\Enum\...`
+- `MSISupported = 1`
+- `Interrupt Management\Affinity Policy\DevicePriority = 3` (High)
+- exporta backup `.reg` antes da alteracao
 
-Intel/Arc:
+**Intel/Arc:**
 
 - nao aplica Registro automaticamente
 - recomenda Intel Graphics Software / Low Latency Mode
 
-Observacao: settings 3D do NVIDIA Control Panel ficam em perfis DRS/NVAPI, nao em chaves simples e estaveis de regedit. Por isso o app aplica via Registro apenas ajustes de power-state/driver que sao rastreaveis.
+Settings 3D do NVIDIA Control Panel ficam em perfis DRS/NVAPI, nao em chaves simples de regedit.
 
 ## Monitor VAL
 
-Monitora processos do VALORANT em segundo plano usando enumeração simples por nome e acesso nativo de baixo privilégio.
-
-Processos observados:
+Monitora processos do VALORANT em segundo plano:
 
 - `VALORANT`
 - `VALORANT-Win64-Shipping`
 
 Quando detectado:
 
-- solicita handle com `PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_SET_INFORMATION`
-- tenta aplicar afinidade via `SetProcessAffinityMask`
-- tenta definir prioridade `High` via `SetPriorityClass`
+- handle com `PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_SET_INFORMATION`
+- afinidade via `SetProcessAffinityMask` (com apoio de `ApexTweaker.Native.dll` em CPUs hibridas)
+- prioridade `High` via `SetPriorityClass`
 - nao usa `ntdll.dll!NtSetTimerResolution`
 
-Em Intel de nova geracao com arquitetura hibrida, o app tenta usar apenas os primeiros nucleos logicos estimados como P-cores, evitando E-cores. Essa estimativa usa os dados de nucleos fisicos/logicos coletados via WMI.
+Em Intel hibrida, tenta usar P-cores via topologia nativa e `IntelHybridProbeStrategy`.
 
-Se o Windows, Vanguard ou outro anti-cheat negarem o handle, o app ignora silenciosamente aquela tentativa e continua funcionando. O jogo continua responsavel pelo timer de plataforma.
+Se Vanguard ou o Windows negarem o handle, a tentativa e ignorada silenciosamente.
 
 ## Energia
 
@@ -169,135 +219,137 @@ Foco: reduzir economia de energia durante jogo.
 
 Aplica:
 
-- tenta liberar e ativar Ultimate Performance
-- se falhar, ativa Alto desempenho
-- CPU minimo em 100% na tomada
-- CPU maximo em 100% na tomada
+- Ultimate Performance (com fallback para Alto desempenho)
+- CPU minimo/maximo 100% na tomada
 - politica de resfriamento ativa
 - suspensao seletiva USB desligada na tomada
 
 ## Latencia extrema
 
-Foco: aproximar pelo Windows o comportamento de uma BIOS agressiva para jogo.
+Foco: perfil agressivo de energia para jogo.
 
-Aplica no plano de energia atual:
+No plano ativo:
 
-- CPU boost mode em `Aggressive`
-- EPP em `0`, preferencia total por desempenho
-- em CPU homogenea/legacy: core parking minimo em `100%` e core parking maximo em `100%`
-- em CPU heterogenea (Intel 12a geracao+, Core Ultra, P-Cores/E-Cores): nao altera Core Parking; aplica `HETEROPOLICY=4`, `HETEROTHREAD=0` e `SCHEDPOLICY=2` para preservar o Thread Director
+- CPU boost mode `Aggressive`
+- EPP em `0`
+- CPU homogenea: core parking min/max 100%
+- CPU heterogenea (Intel 12a gen+, Core Ultra): preserva Thread Director (`HETEROPOLICY=4`, `HETEROTHREAD=0`, `SCHEDPOLICY=2`)
 - processor idle states desativados
 - PCIe ASPM desligado
-- disco sem desligamento automatico na tomada
-- suspensao automatica desligada na tomada
-- hibernacao automatica desligada
+- disco/suspensao/hibernacao desligados na tomada
 - `powercfg /hibernate off`
 
-Isso aumenta consumo, temperatura e ruido. Pode melhorar feeling/input em alguns PCs e piorar temperatura/throttle em outros.
+Aumenta consumo e temperatura. Pode melhorar input em alguns PCs e piorar throttle em outros.
 
-O Windows nao controla diretamente ring ratio, PL1, PL2 ou core current limit. Esses valores ficam em BIOS/UEFI, firmware ou ferramentas com driver proprio.
+Windows nao controla ring ratio, PL1, PL2 ou core current limit — ficam em BIOS/firmware.
 
-Tambem aplica correcoes avancadas:
+Tambem aplica:
 
-- `OverlayTestMode = 5` em `HKLM\SOFTWARE\Microsoft\Windows\Dwm`
-- backup automatico das chaves DWM/MMCSS antes de alterar
+- `OverlayTestMode = 5` em DWM (MPO)
+- backup automatico DWM/MMCSS
 - ajustes MMCSS/DPC para `Tasks\Games`
 - `NetworkThrottlingIndex = 0xffffffff`
 
 ## MPO/DWM
 
-Aplicado pelo preset extremo via `ApplyMpoStabilityFix`.
+Via `ApplyMpoStabilityFix` / preset extremo.
 
-Chave:
+Chave: `HKLM\SOFTWARE\Microsoft\Windows\Dwm` → `OverlayTestMode = 5`
 
-`HKLM\SOFTWARE\Microsoft\Windows\Dwm`
-
-Valor:
-
-- `OverlayTestMode = 5`
-
-Antes de alterar, exporta backup `.reg` para:
-
-`C:\ProgramData\ValorantTweaker\Backups`
+Backup `.reg` em `C:\ProgramData\ApexTweaker\Backups`.
 
 ## CPU/Scheduler
 
-Foco: perfil multimidia/MMCSS para jogos.
+Perfil MMCSS para jogos.
 
-Aplica em `HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile`:
+Em `HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile`:
 
 - `SystemResponsiveness = 0`
 - `NetworkThrottlingIndex = 0xffffffff`
 
-Aplica em `Tasks\Games`:
+Em `Tasks\Games`:
 
 - `GPU Priority = 8`
 - `Priority = 6`
 - `Scheduling Category = High`
 - `SFIO Priority = High`
 
-Exige Administrador e normalmente pede reinicio.
+Exige Administrador; reinicio recomendado.
 
 ## GPU/Display
 
-Foco: recursos graficos e captura em segundo plano.
+- HAGS com `HwSchMode = 2`
+- Game Mode ativo
+- Game DVR/captura desligados
+- fullscreen optimizations do VALORANT quando encontrado
 
-Aplica:
-
-- solicita HAGS com `HwSchMode = 2`
-- ativa Game Mode
-- desativa Game DVR/captura em segundo plano
-- desativa fullscreen optimizations no executavel do VALORANT quando encontrado
-
-HAGS depende de Windows, GPU e driver. Pode nao aparecer em todo hardware.
+HAGS depende de Windows, GPU e driver.
 
 ## Input/USB
 
-Foco: resposta de mouse, teclado e USB.
-
-Aplica:
-
 - remove aceleracao do mouse
-- configura repeticao rapida do teclado
-- desativa suspensao seletiva USB na tomada
+- repeticao rapida do teclado
+- suspensao seletiva USB desligada na tomada
 
 ## Rede
-
-Foco: baixa latencia sem quebrar o TCP moderno do Windows.
-
-Aplica:
 
 - `NetworkThrottlingIndex = 0xffffffff`
 - `netsh int tcp set global rss=enabled`
 - `netsh int tcp set global ecncapability=disabled`
-- varre adaptadores em `HKLM\SYSTEM\CurrentControlSet\Control\Class\{4d36e972-e325-11ce-bfc1-08002be10318}`
-- desativa parametros existentes de `Interrupt Moderation`
-- desativa parametros existentes de `Green Ethernet` / `EEE`
+- desativa `Interrupt Moderation`, `Green Ethernet` / `EEE` nos adaptadores encontrados
 
-Antes das alteracoes de driver de rede, exporta backup `.reg` para:
+Backup `.reg` antes de alteracoes de driver de rede.
 
-`C:\ProgramData\ValorantTweaker\Backups`
+Implementado tambem via `NetworkInterruptModerationTweakCommand` no pipeline estruturado.
 
 ## Background
 
-Foco: reduzir capturas e paineis em segundo plano.
-
-Aplica:
-
-- desativa Game DVR
-- desativa App Capture
+- desativa Game DVR e App Capture
 - reduz paineis/startup do Game Bar
 
-Nao remove Game Bar e nao desativa Windows Defender.
+Nao remove Game Bar nem desativa Windows Defender.
+
+## Politicas/Servicos
+
+Modulo que aplica ajustes de servicos e politicas do Windows conforme catalogo do `TweakService`. Alteracoes sao condicionais e reversiveis via ledger.
 
 ## Reverter
 
-Tenta voltar:
+Via **Utilidades → Reverter** (`MasterRollbackService`):
 
-- Game Mode/Game DVR para valores comuns
-- fullscreen optimizations do VALORANT
-- mouse para padrao comum
-- HAGS para decisao do Windows/driver
-- plano de energia Equilibrado
+- restaura snapshots pendentes em ordem reversa (LIFO)
+- cobre Registro, energia, BCD, servicos e estados capturados no ledger
 
-Para reverter tudo com garantia, use tambem o restore point criado antes do preset.
+Para reversao completa do sistema operacional, use tambem o restore point criado antes do preset.
+
+## Pipeline transacional
+
+Toda mutacao encapsulada em `MutationExecutor` segue:
+
+```
+Validate -> Snapshot -> Execute -> Verify/ReadBack -> Log
+```
+
+Nenhuma operacao deve reportar sucesso sem read-back do estado real do Windows.
+
+## Telemetria
+
+- **HardwareTelemetryService**: sensores via LibreHardwareMonitor, snapshots periodicos
+- **EtwFrameTracker**: frametime via ETW (`Microsoft-Windows-DxgKrnl`)
+- Degradacao graciosa: falta de sensor ou privilegio nao deve crashar o app
+- ETW filtra PID do jogo e descarta ruido de DWM/overlays
+
+## Comandos estruturados adicionais
+
+| Comando | Funcao |
+|---------|--------|
+| `ProcessorIdleStatesTweakCommand` | Idle states do processador |
+| `EdgeRemovalTweakCommand` | Remocao do Edge (modulo avancado) |
+| `NetworkInterruptModerationTweakCommand` | Moderacao de interrupcao de rede |
+| `MemoryCompressionTweakCommand` | Compressao de memoria |
+| `ExtremeMutationCommands` | Hypervisor, timer resolution, MPO, MSI Mode |
+
+## Divida tecnica conhecida
+
+- Telemetria e console compartilham a mesma view; a aba Telemetria e instanciada sob demanda na primeira escrita de log.
+- Alguns servicos ainda usam strings legadas em comentarios internos; paths publicos usam `ApexTweaker`.

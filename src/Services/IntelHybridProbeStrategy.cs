@@ -1,7 +1,7 @@
 using System.Runtime.InteropServices;
 using ApexTweaker.NativeInterop;
 
-namespace Renomeador.Services;
+namespace ApexTweaker.Services;
 
 internal static class IntelHybridProbeStrategy
 {

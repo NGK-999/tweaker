@@ -1,4 +1,8 @@
-﻿#define MyAppName "ApexTweaker"
+﻿#ifndef ReleaseDir
+#define ReleaseDir "..\release-v2"
+#endif
+
+#define MyAppName "ApexTweaker"
 #define MyAppVersion "2.0.1"
 #define MyAppPublisher "Igor Silva"
 #define MyAppExeName "ApexTweaker.exe"
@@ -37,7 +41,7 @@ Name: "brazilianportuguese"; MessagesFile: "compiler:Languages\BrazilianPortugue
 Name: "desktopicon"; Description: "Criar atalho na area de trabalho"; GroupDescription: "Atalhos adicionais:"; Flags: unchecked
 
 [Files]
-Source: "..\release-v2\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#ReleaseDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{group}\ApexTweaker"; Filename: "{app}\ApexTweaker.exe"

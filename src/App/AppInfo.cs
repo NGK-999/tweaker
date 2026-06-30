@@ -1,4 +1,4 @@
-namespace Renomeador;
+namespace ApexTweaker;
 
 internal static class AppInfo
 {

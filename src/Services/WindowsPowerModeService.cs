@@ -3,7 +3,7 @@ using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Text;
 
-namespace Renomeador.Services;
+namespace ApexTweaker.Services;
 
 internal static class WindowsPowerModeService
 {

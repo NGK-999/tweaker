@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 
-namespace Renomeador.Services;
+namespace ApexTweaker.Services;
 
 internal sealed class ValorantLocator
 {

@@ -1,8 +1,8 @@
 using System;
-using Renomeador.Infrastructure;
-using Renomeador.Models;
+using ApexTweaker.Infrastructure;
+using ApexTweaker.Models;
 
-namespace Renomeador.Services;
+namespace ApexTweaker.Services;
 
 internal sealed class MemoryCompressionTweakCommand : ISystemMutationCommand
 {

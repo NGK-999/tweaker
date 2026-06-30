@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 
-namespace Renomeador.Models;
+namespace ApexTweaker.Models;
 
 internal sealed record RegistryValueSnapshot(
     string Root,

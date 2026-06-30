@@ -1,6 +1,6 @@
 using Microsoft.Win32;
 
-namespace Renomeador.Services;
+namespace ApexTweaker.Services;
 
 internal static class RegistryService
 {

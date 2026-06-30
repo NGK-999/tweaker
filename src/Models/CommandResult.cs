@@ -1,6 +1,6 @@
 using System;
 
-namespace Renomeador.Models;
+namespace ApexTweaker.Models;
 
 internal readonly record struct CommandResult(
     int ExitCode,

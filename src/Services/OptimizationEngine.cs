@@ -3,9 +3,9 @@ using System.Globalization;
 using System.Management;
 using System.Text.RegularExpressions;
 using Microsoft.Win32;
-using Renomeador.Models;
+using ApexTweaker.Models;
 
-namespace Renomeador.Services;
+namespace ApexTweaker.Services;
 
 internal sealed class OptimizationEngine
 {

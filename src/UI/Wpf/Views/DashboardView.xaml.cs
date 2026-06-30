@@ -32,20 +32,20 @@ public partial class DashboardView : WpfUserControl
     public void SetAutoOptimizeBusy()
     {
         AutoOptimizeButton.Content = "Aplicando otimiza\u00E7\u00F5es...";
-        AutoOptimizeButton.Background = new SolidColorBrush(System.Windows.Media.Color.FromRgb(58, 58, 60));
+        AutoOptimizeButton.Background = new SolidColorBrush(System.Windows.Media.Color.FromRgb(72, 72, 74));
         AutoOptimizeButton.IsEnabled = false;
     }
 
     public void SetAutoOptimizeIdle(bool alreadyOptimized)
     {
         AutoOptimizeButton.Content = alreadyOptimized
-            ? "\u2713 SISTEMA J\u00C1 OTIMIZADO AO M\u00C1XIMO"
-            : "\u26A1 OTIMIZAR SISTEMA AO M\u00C1XIMO";
+            ? "\u2713 Sistema j\u00E1 otimizado"
+            : "\u26A1 Otimizar sistema";
 
         AutoOptimizeButton.Background = new SolidColorBrush(
             alreadyOptimized
-                ? System.Windows.Media.Color.FromRgb(18, 96, 110)
-                : System.Windows.Media.Color.FromRgb(0, 180, 216));
+                ? System.Windows.Media.Color.FromRgb(44, 74, 110)
+                : System.Windows.Media.Color.FromRgb(10, 132, 255));
         AutoOptimizeButton.IsEnabled = true;
     }
 

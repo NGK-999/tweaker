@@ -6,10 +6,10 @@ using System.Runtime.InteropServices;
 using System.Security.Principal;
 using System.Text.RegularExpressions;
 using Microsoft.Win32;
-using Renomeador.Infrastructure;
-using Renomeador.Models;
+using ApexTweaker.Infrastructure;
+using ApexTweaker.Models;
 
-namespace Renomeador.Services;
+namespace ApexTweaker.Services;
 
 internal sealed class SystemDiagnosticsService
 {

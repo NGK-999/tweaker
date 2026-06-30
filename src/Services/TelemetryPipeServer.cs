@@ -4,9 +4,9 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Channels;
 
-namespace ApexTweaker.Service;
+namespace ApexTweaker.Services;
 
-using Renomeador.Services;
+using ApexTweaker.Services;
 
 internal sealed class TelemetryPipeServer : IDisposable
 {

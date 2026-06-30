@@ -1,165 +1,161 @@
 <UserControl x:Class="ApexTweaker.UI.Wpf.Views.TelemetryView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             Background="Transparent">
+             Background="Transparent"
+             FontFamily="Segoe UI Variable Display, Segoe UI, Arial">
     <UserControl.Resources>
-        <Style x:Key="CardStyle" TargetType="Border">
-            <Setter Property="Background" Value="#2A2A2A" />
-            <Setter Property="BorderBrush" Value="#3A3A3C" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="14" />
-            <Setter Property="Padding" Value="20" />
-        </Style>
-        <Style x:Key="PrimaryButtonStyle" TargetType="Button">
-            <Setter Property="Height" Value="42" />
-            <Setter Property="Background" Value="#323234" />
-            <Setter Property="Foreground" Value="White" />
-            <Setter Property="BorderBrush" Value="#404044" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Cursor" Value="Hand" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="RootBorder"
-                                Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="10">
-                            <ContentPresenter HorizontalAlignment="Center"
-                                              VerticalAlignment="Center" />
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="RootBorder" Property="Background" Value="#3A3A3C" />
-                            </Trigger>
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="RootBorder" Property="Opacity" Value="0.86" />
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter TargetName="RootBorder" Property="Opacity" Value="0.5" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-        <Style x:Key="MetricValueStyle" TargetType="TextBlock">
-            <Setter Property="Foreground" Value="White" />
-            <Setter Property="FontSize" Value="22" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-        </Style>
-        <Style x:Key="MetricCaptionStyle" TargetType="TextBlock">
-            <Setter Property="Foreground" Value="#A1A1AA" />
-            <Setter Property="FontSize" Value="13" />
-        </Style>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="../Themes/MacTheme.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
     </UserControl.Resources>
 
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel>
-            <Border Style="{StaticResource CardStyle}">
+            <Border Style="{StaticResource MacCardStyle}">
                 <StackPanel>
-                    <TextBlock Text="Teste A/B de Estabilidade"
-                               Foreground="#00B4D8"
+                    <TextBlock Style="{StaticResource MacSectionLabel}"
+                               Text="BENCHMARK" />
+                    <TextBlock Margin="0,6,0,0"
+                               Style="{StaticResource MacPageTitle}"
                                FontSize="22"
-                               FontWeight="Bold" />
+                               Text="Teste A/B de estabilidade" />
                     <Button x:Name="BenchmarkButton"
-                            Margin="0,16,0,0"
-                            Style="{StaticResource PrimaryButtonStyle}"
-                            Content="Iniciar Teste (Antes da Otimização)"
+                            Margin="0,18,0,0"
+                            Style="{StaticResource MacPrimaryButton}"
+                            Content="Iniciar teste (antes da otimiza&#x00E7;&#x00E3;o)"
                             Click="BenchmarkButton_OnClick" />
                 </StackPanel>
             </Border>
 
-            <Border Margin="0,16,0,0" Style="{StaticResource CardStyle}">
+            <Border Margin="0,14,0,0" Style="{StaticResource MacCardStyle}">
                 <StackPanel>
-                    <TextBlock Text="Gráfico em tempo real"
-                               Foreground="#00B4D8"
-                               FontSize="22"
-                               FontWeight="Bold" />
+                    <TextBlock Style="{StaticResource MacSectionLabel}"
+                               Text="FRAMETIME" />
+                    <TextBlock Margin="0,6,0,0"
+                               Style="{StaticResource MacSectionTitle}"
+                               Text="Gr&#x00E1;fico em tempo real" />
                     <Border Margin="0,16,0,0"
-                            Background="#131827"
-                            BorderBrush="#263048"
-                            BorderThickness="1"
-                            CornerRadius="10"
-                            Padding="12">
+                            Background="{StaticResource ChartBgBrush}"
+                            BorderBrush="{StaticResource CardBorderBrush}"
+                            BorderThickness="0.5"
+                            CornerRadius="12"
+                            Padding="14">
                         <Grid>
                             <Canvas x:Name="ChartCanvas"
                                     Height="220"
                                     SizeChanged="ChartCanvas_OnSizeChanged">
                                 <Polyline x:Name="FpsPolyline"
-                                          Stroke="#00B4D8"
-                                          StrokeThickness="2" />
+                                          Stroke="#0A84FF"
+                                          StrokeThickness="2.5"
+                                          StrokeLineJoin="Round"
+                                          StrokeStartLineCap="Round"
+                                          StrokeEndLineCap="Round" />
                                 <Polyline x:Name="OnePercentPolyline"
-                                          Stroke="#4ADE80"
-                                          StrokeThickness="2" />
+                                          Stroke="#30D158"
+                                          StrokeThickness="2.5"
+                                          StrokeLineJoin="Round"
+                                          StrokeStartLineCap="Round"
+                                          StrokeEndLineCap="Round" />
                             </Canvas>
                             <TextBlock x:Name="ChartPlaceholderText"
                                        HorizontalAlignment="Center"
                                        VerticalAlignment="Center"
-                                       Foreground="#667085"
-                                       FontSize="16"
-                                       Text="Aguardando início do jogo..." />
+                                       Foreground="{StaticResource TextTertiaryBrush}"
+                                       FontSize="14"
+                                       Text="Aguardando in&#x00ED;cio do jogo..." />
                         </Grid>
                     </Border>
                 </StackPanel>
             </Border>
 
-            <Grid Margin="0,16,0,0">
+            <Grid Margin="0,14,0,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="16" />
+                    <ColumnDefinition Width="14" />
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
 
-                <Border Grid.Column="0" Style="{StaticResource CardStyle}">
+                <Border Grid.Column="0" Style="{StaticResource MacCardStyle}">
                     <StackPanel>
-                        <TextBlock Text="Métricas de kernel e CPU"
-                                   Foreground="#00B4D8"
-                                   FontSize="20"
-                                   FontWeight="Bold" />
+                        <TextBlock Style="{StaticResource MacSectionLabel}"
+                                   Text="KERNEL" />
+                        <TextBlock Margin="0,6,0,0"
+                                   Style="{StaticResource MacSectionTitle}"
+                                   Text="M&#x00E9;tricas de CPU" />
                         <UniformGrid Margin="0,18,0,0" Rows="2" Columns="2">
                             <StackPanel Margin="0,0,12,16">
-                                <TextBlock Style="{StaticResource MetricCaptionStyle}" Text="Pico de Latência DPC" />
-                                <TextBlock x:Name="DpcLatencyText" Style="{StaticResource MetricValueStyle}" Text="0 µs" />
+                                <TextBlock Style="{StaticResource MacMetricCaption}" Text="Pico DPC" />
+                                <TextBlock x:Name="DpcLatencyText" Style="{StaticResource MacMetricValue}" FontSize="20" Text="0 &#x00B5;s" />
                             </StackPanel>
                             <StackPanel Margin="0,0,12,16">
-                                <TextBlock Style="{StaticResource MetricCaptionStyle}" Text="Boost Drop" />
-                                <TextBlock x:Name="BoostDropText" Style="{StaticResource MetricValueStyle}" Text="0 MHz" />
+                                <TextBlock Style="{StaticResource MacMetricCaption}" Text="Boost drop" />
+                                <TextBlock x:Name="BoostDropText" Style="{StaticResource MacMetricValue}" FontSize="20" Text="0 MHz" />
                             </StackPanel>
                             <StackPanel Margin="0,0,12,0">
-                                <TextBlock Style="{StaticResource MetricCaptionStyle}" Text="CPU Package" />
-                                <TextBlock x:Name="CpuPackageText" Style="{StaticResource MetricValueStyle}" Text="-- °C" />
+                                <TextBlock Style="{StaticResource MacMetricCaption}" Text="CPU package" />
+                                <TextBlock x:Name="CpuPackageText" Style="{StaticResource MacMetricValue}" FontSize="20" Text="-- &#x00B0;C" />
                             </StackPanel>
                             <StackPanel Margin="0,0,12,0">
-                                <TextBlock Style="{StaticResource MetricCaptionStyle}" Text="Clock de jogo" />
-                                <TextBlock x:Name="EffectiveClockText" Style="{StaticResource MetricValueStyle}" Text="0 MHz" />
+                                <TextBlock Style="{StaticResource MacMetricCaption}" Text="Clock de jogo" />
+                                <TextBlock x:Name="EffectiveClockText" Style="{StaticResource MacMetricValue}" FontSize="20" Text="0 MHz" />
                             </StackPanel>
                         </UniformGrid>
                     </StackPanel>
                 </Border>
 
-                <Border Grid.Column="2" Style="{StaticResource CardStyle}">
+                <Border Grid.Column="2" Style="{StaticResource MacCardStyle}">
                     <StackPanel>
-                        <TextBlock Text="Console"
-                                   Foreground="#00B4D8"
-                                   FontSize="20"
-                                   FontWeight="Bold" />
-                        <Border Margin="0,16,0,0"
-                                Background="#141416"
-                                BorderBrush="#343434"
-                                BorderThickness="1"
+                        <TextBlock Style="{StaticResource MacSectionLabel}"
+                                   Text="LOG" />
+                        <TextBlock Margin="0,6,0,0"
+                                   Style="{StaticResource MacSectionTitle}"
+                                   Text="Console" />
+                        <Border Margin="0,14,0,0"
+                                Background="{StaticResource ChartBgBrush}"
+                                BorderBrush="{StaticResource CardBorderBrush}"
+                                BorderThickness="0.5"
                                 CornerRadius="10"
-                                Padding="8">
-                            <RichTextBox x:Name="ConsoleBox"
-                                         Background="#141416"
-                                         BorderThickness="0"
-                                         FontFamily="Consolas"
-                                         FontSize="13"
-                                         Foreground="#F4F4F5"
-                                         IsReadOnly="True"
-                                         HorizontalScrollBarVisibility="Disabled"
-                                         VerticalScrollBarVisibility="Auto" />
+                                Padding="4">
+                            <ListBox x:Name="ConsoleList"
+                                     Background="Transparent"
+                                     BorderThickness="0"
+                                     FontFamily="{StaticResource MacMonoFont}"
+                                     FontSize="12"
+                                     Foreground="{StaticResource TextPrimaryBrush}"
+                                     Focusable="False"
+                                     HorizontalContentAlignment="Stretch"
+                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                     ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                     VirtualizingPanel.IsVirtualizing="True"
+                                     VirtualizingPanel.VirtualizationMode="Recycling">
+                                <ListBox.ItemContainerStyle>
+                                    <Style TargetType="ListBoxItem">
+                                        <Setter Property="Padding" Value="6,2" />
+                                        <Setter Property="Margin" Value="0" />
+                                        <Setter Property="Background" Value="Transparent" />
+                                        <Setter Property="BorderThickness" Value="0" />
+                                        <Setter Property="Focusable" Value="False" />
+                                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                        <Style.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter Property="Background" Value="Transparent" />
+                                            </Trigger>
+                                            <Trigger Property="IsSelected" Value="True">
+                                                <Setter Property="Background" Value="Transparent" />
+                                            </Trigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </ListBox.ItemContainerStyle>
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding Text}"
+                                                   Foreground="{Binding Foreground}"
+                                                   TextWrapping="Wrap" />
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
                         </Border>
                     </StackPanel>
                 </Border>

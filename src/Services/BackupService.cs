@@ -9,10 +9,10 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading;
 using Microsoft.Win32;
-using Renomeador.Infrastructure;
-using Renomeador.Models;
+using ApexTweaker.Infrastructure;
+using ApexTweaker.Models;
 
-namespace Renomeador.Services;
+namespace ApexTweaker.Services;
 
 internal sealed class BackupService
 {

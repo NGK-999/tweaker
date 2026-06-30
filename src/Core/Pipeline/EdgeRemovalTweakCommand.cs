@@ -2,9 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using Microsoft.Win32;
-using Renomeador.Infrastructure;
-using Renomeador.Models;
-using Renomeador.Services;
+using ApexTweaker.Infrastructure;
+using ApexTweaker.Models;
+using ApexTweaker.Services;
 
 namespace ApexTweaker.Core.Pipeline;
 

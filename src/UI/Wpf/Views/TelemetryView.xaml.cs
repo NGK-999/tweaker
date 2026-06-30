@@ -1,30 +1,55 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using WpfUserControl = System.Windows.Controls.UserControl;
-using System.Windows.Documents;
 using System.Windows.Media;
 using System.Windows.Shapes;
-using Renomeador.Services;
+using System.Windows.Threading;
+using WpfBrush = System.Windows.Media.Brush;
+using ApexTweaker.Services;
 
 namespace ApexTweaker.UI.Wpf.Views;
 
 public partial class TelemetryView : WpfUserControl
 {
     private const int MaxSamples = 90;
-    private const int MaxConsoleBlocks = 320;
+    private const int MaxConsoleLines = 320;
+    private const int ChartRedrawIntervalMs = 66;
+
     private readonly Queue<double> fpsSamples = new();
     private readonly Queue<double> onePercentSamples = new();
+    private readonly ObservableCollection<ConsoleLineViewModel> consoleLines = [];
+    private readonly DispatcherTimer chartRedrawTimer;
+    private bool chartDirty;
+    private DateTime lastMetricsUpdateUtc = DateTime.MinValue;
+    private TelemetryMetricsSnapshot? pendingMetrics;
 
     public event Func<Task>? ToggleTelemetryRequested;
 
     public TelemetryView()
     {
         InitializeComponent();
-        ConsoleBox.Document = CreateDocument();
+
+        ConsoleList.ItemsSource = consoleLines;
+
+        chartRedrawTimer = new DispatcherTimer(DispatcherPriority.Render)
+        {
+            Interval = TimeSpan.FromMilliseconds(ChartRedrawIntervalMs)
+        };
+        chartRedrawTimer.Tick += (_, _) =>
+        {
+            if (!chartDirty)
+            {
+                return;
+            }
+
+            chartDirty = false;
+            RedrawChart();
+        };
     }
 
     public void SetBusy(bool busy)
@@ -39,14 +64,24 @@ public partial class TelemetryView : WpfUserControl
 
     public void SetMetrics(TelemetryMetricsSnapshot snapshot)
     {
-        DpcLatencyText.Text = $"{snapshot.PeakDpcLatencyMicros:0} \u00B5s";
-        BoostDropText.Text = $"{snapshot.BoostDropMhz:0} MHz";
-        CpuPackageText.Text = snapshot.CpuPackageTemperatureC > 0
-            ? $"{snapshot.CpuPackageTemperatureC:0} \u00B0C"
-            : "-- \u00B0C";
-        EffectiveClockText.Text = snapshot.EffectiveGameClockMhz > 0
-            ? $"{snapshot.EffectiveGameClockMhz:0} MHz"
-            : "0 MHz";
+        pendingMetrics = snapshot;
+
+        var now = DateTime.UtcNow;
+        if ((now - lastMetricsUpdateUtc).TotalMilliseconds < 120D)
+        {
+            return;
+        }
+
+        lastMetricsUpdateUtc = now;
+        ApplyMetrics(snapshot);
+    }
+
+    public void FlushPendingMetrics()
+    {
+        if (pendingMetrics is not null)
+        {
+            ApplyMetrics(pendingMetrics);
+        }
     }
 
     public void AddTelemetryPoint(TelemetryHistoryPoint point)
@@ -54,38 +89,51 @@ public partial class TelemetryView : WpfUserControl
         Enqueue(fpsSamples, point.FPS);
         Enqueue(onePercentSamples, point.OnePercentLowFps);
         ChartPlaceholderText.Visibility = Visibility.Collapsed;
-        RedrawChart();
+
+        chartDirty = true;
+        if (!chartRedrawTimer.IsEnabled)
+        {
+            chartRedrawTimer.Start();
+        }
     }
 
     public void ClearConsole()
     {
-        ConsoleBox.Document = CreateDocument();
+        consoleLines.Clear();
     }
 
     public void SetConsoleLines(IReadOnlyList<string> lines)
     {
-        var document = CreateDocument();
+        consoleLines.Clear();
         foreach (var line in lines)
         {
-            document.Blocks.Add(CreateParagraph(line));
+            consoleLines.Add(ConsoleLineViewModel.FromLine(line));
         }
 
-        ConsoleBox.Document = document;
-        ConsoleBox.ScrollToEnd();
+        ScrollConsoleToEnd();
     }
 
     public void AppendConsoleLine(string line)
     {
-        var document = ConsoleBox.Document ?? CreateDocument();
-        document.Blocks.Add(CreateParagraph(line));
+        consoleLines.Add(ConsoleLineViewModel.FromLine(line));
+        TrimConsoleLines();
+        ScrollConsoleToEnd();
+    }
 
-        while (document.Blocks.Count > MaxConsoleBlocks)
+    public void AppendConsoleLines(IReadOnlyList<string> lines)
+    {
+        if (lines.Count == 0)
         {
-            document.Blocks.Remove(document.Blocks.FirstBlock);
+            return;
         }
 
-        ConsoleBox.Document = document;
-        ConsoleBox.ScrollToEnd();
+        foreach (var line in lines)
+        {
+            consoleLines.Add(ConsoleLineViewModel.FromLine(line));
+        }
+
+        TrimConsoleLines();
+        ScrollConsoleToEnd();
     }
 
     private async void BenchmarkButton_OnClick(object sender, RoutedEventArgs e)
@@ -98,7 +146,20 @@ public partial class TelemetryView : WpfUserControl
 
     private void ChartCanvas_OnSizeChanged(object sender, SizeChangedEventArgs e)
     {
+        chartDirty = true;
         RedrawChart();
+    }
+
+    private void ApplyMetrics(TelemetryMetricsSnapshot snapshot)
+    {
+        DpcLatencyText.Text = $"{snapshot.PeakDpcLatencyMicros:0} \u00B5s";
+        BoostDropText.Text = $"{snapshot.BoostDropMhz:0} MHz";
+        CpuPackageText.Text = snapshot.CpuPackageTemperatureC > 0
+            ? $"{snapshot.CpuPackageTemperatureC:0} \u00B0C"
+            : "-- \u00B0C";
+        EffectiveClockText.Text = snapshot.EffectiveGameClockMhz > 0
+            ? $"{snapshot.EffectiveGameClockMhz:0} MHz"
+            : "0 MHz";
     }
 
     private void RedrawChart()
@@ -112,55 +173,27 @@ public partial class TelemetryView : WpfUserControl
         OnePercentPolyline.Points = BuildPoints(onePercentSamples, ChartCanvas.ActualWidth, ChartCanvas.ActualHeight);
     }
 
-    private static FlowDocument CreateDocument()
+    private void TrimConsoleLines()
     {
-        return new FlowDocument
+        while (consoleLines.Count > MaxConsoleLines)
         {
-            Background = System.Windows.Media.Brushes.Transparent,
-            Foreground = System.Windows.Media.Brushes.Gainsboro,
-            FontFamily = new System.Windows.Media.FontFamily("Consolas"),
-            PagePadding = new Thickness(0),
-            TextAlignment = TextAlignment.Left
-        };
+            consoleLines.RemoveAt(0);
+        }
     }
 
-    private static Paragraph CreateParagraph(string line)
+    private void ScrollConsoleToEnd()
     {
-        return new Paragraph(new Run(line))
+        if (consoleLines.Count == 0)
         {
-            Margin = new Thickness(0),
-            Foreground = ResolveBrush(line)
-        };
-    }
-
-    private static System.Windows.Media.Brush ResolveBrush(string line)
-    {
-        if (line.Contains("[AVISO]", StringComparison.OrdinalIgnoreCase))
-        {
-            return System.Windows.Media.Brushes.Gold;
+            return;
         }
 
-        if (line.Contains("erro", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("falha", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("bloque", StringComparison.OrdinalIgnoreCase))
-        {
-            return new SolidColorBrush(System.Windows.Media.Color.FromRgb(255, 0, 85));
-        }
-
-        if (line.Contains("aplicado", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("conclu", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("ativo", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("otimizado", StringComparison.OrdinalIgnoreCase))
-        {
-            return new SolidColorBrush(System.Windows.Media.Color.FromRgb(0, 255, 102));
-        }
-
-        return System.Windows.Media.Brushes.Gainsboro;
+        ConsoleList.ScrollIntoView(consoleLines[^1]);
     }
 
     private static PointCollection BuildPoints(IEnumerable<double> source, double width, double height)
     {
-        var values = source.ToArray();
+        var values = source as double[] ?? source.ToArray();
         if (values.Length == 0)
         {
             return [];
@@ -189,6 +222,45 @@ public partial class TelemetryView : WpfUserControl
             _ = queue.Dequeue();
         }
     }
+
+    private sealed class ConsoleLineViewModel
+    {
+        public required string Text { get; init; }
+
+        public required WpfBrush Foreground { get; init; }
+
+        public static ConsoleLineViewModel FromLine(string line)
+        {
+            return new ConsoleLineViewModel
+            {
+                Text = line,
+                Foreground = ResolveBrush(line)
+            };
+        }
+
+        private static WpfBrush ResolveBrush(string line)
+        {
+            if (line.Contains("[AVISO]", StringComparison.OrdinalIgnoreCase))
+            {
+                return System.Windows.Media.Brushes.Gold;
+            }
+
+            if (line.Contains("erro", StringComparison.OrdinalIgnoreCase) ||
+                line.Contains("falha", StringComparison.OrdinalIgnoreCase) ||
+                line.Contains("bloque", StringComparison.OrdinalIgnoreCase))
+            {
+                return new SolidColorBrush(System.Windows.Media.Color.FromRgb(255, 0, 85));
+            }
+
+            if (line.Contains("aplicado", StringComparison.OrdinalIgnoreCase) ||
+                line.Contains("conclu", StringComparison.OrdinalIgnoreCase) ||
+                line.Contains("ativo", StringComparison.OrdinalIgnoreCase) ||
+                line.Contains("otimizado", StringComparison.OrdinalIgnoreCase))
+            {
+                return new SolidColorBrush(System.Windows.Media.Color.FromRgb(0, 255, 102));
+            }
+
+            return System.Windows.Media.Brushes.Gainsboro;
+        }
+    }
 }
-
-

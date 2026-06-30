@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace Renomeador.Models;
+namespace ApexTweaker.Models;
 
 internal sealed record PresetRecommendation(
     HardwareTier Tier,

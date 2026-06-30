@@ -3,9 +3,9 @@ using System.Diagnostics;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using Renomeador.Models;
+using ApexTweaker.Models;
 
-namespace Renomeador.Infrastructure;
+namespace ApexTweaker.Infrastructure;
 
 internal sealed class CommandRunner
 {

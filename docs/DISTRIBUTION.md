@@ -1,35 +1,69 @@
 # Distribuicao
 
-O arquivo para enviar ao cliente fica em:
+## Artefato portatil (oficial)
 
-`release-v2/ApexTweaker.exe`
+Pasta: `release-v2/`
 
-Esse executavel e self-contained para Windows 10/11 64-bit. O cliente nao precisa instalar .NET nem rodar instalador separado.
+| Arquivo | Descricao |
+|---------|-----------|
+| `ApexTweaker.exe` | Executavel principal, self-contained, single-file |
+| `ApexTweaker.Native.dll` | DLL nativa C++ (topologia/afinidade de CPU) |
 
-## Como gerar
+O cliente nao precisa instalar .NET. Target: **Windows 10/11 64-bit**.
 
-No terminal, a partir da raiz do projeto:
+Versao atual: **2.0.1**.
+
+## Como gerar o portatil
+
+Na raiz do projeto:
 
 ```powershell
-dotnet publish VSCODE.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=None -p:DebugSymbols=false -o release-v2
+dotnet publish ApexTweaker.csproj -c Release -r win-x64 --self-contained true -o release-v2
 ```
 
-Ou rode a task:
+Parametros ja definidos no `.csproj`: single-file comprimido, ReadyToRun, bibliotecas nativas extraidas.
 
-`Publicar EXE unico`
+**Importante:** feche qualquer instancia de `ApexTweaker.exe` antes de publicar. Processo elevado bloqueia substituicao do executavel.
+
+## Instalador (opcional)
+
+Script Inno Setup: `installer/ApexTweaker.iss`
+
+Saida: `release-installer/ApexTweaker-Setup.exe`
+
+Reconstrua o instalador apos atualizar `release-v2`, para que o setup embuta o build mais recente.
 
 ## Como o cliente deve executar
 
-O app ja pede Administrador pelo manifesto.
+O app solicita **Administrador** pelo manifesto (`app.manifest`). Mutacoes de Registro, BCD, energia e ETW de kernel exigem privilegio elevado.
 
-O cliente so precisa executar:
+Execucao minima:
 
-`ApexTweaker.exe`
+```text
+release-v2\ApexTweaker.exe
+```
+
+Ou, com elevacao explicita:
+
+```powershell
+Start-Process "release-v2\ApexTweaker.exe" -Verb RunAs
+```
+
+## Fluxo de release recomendado
+
+1. Fechar todas as instancias do ApexTweaker.
+2. `dotnet publish ... -o release-v2`
+3. Confirmar data/tamanho de `ApexTweaker.exe`.
+4. Testar navegacao, Auto-Tuning, telemetria e fechamento.
+5. Rebuild do instalador, se necessario.
+6. Criar release no GitHub com os artefatos.
 
 ## Observacoes
 
-- Windows SmartScreen pode alertar enquanto o arquivo nao estiver assinado digitalmente.
-- Para distribuicao comercial, assine o executavel com certificado de code signing.
-- A versao atual e `2.0.1`.
-- O app cria backups em `C:\ProgramData\ApexTweaker\Backups`.
-- O app nao depende de instalador `.exe`; a entrega oficial e o binario unico em `release-v2`.
+- **SmartScreen** pode alertar enquanto o arquivo nao estiver assinado digitalmente. Para distribuicao comercial, use certificado de code signing.
+- Backups do app: `C:\ProgramData\ApexTweaker\Backups`
+- Logs: `C:\ProgramData\ApexTweaker\Logs\latest_runtime.log`
+- O app **nao modifica arquivos de jogos** e evita hooks agressivos contra anti-cheat.
+- Downloads publicos (quando disponiveis):
+  - Instalador: [ApexTweaker-Setup.exe](https://github.com/NGK-999/tweaker/releases/latest/download/ApexTweaker-Setup.exe)
+  - Portatil: [ApexTweaker.exe](https://github.com/NGK-999/tweaker/releases/latest/download/ApexTweaker.exe)

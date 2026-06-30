@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Management;
 using System.Security.Principal;
 
-namespace Renomeador.Services;
+namespace ApexTweaker.Services;
 
 internal static class SystemRestoreService
 {

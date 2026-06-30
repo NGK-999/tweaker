@@ -11,6 +11,8 @@ namespace ApexTweaker.UI.Wpf.Animations;
 internal static class PageTransitionAnimator
 {
     private static readonly TimeSpan Duration = TimeSpan.FromMilliseconds(280);
+    private static readonly IEasingFunction EnterEasing = new CubicEase { EasingMode = EasingMode.EaseOut };
+    private static readonly IEasingFunction ExitEasing = new QuadraticEase { EasingMode = EasingMode.EaseIn };
 
     public static async Task ShowAsync(
         ContentControl host,
@@ -20,7 +22,7 @@ internal static class PageTransitionAnimator
     {
         if (!host.Dispatcher.CheckAccess())
         {
-            await await host.Dispatcher.InvokeAsync(() => ShowAsync(host, incoming, cancellationToken, skipAnimation));
+            await host.Dispatcher.InvokeAsync(() => ShowAsync(host, incoming, cancellationToken, skipAnimation));
             return;
         }
 
@@ -47,74 +49,97 @@ internal static class PageTransitionAnimator
         DetachFromParent(outgoing);
         DetachFromParent(incoming);
 
-        var stage = new Grid
-        {
-            ClipToBounds = true
-        };
-
-        var outgoingTransform = new TranslateTransform();
-        var incomingTransform = new TranslateTransform(34D, 0D);
-
-        outgoing.RenderTransform = outgoingTransform;
+        var outgoingGroup = CreateTransformGroup();
+        var incomingGroup = CreateTransformGroup();
+        outgoing.RenderTransform = outgoingGroup;
+        incoming.RenderTransform = incomingGroup;
+        outgoing.RenderTransformOrigin = new Point(0.5, 0.5);
+        incoming.RenderTransformOrigin = new Point(0.5, 0.5);
         outgoing.Opacity = 1D;
 
-        incoming.RenderTransform = incomingTransform;
+        SetTransform(outgoingGroup, y: 0D, scale: 1D);
+        SetTransform(incomingGroup, y: 10D, scale: 0.988D);
         incoming.Opacity = 0D;
 
+        var stage = new Grid { ClipToBounds = true };
         stage.Children.Add(outgoing);
         stage.Children.Add(incoming);
         host.Content = stage;
 
+        EnableAnimationCache(outgoing);
+        EnableAnimationCache(incoming);
+
         try
         {
-            await RunStoryboardAsync(outgoing, outgoingTransform, incoming, incomingTransform, cancellationToken).ConfigureAwait(true);
+            await CrossfadeAsync(outgoing, outgoingGroup, incoming, incomingGroup, cancellationToken)
+                .ConfigureAwait(true);
         }
         catch (OperationCanceledException)
         {
-            DetachFromParent(incoming);
-            DetachFromParent(outgoing);
+            DisableAnimationCache(outgoing);
+            DisableAnimationCache(incoming);
             PreparePage(outgoing);
-            if (host.Content is Grid)
-            {
-                host.Content = outgoing;
-            }
-
+            PreparePage(incoming);
+            host.Content = outgoing;
             throw;
         }
 
-        DetachFromParent(incoming);
-        DetachFromParent(outgoing);
+        DisableAnimationCache(outgoing);
+        DisableAnimationCache(incoming);
+
+        stage.Children.Remove(outgoing);
+        stage.Children.Remove(incoming);
+        host.Content = null;
+
         PreparePage(incoming);
         host.Content = incoming;
     }
 
-    private static Task RunStoryboardAsync(
+    private static Task CrossfadeAsync(
         FrameworkElement outgoing,
-        TranslateTransform outgoingTransform,
+        TransformGroup outgoingGroup,
         FrameworkElement incoming,
-        TranslateTransform incomingTransform,
+        TransformGroup incomingGroup,
         CancellationToken cancellationToken)
     {
         var completion = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
 
         var storyboard = new Storyboard
         {
-            FillBehavior = FillBehavior.HoldEnd
+            FillBehavior = FillBehavior.Stop
         };
 
-        var easing = new CubicEase
-        {
-            EasingMode = EasingMode.EaseOut
-        };
+        AddTransformAnimations(
+            storyboard,
+            outgoingGroup,
+            outgoing,
+            fromY: 0D,
+            toY: -8D,
+            fromScale: 1D,
+            toScale: 0.992D,
+            fromOpacity: 1D,
+            toOpacity: 0D,
+            ExitEasing);
 
-        storyboard.Children.Add(CreateAnimation(outgoingTransform, TranslateTransform.XProperty, 0D, -18D, easing));
-        storyboard.Children.Add(CreateAnimation(incomingTransform, TranslateTransform.XProperty, 34D, 0D, easing));
-        storyboard.Children.Add(CreateAnimation(outgoing, UIElement.OpacityProperty, 1D, 0D, easing));
-        storyboard.Children.Add(CreateAnimation(incoming, UIElement.OpacityProperty, 0D, 1D, easing));
+        AddTransformAnimations(
+            storyboard,
+            incomingGroup,
+            incoming,
+            fromY: 10D,
+            toY: 0D,
+            fromScale: 0.988D,
+            toScale: 1D,
+            fromOpacity: 0D,
+            toOpacity: 1D,
+            EnterEasing);
 
         void OnCompleted(object? sender, EventArgs args)
         {
             storyboard.Completed -= OnCompleted;
+            SetTransform(outgoingGroup, y: -8D, scale: 0.992D);
+            SetTransform(incomingGroup, y: 0D, scale: 1D);
+            outgoing.Opacity = 0D;
+            incoming.Opacity = 1D;
             completion.TrySetResult(null);
         }
 
@@ -122,19 +147,59 @@ internal static class PageTransitionAnimator
 
         using var registration = cancellationToken.Register(() =>
         {
-            storyboard.Dispatcher.BeginInvoke(new Action(() =>
+            storyboard.Dispatcher.BeginInvoke(() =>
             {
                 storyboard.Stop();
                 storyboard.Completed -= OnCompleted;
                 completion.TrySetCanceled(cancellationToken);
-            }));
+            });
         });
 
         storyboard.Begin();
         return completion.Task;
     }
 
-    private static Timeline CreateAnimation(
+    private static void AddTransformAnimations(
+        Storyboard storyboard,
+        TransformGroup group,
+        UIElement element,
+        double fromY,
+        double toY,
+        double fromScale,
+        double toScale,
+        double fromOpacity,
+        double toOpacity,
+        IEasingFunction easing)
+    {
+        var translate = (TranslateTransform)group.Children[0];
+        var scale = (ScaleTransform)group.Children[1];
+
+        storyboard.Children.Add(CreateAnimation(translate, TranslateTransform.YProperty, fromY, toY, easing));
+        storyboard.Children.Add(CreateAnimation(scale, ScaleTransform.ScaleXProperty, fromScale, toScale, easing));
+        storyboard.Children.Add(CreateAnimation(scale, ScaleTransform.ScaleYProperty, fromScale, toScale, easing));
+        storyboard.Children.Add(CreateAnimation(element, UIElement.OpacityProperty, fromOpacity, toOpacity, easing));
+    }
+
+    private static TransformGroup CreateTransformGroup()
+    {
+        return new TransformGroup
+        {
+            Children =
+            [
+                new TranslateTransform(),
+                new ScaleTransform(1D, 1D)
+            ]
+        };
+    }
+
+    private static void SetTransform(TransformGroup group, double y, double scale)
+    {
+        ((TranslateTransform)group.Children[0]).Y = y;
+        ((ScaleTransform)group.Children[1]).ScaleX = scale;
+        ((ScaleTransform)group.Children[1]).ScaleY = scale;
+    }
+
+    private static DoubleAnimation CreateAnimation(
         DependencyObject target,
         DependencyProperty property,
         double from,
@@ -152,6 +217,17 @@ internal static class PageTransitionAnimator
         Storyboard.SetTarget(animation, target);
         Storyboard.SetTargetProperty(animation, new PropertyPath(property));
         return animation;
+    }
+
+    private static void EnableAnimationCache(FrameworkElement element)
+    {
+        element.CacheMode = new BitmapCache(1D);
+        RenderOptions.SetBitmapScalingMode(element, BitmapScalingMode.LowQuality);
+    }
+
+    private static void DisableAnimationCache(FrameworkElement element)
+    {
+        element.CacheMode = null;
     }
 
     private static void DetachFromParent(FrameworkElement element)
@@ -182,5 +258,6 @@ internal static class PageTransitionAnimator
         page.Margin = default;
         page.RenderTransform = Transform.Identity;
         page.Opacity = 1D;
+        page.CacheMode = null;
     }
 }

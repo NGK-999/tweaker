@@ -1,7 +1,7 @@
 using System;
-using Renomeador.Infrastructure;
-using Renomeador.Models;
-using Renomeador.Services;
+using ApexTweaker.Infrastructure;
+using ApexTweaker.Models;
+using ApexTweaker.Services;
 
 namespace ApexTweaker.Core.Pipeline;
 

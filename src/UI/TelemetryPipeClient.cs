@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.IO;
 using System.IO.Pipes;
 using System.Text;
 using System.Text.Json;
@@ -6,7 +6,7 @@ using System.Text.Json.Serialization;
 
 namespace ApexTweaker.UI;
 
-using Renomeador.Services;
+using ApexTweaker.Services;
 
 internal sealed class TelemetryPipeMetricsReceivedEventArgs : EventArgs
 {

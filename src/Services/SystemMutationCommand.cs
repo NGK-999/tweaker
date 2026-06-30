@@ -1,7 +1,7 @@
 using System;
-using Renomeador.Models;
+using ApexTweaker.Models;
 
-namespace Renomeador.Services;
+namespace ApexTweaker.Services;
 
 internal interface ISystemMutationCommand
 {

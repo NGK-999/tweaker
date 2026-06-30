@@ -1,14 +1,14 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.RegularExpressions;
 using System.Runtime.InteropServices;
 using ApexTweaker.Core.Pipeline;
 using Microsoft.Win32;
-using Renomeador.Infrastructure;
-using Renomeador.Models;
+using ApexTweaker.Infrastructure;
+using ApexTweaker.Models;
 
-namespace Renomeador.Services;
+namespace ApexTweaker.Services;
 
 internal sealed class TweakService
 {
@@ -280,11 +280,11 @@ internal sealed class TweakService
 
             if (!ultimateAvailable)
             {
-                log.Add("[INFO] Plano Desempenho MÃ¡ximo legado nÃ£o estÃ¡ exposto neste Windows. O ApexTweaker vai reforÃ§ar o Power Mode moderno.");
+                log.Add("[INFO] Plano Desempenho M\u00E1ximo legado n\u00E3o est\u00E1 exposto neste Windows. O ApexTweaker vai refor\u00E7ar o Power Mode moderno.");
             }
             else
             {
-                RunPowercfgSetting($"-setactive {UltimatePerformanceGuid}", "Plano Desempenho MÃ¡ximo ativado.", log);
+                RunPowercfgSetting($"-setactive {UltimatePerformanceGuid}", "Plano Desempenho M\u00E1ximo ativado.", log);
             }
 
             ApplyModernBestPerformanceOverlay(log);

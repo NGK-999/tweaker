@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Renomeador.Services;
+namespace ApexTweaker.Services;
 
 internal sealed class MasterRollbackService
 {

@@ -1,93 +1,63 @@
 <UserControl x:Class="ApexTweaker.UI.Wpf.Views.UtilitiesView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             Background="Transparent">
+             Background="Transparent"
+             FontFamily="Segoe UI Variable Display, Segoe UI, Arial">
     <UserControl.Resources>
-        <Style x:Key="CardStyle" TargetType="Border">
-            <Setter Property="Background" Value="#2A2A2A" />
-            <Setter Property="BorderBrush" Value="#3A3A3C" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="14" />
-            <Setter Property="Padding" Value="20" />
-        </Style>
-        <Style x:Key="ButtonStyle" TargetType="Button">
-            <Setter Property="Width" Value="170" />
-            <Setter Property="Height" Value="40" />
-            <Setter Property="Margin" Value="0,0,12,0" />
-            <Setter Property="Background" Value="#323234" />
-            <Setter Property="Foreground" Value="White" />
-            <Setter Property="BorderBrush" Value="#404044" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Cursor" Value="Hand" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="RootBorder"
-                                Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="10">
-                            <ContentPresenter HorizontalAlignment="Center"
-                                              VerticalAlignment="Center" />
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="RootBorder" Property="Background" Value="#3A3A3C" />
-                            </Trigger>
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="RootBorder" Property="Opacity" Value="0.86" />
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter TargetName="RootBorder" Property="Opacity" Value="0.5" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="../Themes/MacTheme.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
     </UserControl.Resources>
 
     <StackPanel>
-        <Border Style="{StaticResource CardStyle}">
+        <Border Style="{StaticResource MacCardStyle}">
             <StackPanel>
-                <TextBlock Text="Utilidades e Suporte"
-                           Foreground="#00B4D8"
-                           FontSize="24"
-                           FontWeight="Bold" />
-                <WrapPanel Margin="0,18,0,0">
+                <TextBlock Style="{StaticResource MacSectionLabel}"
+                           Text="UTILIDADES" />
+                <TextBlock Margin="0,6,0,0"
+                           Style="{StaticResource MacPageTitle}"
+                           FontSize="22"
+                           Text="Suporte e rollback" />
+                <WrapPanel Margin="0,20,0,0">
                     <Button x:Name="RevertButton"
-                            Style="{StaticResource ButtonStyle}"
-                            Background="#FF453A"
-                            BorderBrush="#FF453A"
+                            Style="{StaticResource MacDestructiveButton}"
+                            Width="140"
                             Content="Reverter"
                             Click="RevertButton_OnClick" />
                     <Button x:Name="UninstallButton"
-                            Style="{StaticResource ButtonStyle}"
-                            Content="Desinstalar e Sair"
+                            Style="{StaticResource MacSecondaryButton}"
+                            Width="160"
+                            Margin="10,0,0,0"
+                            Content="Desinstalar e sair"
                             Click="UninstallButton_OnClick" />
                     <Button x:Name="AboutButton"
-                            Style="{StaticResource ButtonStyle}"
+                            Style="{StaticResource MacSecondaryButton}"
+                            Width="120"
+                            Margin="10,0,0,0"
                             Content="Sobre"
                             Click="AboutButton_OnClick" />
                     <Button x:Name="RiotSupportButton"
-                            Style="{StaticResource ButtonStyle}"
+                            Style="{StaticResource MacSecondaryButton}"
+                            Width="140"
+                            Margin="10,0,0,0"
                             Content="Suporte Riot"
                             Click="RiotSupportButton_OnClick" />
                 </WrapPanel>
             </StackPanel>
         </Border>
 
-        <Border Margin="0,16,0,0" Style="{StaticResource CardStyle}">
+        <Border Margin="0,14,0,0" Style="{StaticResource MacCardStyle}">
             <StackPanel>
-                <TextBlock Text="Observações"
-                           Foreground="#00B4D8"
-                           FontSize="20"
-                           FontWeight="Bold" />
-                <TextBlock Margin="0,12,0,0"
-                           Foreground="#E4E4E7"
-                           TextWrapping="Wrap"
-                           Text="A UI principal migrou para WPF. O pipeline transacional, o ledger de rollback e os serviços de telemetria permanecem no backend já validado." />
+                <TextBlock Style="{StaticResource MacSectionLabel}"
+                           Text="INFO" />
+                <TextBlock Margin="0,6,0,0"
+                           Style="{StaticResource MacSectionTitle}"
+                           Text="Observa&#x00E7;&#x00F5;es" />
+                <TextBlock Margin="0,10,0,0"
+                           Style="{StaticResource MacBodyText}"
+                           Text="Todas as muta&#x00E7;&#x00F5;es s&#x00E3;o rastre&#x00E1;veis e revers&#x00ED;veis via ledger em ProgramData." />
             </StackPanel>
         </Border>
     </StackPanel>

@@ -10,11 +10,12 @@ using System.Windows;
 using System.Windows.Controls;
 using WpfButton = System.Windows.Controls.Button;
 using System.Windows.Input;
+using System.Windows.Threading;
 using ApexTweaker.UI.Wpf.Animations;
 using ApexTweaker.UI.Wpf.Views;
-using Renomeador;
-using Renomeador.Models;
-using Renomeador.Services;
+using ApexTweaker;
+using ApexTweaker.Models;
+using ApexTweaker.Services;
 
 namespace ApexTweaker.UI.Wpf;
 
@@ -34,11 +35,11 @@ public partial class MainWindow : Window
     private readonly OptimizationEngine optimizationEngine = new();
     private readonly HardwareTelemetryService hardwareTelemetryService = new();
     private readonly EtwFrameTracker etwFrameTracker;
-    private readonly DashboardView dashboardView = new();
-    private readonly ModulesView modulesView = new();
-    private readonly TelemetryView telemetryView = new();
-    private readonly UtilitiesView utilitiesView = new();
-    private readonly Dictionary<string, FrameworkElement> pages = new(StringComparer.OrdinalIgnoreCase);
+    private DashboardView? dashboardView;
+    private ModulesView? modulesView;
+    private TelemetryView? telemetryView;
+    private UtilitiesView? utilitiesView;
+    private readonly Dictionary<string, Func<FrameworkElement>> pageFactories = new(StringComparer.OrdinalIgnoreCase);
     private readonly List<string> consoleLines = [];
     private CancellationTokenSource? transitionCancellation;
     private bool isTweaking;
@@ -47,6 +48,8 @@ public partial class MainWindow : Window
     private bool closingRequested;
     private bool shutdownReady;
     private bool resourcesDisposed;
+    private bool telemetryUiUpdateScheduled;
+    private string? activePageKey;
 
     public MainWindow()
     {
@@ -54,62 +57,136 @@ public partial class MainWindow : Window
 
         etwFrameTracker = new EtwFrameTracker(hardwareTelemetryService);
 
-        InitializePages();
+        pageFactories[DashboardPageKey] = () => Dashboard;
+        pageFactories[ModulesPageKey] = () => Modules;
+        pageFactories[TelemetryPageKey] = () => Telemetry;
+        pageFactories[UtilitiesPageKey] = () => Utilities;
+
         WireRuntimeEvents();
 
         Loaded += MainWindow_OnLoaded;
         Closing += MainWindow_OnClosing;
+        StateChanged += (_, _) => UpdateMaximizeButtonIcon();
     }
 
-    private void InitializePages()
+    private DashboardView Dashboard
     {
-        dashboardView.AutoOptimizeRequested += RunAutoOptimizeAsync;
-        dashboardView.CreateRestorePointRequested += CreateRestorePointAsync;
-        modulesView.ModuleRequested += HandleModuleRequestedAsync;
-        telemetryView.ToggleTelemetryRequested += ToggleTelemetryAsync;
-        utilitiesView.RevertRequested += RevertTweaksAsync;
-        utilitiesView.UninstallRequested += UninstallAndExitAsync;
-        utilitiesView.AboutRequested += ShowAbout;
-        utilitiesView.RiotSupportRequested += OpenRiotSupport;
+        get
+        {
+            if (dashboardView is not null)
+            {
+                return dashboardView;
+            }
 
-        pages[DashboardPageKey] = dashboardView;
-        pages[ModulesPageKey] = modulesView;
-        pages[TelemetryPageKey] = telemetryView;
-        pages[UtilitiesPageKey] = utilitiesView;
+            dashboardView = new DashboardView();
+            dashboardView.AutoOptimizeRequested += RunAutoOptimizeAsync;
+            dashboardView.CreateRestorePointRequested += CreateRestorePointAsync;
+            return dashboardView;
+        }
+    }
+
+    private ModulesView Modules
+    {
+        get
+        {
+            if (modulesView is not null)
+            {
+                return modulesView;
+            }
+
+            modulesView = new ModulesView();
+            modulesView.ModuleRequested += HandleModuleRequestedAsync;
+            return modulesView;
+        }
+    }
+
+    private TelemetryView Telemetry
+    {
+        get
+        {
+            if (telemetryView is not null)
+            {
+                return telemetryView;
+            }
+
+            telemetryView = new TelemetryView();
+            telemetryView.ToggleTelemetryRequested += ToggleTelemetryAsync;
+            return telemetryView;
+        }
+    }
+
+    private UtilitiesView Utilities
+    {
+        get
+        {
+            if (utilitiesView is not null)
+            {
+                return utilitiesView;
+            }
+
+            utilitiesView = new UtilitiesView();
+            utilitiesView.RevertRequested += RevertTweaksAsync;
+            utilitiesView.UninstallRequested += UninstallAndExitAsync;
+            utilitiesView.AboutRequested += ShowAbout;
+            utilitiesView.RiotSupportRequested += OpenRiotSupport;
+            return utilitiesView;
+        }
     }
 
     private void WireRuntimeEvents()
     {
         hardwareTelemetryService.TelemetryPointRecorded += (_, args) =>
         {
-            _ = Dispatcher.BeginInvoke(new Action(() => telemetryView.AddTelemetryPoint(args.Point)));
+            var point = args.Point;
+            _ = Dispatcher.BeginInvoke(DispatcherPriority.Render, new Action(() =>
+            {
+                if (PageHost.Content is TelemetryView view)
+                {
+                    view.AddTelemetryPoint(point);
+                }
+            }));
         };
 
         hardwareTelemetryService.MetricsSnapshotUpdated += (_, args) =>
         {
-            _ = Dispatcher.BeginInvoke(new Action(() =>
+            if (telemetryUiUpdateScheduled)
             {
-                telemetryView.SetMetrics(args.Snapshot);
-                if (!string.IsNullOrWhiteSpace(args.Snapshot.TelemetryStatusMessage))
+                return;
+            }
+
+            telemetryUiUpdateScheduled = true;
+            var snapshot = args.Snapshot;
+
+            _ = Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() =>
+            {
+                telemetryUiUpdateScheduled = false;
+
+                if (PageHost.Content is TelemetryView view)
                 {
-                    SetStatus(args.Snapshot.TelemetryStatusMessage);
+                    view.SetMetrics(snapshot);
+                }
+
+                if (!string.IsNullOrWhiteSpace(snapshot.TelemetryStatusMessage))
+                {
+                    SetStatus(snapshot.TelemetryStatusMessage);
                 }
             }));
         };
 
         hardwareTelemetryService.DiagnosticEventRecorded += (_, args) =>
         {
-            _ = Dispatcher.BeginInvoke(new Action(() => WriteLine(args.Message)));
+            _ = Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => WriteLine(args.Message)));
         };
 
         etwFrameTracker.Error += message =>
         {
-            _ = Dispatcher.BeginInvoke(new Action(() => WriteLine($"[ETW] {message}")));
+            _ = Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => WriteLine($"[ETW] {message}")));
         };
     }
 
     private async void MainWindow_OnLoaded(object sender, RoutedEventArgs e)
     {
+        UpdateMaximizeButtonIcon();
         await ShowPageAsync(DashboardPageKey, DashboardButton, animate: false);
         LoadInitialDiagnostics();
     }
@@ -129,21 +206,28 @@ public partial class MainWindow : Window
 
         closingRequested = true;
         IsEnabled = false;
+        _ = ShutdownAndCloseAsync();
+    }
 
+    private async Task ShutdownAndCloseAsync()
+    {
         try
         {
-            await ShutdownBackgroundServicesAsync();
+            await ShutdownBackgroundServicesAsync().ConfigureAwait(true);
         }
         catch
         {
             // Closing must never be blocked by telemetry teardown.
         }
-        finally
+
+        DisposeRuntimeResources();
+        shutdownReady = true;
+
+        await Dispatcher.InvokeAsync(() =>
         {
-            DisposeRuntimeResources();
-            shutdownReady = true;
-            _ = Dispatcher.BeginInvoke(new Action(Close), System.Windows.Threading.DispatcherPriority.ApplicationIdle);
-        }
+            Closing -= MainWindow_OnClosing;
+            Close();
+        }, DispatcherPriority.Normal);
     }
 
     private void DisposeRuntimeResources()
@@ -162,16 +246,16 @@ public partial class MainWindow : Window
     }
     private void LoadInitialDiagnostics()
     {
-        var hardware = diagnosticsService.GetHardwareInfo();
-        var profile = optimizationEngine.IdentifyCPUArchitecture(hardware);
-        var alreadyOptimized = optimizationEngine.CheckIfAlreadyOptimized();
+        var hardware = ApplicationWarmup.Hardware;
+        var profile = ApplicationWarmup.Profile;
+        var alreadyOptimized = ApplicationWarmup.AlreadyOptimized;
 
-        dashboardView.SetSummary(
+        Dashboard.SetSummary(
             $"CPU: {hardware.ProcessorName}{Environment.NewLine}" +
             $"N\u00FAcleos: {hardware.PhysicalCoreCount} f\u00EDsicos / {hardware.LogicalCoreCount} l\u00F3gicos{Environment.NewLine}" +
             $"RAM instalada: {hardware.TotalMemoryGb:0.#} GB{Environment.NewLine}" +
             $"Perfil adotado: {profile.AdoptedProfile}");
-        dashboardView.SetAutoOptimizeIdle(alreadyOptimized);
+        Dashboard.SetAutoOptimizeIdle(alreadyOptimized);
 
         WriteSection("Diagn\u00F3stico geral iniciado");
         WriteLine($"Windows: {Environment.OSVersion.VersionString}");
@@ -198,8 +282,16 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (!pages.TryGetValue(pageKey, out var page))
+        if (!pageFactories.TryGetValue(pageKey, out var factory))
         {
+            return;
+        }
+
+        var page = factory();
+
+        if (string.Equals(activePageKey, pageKey, StringComparison.OrdinalIgnoreCase))
+        {
+            SetActiveNav(navigationButton);
             return;
         }
 
@@ -214,6 +306,13 @@ public partial class MainWindow : Window
         try
         {
             await PageTransitionAnimator.ShowAsync(PageHost, page, cancellationToken, skipAnimation: !animate);
+            activePageKey = pageKey;
+
+            if (string.Equals(pageKey, TelemetryPageKey, StringComparison.OrdinalIgnoreCase) &&
+                PageHost.Content is TelemetryView telemetryPage)
+            {
+                telemetryPage.FlushPendingMetrics();
+            }
         }
         catch (OperationCanceledException)
         {
@@ -222,8 +321,8 @@ public partial class MainWindow : Window
         catch (InvalidOperationException ex)
         {
             WriteLine($"[AVISO] Transi\u00E7\u00E3o visual reiniciada: {ex.Message}");
-            PageHost.Content = null;
             PageHost.Content = page;
+            activePageKey = pageKey;
         }
     }
 
@@ -256,21 +355,21 @@ public partial class MainWindow : Window
         }
 
         isTweaking = true;
-        dashboardView.SetBusy(true);
-        modulesView.SetBusy(true);
-        utilitiesView.SetBusy(true);
-        telemetryView.SetBusy(true);
+        dashboardView?.SetBusy(true);
+        modulesView?.SetBusy(true);
+        utilitiesView?.SetBusy(true);
+        telemetryView?.SetBusy(true);
         return true;
     }
 
     private void EndTweaking()
     {
         isTweaking = false;
-        dashboardView.SetBusy(false);
-        modulesView.SetBusy(false);
-        utilitiesView.SetBusy(false);
-        telemetryView.SetBusy(false);
-        dashboardView.SetAutoOptimizeIdle(optimizationEngine.CheckIfAlreadyOptimized());
+        dashboardView?.SetBusy(false);
+        modulesView?.SetBusy(false);
+        utilitiesView?.SetBusy(false);
+        telemetryView?.SetBusy(false);
+        Dashboard.SetAutoOptimizeIdle(optimizationEngine.CheckIfAlreadyOptimized());
     }
 
     private async Task CreateAutomaticBackupAsync(string section)
@@ -279,10 +378,7 @@ public partial class MainWindow : Window
         SetStatus($"{section}: criando backup preventivo...");
 
         var backupLines = await Task.Run(() => backupService.CreateBackup());
-        foreach (var line in backupLines)
-        {
-            WriteLine(line);
-        }
+        WriteLines(backupLines);
     }
 
     private async Task RunAutoOptimizeAsync()
@@ -292,7 +388,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        dashboardView.SetAutoOptimizeBusy();
+        Dashboard.SetAutoOptimizeBusy();
         WriteSection("Auto-Tuning inteligente");
         WriteLine("Analisando hardware...");
         SetStatus("Auto-Tuning: analisando hardware e aplicando perfil ideal...");
@@ -301,33 +397,30 @@ public partial class MainWindow : Window
         {
             if (optimizationEngine.CheckIfAlreadyOptimized())
             {
-                WriteLine("[INFO] Sistema j� est� otimizado pelo ApexTweaker. Comandos redundantes foram ignorados.");
-                SetStatus("Auto-Tuning: sistema j� otimizado.");
+                WriteLine("[INFO] Sistema j\u00E1 est\u00E1 otimizado pelo ApexTweaker. Comandos redundantes foram ignorados.");
+                SetStatus("Auto-Tuning: sistema j\u00E1 otimizado.");
                 return;
             }
 
             await CreateAutomaticBackupAsync("Auto-Tuning");
             var lines = await Task.Run(() => tweakService.ApplyAutonomousOptimization(valorantLocator.FindExecutable()));
-            foreach (var line in lines)
-            {
-                WriteLine(line);
-            }
+            WriteLines(lines);
 
             SetStatus("Auto-Tuning aplicado. Reinicie o PC antes de medir.");
         }
         catch (UnauthorizedAccessException ex)
         {
             WriteLine("Acesso negado pelo Windows ao Registro.");
-            WriteLine("Execute o app como Administrador. Se j� estiver como admin, o driver protegeu essa chave e ela foi ignorada por seguran�a.");
+            WriteLine("Execute o app como Administrador. Se j\u00E1 estiver como admin, o driver protegeu essa chave e ela foi ignorada por seguran\u00E7a.");
             WriteLine($"Detalhe: {ex.Message}");
             SetStatus("Auto-Tuning: acesso negado. Veja o log.");
         }
         catch (SecurityException ex)
         {
-            WriteLine("A pol�tica de seguran�a do Windows bloqueou a altera��o.");
-            WriteLine("Nenhuma altera��o adicional foi aplicada nessa etapa.");
+            WriteLine("A pol\u00EDtica de seguran\u00E7a do Windows bloqueou a altera\u00E7\u00E3o.");
+            WriteLine("Nenhuma altera\u00E7\u00E3o adicional foi aplicada nessa etapa.");
             WriteLine($"Detalhe: {ex.Message}");
-            SetStatus("Auto-Tuning: pol�tica de seguran�a bloqueou a execu��o.");
+            SetStatus("Auto-Tuning: pol\u00EDtica de seguran\u00E7a bloqueou a execu\u00E7\u00E3o.");
         }
         catch (Exception ex)
         {
@@ -355,7 +448,7 @@ public partial class MainWindow : Window
             case "Energia":
                 await RunTweakAsync("Energia", () => tweakService.ApplyPowerTweaks());
                 break;
-            case "Lat�ncia extrema":
+            case "Lat\u00EAncia extrema":
                 await ApplyExtremeLatencyTweaksAsync();
                 break;
             case "CPU/Scheduler":
@@ -370,8 +463,8 @@ public partial class MainWindow : Window
             case "Rede":
                 await RunTweakAsync("Rede", () => tweakService.ApplyNetworkTweaks());
                 break;
-            case "Pol�ticas/Servi�os":
-                await RunTweakAsync("Pol�ticas/Servi�os", () => tweakService.ApplyPolicyAndServiceTweaks());
+            case "Pol\u00EDticas/Servi\u00E7os":
+                await RunTweakAsync("Pol\u00EDticas/Servi\u00E7os", () => tweakService.ApplyPolicyAndServiceTweaks());
                 break;
             case "Background":
                 await RunTweakAsync("Background", () => tweakService.ApplyBackgroundTweaks());
@@ -388,7 +481,7 @@ public partial class MainWindow : Window
     private async Task ApplyExtremeLatencyTweaksAsync()
     {
         var hardware = diagnosticsService.GetHardwareInfo();
-        await RunTweakAsync("Lat�ncia extrema", () => tweakService.ApplyExtremeLatencyTweaks(hardware));
+        await RunTweakAsync("Lat\u00EAncia extrema", () => tweakService.ApplyExtremeLatencyTweaks(hardware));
     }
 
     private async Task RunTweakAsync(
@@ -413,26 +506,23 @@ public partial class MainWindow : Window
             }
 
             var lines = await Task.Run(action);
-            foreach (var line in lines)
-            {
-                WriteLine(line);
-            }
+            WriteLines(lines);
 
-            SetStatus(completionStatus ?? $"{section}: conclu�do. Veja o log.");
+            SetStatus(completionStatus ?? $"{section}: conclu\u00EDdo. Veja o log.");
         }
         catch (UnauthorizedAccessException ex)
         {
             WriteLine("Acesso negado pelo Windows ao Registro.");
-            WriteLine("Execute o app como Administrador. Se j� estiver como admin, o driver protegeu essa chave e ela foi ignorada por seguran�a.");
+            WriteLine("Execute o app como Administrador. Se j\u00E1 estiver como admin, o driver protegeu essa chave e ela foi ignorada por seguran\u00E7a.");
             WriteLine($"Detalhe: {ex.Message}");
             SetStatus($"{section}: acesso negado. Veja o log.");
         }
         catch (SecurityException ex)
         {
-            WriteLine("A pol�tica de seguran�a do Windows bloqueou a altera��o.");
-            WriteLine("Nenhuma altera��o adicional foi aplicada nessa etapa.");
+            WriteLine("A pol\u00EDtica de seguran\u00E7a do Windows bloqueou a altera\u00E7\u00E3o.");
+            WriteLine("Nenhuma altera\u00E7\u00E3o adicional foi aplicada nessa etapa.");
             WriteLine($"Detalhe: {ex.Message}");
-            SetStatus($"{section}: bloqueado por pol�tica de seguran�a.");
+            SetStatus($"{section}: bloqueado por pol\u00EDtica de seguran\u00E7a.");
         }
         catch (Exception ex)
         {
@@ -454,7 +544,7 @@ public partial class MainWindow : Window
         }
 
         WriteSection("Telemetria");
-        WriteLine("Sess�o de telemetria iniciada.");
+        WriteLine("Sess\u00E3o de telemetria iniciada.");
         SetStatus("Telemetria ativa. Aguarde o jogo entrar em foco.");
 
         try
@@ -467,26 +557,26 @@ public partial class MainWindow : Window
             }
             catch (UnauthorizedAccessException ex)
             {
-                WriteLine("[AVISO] ETW do kernel indispon�vel para o usu�rio atual.");
+                WriteLine("[AVISO] ETW do kernel indispon\u00EDvel para o usu\u00E1rio atual.");
                 WriteLine($"Detalhe: {ex.Message}");
             }
             catch (SecurityException ex)
             {
-                WriteLine("[AVISO] O Windows bloqueou a sess�o de ETW de kernel.");
+                WriteLine("[AVISO] O Windows bloqueou a sess\u00E3o de ETW de kernel.");
                 WriteLine($"Detalhe: {ex.Message}");
             }
 
             telemetryRunning = true;
-            telemetryView.SetMonitoringButtonText(baselineCaptured
-                ? "Parar Teste (Ap�s Otimiza��o)"
-                : "Parar Teste (Antes da Otimiza��o)");
+            Telemetry.SetMonitoringButtonText(baselineCaptured
+                ? "Parar Teste (Ap\u00F3s Otimiza\u00E7\u00E3o)"
+                : "Parar Teste (Antes da Otimiza\u00E7\u00E3o)");
         }
         catch (Exception ex)
         {
             telemetryRunning = false;
-            telemetryView.SetMonitoringButtonText(baselineCaptured
-                ? "Iniciar Teste (Ap�s Otimiza��o)"
-                : "Iniciar Teste (Antes da Otimiza��o)");
+            Telemetry.SetMonitoringButtonText(baselineCaptured
+                ? "Iniciar Teste (Ap\u00F3s Otimiza\u00E7\u00E3o)"
+                : "Iniciar Teste (Antes da Otimiza\u00E7\u00E3o)");
             WriteLine($"Falha ao iniciar telemetria: {ex.Message}");
             SetStatus("Telemetria parcial: falha ao iniciar monitoramento.");
         }
@@ -514,8 +604,8 @@ public partial class MainWindow : Window
 
         telemetryRunning = false;
         baselineCaptured = true;
-        telemetryView.SetMonitoringButtonText("Iniciar Teste (Ap�s Otimiza��o)");
-        SetStatus("Telemetria parada. Relat�rio gerado no console.");
+        Telemetry.SetMonitoringButtonText("Iniciar Teste (Ap\u00F3s Otimiza\u00E7\u00E3o)");
+        SetStatus("Telemetria parada. Relat\u00F3rio gerado no console.");
         WriteLine("Telemetria encerrada.");
     }
 
@@ -541,18 +631,18 @@ public partial class MainWindow : Window
                 return;
             }
 
-            SetStatus("Rollback conclu�do. Reinicie o PC se houver altera��es de BCD ou energia.");
+            SetStatus("Rollback conclu\u00EDdo. Reinicie o PC se houver altera\u00E7\u00F5es de BCD ou energia.");
         }
         catch (OperationCanceledException)
         {
-            WriteLine("[AVISO] Master rollback cancelado antes da conclus�o.");
+            WriteLine("[AVISO] Master rollback cancelado antes da conclus\u00E3o.");
             SetStatus("Rollback cancelado.");
         }
         catch (UnauthorizedAccessException ex)
         {
-            WriteLine("A opera��o n�o pode ser conclu�da.");
+            WriteLine("A opera\u00E7\u00E3o n\u00E3o pode ser conclu\u00EDda.");
             WriteLine($"Detalhe: {ex.Message}");
-            SetStatus("Rollback bloqueado por permiss�o.");
+            SetStatus("Rollback bloqueado por permiss\u00E3o.");
         }
         catch (Exception ex)
         {
@@ -568,7 +658,7 @@ public partial class MainWindow : Window
     private async Task UninstallAndExitAsync()
     {
         if (System.Windows.MessageBox.Show(
-                "Isso ir� restaurar o �ltimo estado pendente e limpar os dados locais do ApexTweaker. Deseja prosseguir?",
+                "Isso ir\u00E1 restaurar o \u00FAltimo estado pendente e limpar os dados locais do ApexTweaker. Deseja prosseguir?",
                 "Desinstalar e sair",
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Warning) != MessageBoxResult.Yes)
@@ -582,7 +672,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        SetStatus("Restaurando �ltimo backup e limpando dados locais...");
+        SetStatus("Restaurando \u00FAltimo backup e limpando dados locais...");
 
         try
         {
@@ -596,7 +686,7 @@ public partial class MainWindow : Window
                 }
                 catch
                 {
-                    // Fluxo de emerg�ncia: segue limpando dados mesmo se n�o houver backup v�lido.
+                    // Fluxo de emerg\u00EAncia: segue limpando dados mesmo se n\u00E3o houver backup v\u00E1lido.
                 }
 
                 try
@@ -612,7 +702,7 @@ public partial class MainWindow : Window
                 }
                 catch
                 {
-                    // A limpeza local n�o deve impedir o encerramento do app.
+                    // A limpeza local n\u00E3o deve impedir o encerramento do app.
                 }
             });
 
@@ -620,8 +710,8 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            WriteLine($"Falha no fluxo de desinstala��o: {ex.Message}");
-            SetStatus("Desinstala��o parcial. Veja o log.");
+            WriteLine($"Falha no fluxo de desinstala\u00E7\u00E3o: {ex.Message}");
+            SetStatus("Desinstala\u00E7\u00E3o parcial. Veja o log.");
         }
         finally
         {
@@ -672,7 +762,7 @@ public partial class MainWindow : Window
     {
         if (!Dispatcher.CheckAccess())
         {
-            _ = Dispatcher.BeginInvoke(new Action(() => WriteLine(message)));
+            _ = Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => WriteLine(message)));
             return;
         }
 
@@ -687,7 +777,38 @@ public partial class MainWindow : Window
             consoleLines.RemoveAt(0);
         }
 
-        telemetryView.AppendConsoleLine(message);
+        Telemetry.AppendConsoleLine(message);
+    }
+
+    private void WriteLines(IReadOnlyList<string> messages)
+    {
+        if (messages.Count == 0)
+        {
+            return;
+        }
+
+        if (!Dispatcher.CheckAccess())
+        {
+            _ = Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => WriteLines(messages)));
+            return;
+        }
+
+        foreach (var message in messages)
+        {
+            if (consoleLines.Count > 0 && string.IsNullOrWhiteSpace(message) && string.IsNullOrWhiteSpace(consoleLines[^1]))
+            {
+                continue;
+            }
+
+            consoleLines.Add(message);
+        }
+
+        while (consoleLines.Count > 320)
+        {
+            consoleLines.RemoveAt(0);
+        }
+
+        Telemetry.AppendConsoleLines(messages);
     }
 
     private void SetStatus(string message)
@@ -723,6 +844,7 @@ public partial class MainWindow : Window
     private void MaximizeButton_OnClick(object sender, RoutedEventArgs e)
     {
         WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+        UpdateMaximizeButtonIcon();
     }
 
     private void CloseButton_OnClick(object sender, RoutedEventArgs e)
@@ -735,10 +857,17 @@ public partial class MainWindow : Window
         if (e.ClickCount == 2)
         {
             WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+            UpdateMaximizeButtonIcon();
             return;
         }
 
         DragMove();
+    }
+
+    private void UpdateMaximizeButtonIcon()
+    {
+        MaximizeButton.Content = WindowState == WindowState.Maximized ? "\uE923" : "\uE922";
+        MaximizeButton.ToolTip = WindowState == WindowState.Maximized ? "Restaurar" : "Maximizar";
     }
 }
 

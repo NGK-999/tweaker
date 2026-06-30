@@ -5,16 +5,36 @@
 $ErrorActionPreference = 'Stop'
 
 $installerScript = Join-Path $ProjectRoot 'installer\ApexTweaker.iss'
-$portableExe = Join-Path $ProjectRoot 'release-v2\ApexTweaker.exe'
 $outputDir = Join-Path $ProjectRoot 'release-installer'
 
 if (-not (Test-Path -LiteralPath $installerScript)) {
     throw "Script do instalador nao encontrado: $installerScript"
 }
 
-if (-not (Test-Path -LiteralPath $portableExe)) {
-    throw "Binario portatil nao encontrado: $portableExe. Gere release-v2\\ApexTweaker.exe antes."
+$releaseCandidates = @(
+    @{ Name = 'release-v2'; Dir = '..\release-v2' },
+    @{ Name = 'release-v2-staging'; Dir = '..\release-v2-staging' }
+)
+
+$releaseSource = $releaseCandidates |
+    ForEach-Object {
+        $candidateExe = Join-Path $ProjectRoot ($_.Name + '\ApexTweaker.exe')
+        if (Test-Path -LiteralPath $candidateExe) {
+            [PSCustomObject]@{
+                Name = $_.Name
+                Dir = $_.Dir
+                LastWrite = (Get-Item -LiteralPath $candidateExe).LastWriteTimeUtc
+            }
+        }
+    } |
+    Sort-Object LastWrite -Descending |
+    Select-Object -First 1
+
+if (-not $releaseSource) {
+    throw "Binario portatil nao encontrado. Gere release-v2\ApexTweaker.exe (ou release-v2-staging) antes."
 }
+
+Write-Host "Usando pasta de release: $($releaseSource.Name)"
 
 function Resolve-InnoSetupCompiler {
     $command = Get-Command ISCC.exe -ErrorAction SilentlyContinue
@@ -102,7 +122,7 @@ Depois rode:
 
 New-Item -ItemType Directory -Force -Path $outputDir | Out-Null
 
-& $iscc $installerScript
+& $iscc "/DReleaseDir=$($releaseSource.Dir)" $installerScript
 if ($LASTEXITCODE -ne 0) {
     throw "Falha ao compilar o instalador. Codigo de saida: $LASTEXITCODE"
 }

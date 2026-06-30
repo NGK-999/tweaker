@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.Diagnostics.Tracing;
 using Microsoft.Diagnostics.Tracing.Session;
 
-namespace Renomeador.Services;
+namespace ApexTweaker.Services;
 
 internal sealed class EtwFrameTracker : IDisposable
 {

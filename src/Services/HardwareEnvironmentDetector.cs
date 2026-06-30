@@ -1,6 +1,6 @@
 using ApexTweaker.NativeInterop;
 
-namespace Renomeador.Services;
+namespace ApexTweaker.Services;
 
 internal sealed class HardwareEnvironmentDetectionResult
 {
