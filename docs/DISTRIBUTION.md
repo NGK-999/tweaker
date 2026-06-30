@@ -15,7 +15,15 @@ Versao atual: **2.0.1**.
 
 ## Como gerar o portatil
 
-Na raiz do projeto:
+Use sempre **`release-v2/`** como unica pasta de release local. Nao use `release-v2-staging`.
+
+Script recomendado (publica em `release-v2` e remove `release-v2-staging` se existir):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\Build-Release.ps1
+```
+
+Equivalente manual:
 
 ```powershell
 dotnet publish ApexTweaker.csproj -c Release -r win-x64 --self-contained true -o release-v2
@@ -52,7 +60,7 @@ Start-Process "release-v2\ApexTweaker.exe" -Verb RunAs
 ## Fluxo de release recomendado
 
 1. Fechar todas as instancias do ApexTweaker.
-2. `dotnet publish ... -o release-v2`
+2. `scripts\Build-Release.ps1` (ou `dotnet publish ... -o release-v2`)
 3. Confirmar data/tamanho de `ApexTweaker.exe`.
 4. Testar navegacao, Auto-Tuning, telemetria e fechamento.
 5. Rebuild do instalador, se necessario.

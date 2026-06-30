@@ -157,7 +157,8 @@
                                     Margin="32,20,32,12"
                                     SnapsToDevicePixels="True"
                                     UseLayoutRounding="True"
-                                    RenderOptions.BitmapScalingMode="LowQuality" />
+                                    RenderOptions.BitmapScalingMode="HighQuality"
+                                    RenderOptions.CachingHint="Cache" />
 
                     <Border Grid.Row="2"
                             Margin="32,0,32,24"

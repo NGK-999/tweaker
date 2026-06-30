@@ -10,9 +10,10 @@ namespace ApexTweaker.UI.Wpf.Animations;
 
 internal static class PageTransitionAnimator
 {
-    private static readonly TimeSpan Duration = TimeSpan.FromMilliseconds(280);
-    private static readonly IEasingFunction EnterEasing = new CubicEase { EasingMode = EasingMode.EaseOut };
-    private static readonly IEasingFunction ExitEasing = new QuadraticEase { EasingMode = EasingMode.EaseIn };
+    private static readonly TimeSpan TransformDuration = TimeSpan.FromMilliseconds(360);
+    private static readonly TimeSpan OpacityDuration = TimeSpan.FromMilliseconds(300);
+    private static readonly IEasingFunction EnterMotion = UiMotion.EaseOut;
+    private static readonly IEasingFunction ExitMotion = UiMotion.EaseIn;
 
     public static async Task ShowAsync(
         ContentControl host,
@@ -58,7 +59,7 @@ internal static class PageTransitionAnimator
         outgoing.Opacity = 1D;
 
         SetTransform(outgoingGroup, y: 0D, scale: 1D);
-        SetTransform(incomingGroup, y: 10D, scale: 0.988D);
+        SetTransform(incomingGroup, y: 5D, scale: 0.996D);
         incoming.Opacity = 0D;
 
         var stage = new Grid { ClipToBounds = true };
@@ -108,35 +109,41 @@ internal static class PageTransitionAnimator
         {
             FillBehavior = FillBehavior.Stop
         };
+        UiMotion.ConfigureStoryboard(storyboard);
 
         AddTransformAnimations(
             storyboard,
             outgoingGroup,
             outgoing,
             fromY: 0D,
-            toY: -8D,
+            toY: -4D,
             fromScale: 1D,
-            toScale: 0.992D,
+            toScale: 0.998D,
             fromOpacity: 1D,
             toOpacity: 0D,
-            ExitEasing);
+            ExitMotion,
+            transformDuration: TransformDuration,
+            opacityDuration: OpacityDuration * 0.85);
 
         AddTransformAnimations(
             storyboard,
             incomingGroup,
             incoming,
-            fromY: 10D,
+            fromY: 5D,
             toY: 0D,
-            fromScale: 0.988D,
+            fromScale: 0.996D,
             toScale: 1D,
             fromOpacity: 0D,
             toOpacity: 1D,
-            EnterEasing);
+            EnterMotion,
+            transformDuration: TransformDuration,
+            opacityDuration: OpacityDuration,
+            opacityBeginTime: TimeSpan.FromMilliseconds(20));
 
         void OnCompleted(object? sender, EventArgs args)
         {
             storyboard.Completed -= OnCompleted;
-            SetTransform(outgoingGroup, y: -8D, scale: 0.992D);
+            SetTransform(outgoingGroup, y: -4D, scale: 0.998D);
             SetTransform(incomingGroup, y: 0D, scale: 1D);
             outgoing.Opacity = 0D;
             incoming.Opacity = 1D;
@@ -169,15 +176,49 @@ internal static class PageTransitionAnimator
         double toScale,
         double fromOpacity,
         double toOpacity,
-        IEasingFunction easing)
+        IEasingFunction easing,
+        TimeSpan transformDuration,
+        TimeSpan opacityDuration,
+        TimeSpan? opacityBeginTime = null)
     {
         var translate = (TranslateTransform)group.Children[0];
         var scale = (ScaleTransform)group.Children[1];
 
-        storyboard.Children.Add(CreateAnimation(translate, TranslateTransform.YProperty, fromY, toY, easing));
-        storyboard.Children.Add(CreateAnimation(scale, ScaleTransform.ScaleXProperty, fromScale, toScale, easing));
-        storyboard.Children.Add(CreateAnimation(scale, ScaleTransform.ScaleYProperty, fromScale, toScale, easing));
-        storyboard.Children.Add(CreateAnimation(element, UIElement.OpacityProperty, fromOpacity, toOpacity, easing));
+        storyboard.Children.Add(CreateTransformAnimation(
+            translate, TranslateTransform.YProperty, fromY, toY, transformDuration, easing));
+        storyboard.Children.Add(CreateTransformAnimation(
+            scale, ScaleTransform.ScaleXProperty, fromScale, toScale, transformDuration, easing));
+        storyboard.Children.Add(CreateTransformAnimation(
+            scale, ScaleTransform.ScaleYProperty, fromScale, toScale, transformDuration, easing));
+        storyboard.Children.Add(CreateTransformAnimation(
+            element, UIElement.OpacityProperty, fromOpacity, toOpacity, opacityDuration, easing, opacityBeginTime));
+    }
+
+    private static DoubleAnimation CreateTransformAnimation(
+        DependencyObject target,
+        DependencyProperty property,
+        double from,
+        double to,
+        TimeSpan duration,
+        IEasingFunction easing,
+        TimeSpan? beginTime = null)
+    {
+        var animation = new DoubleAnimation
+        {
+            From = from,
+            To = to,
+            Duration = new Duration(duration),
+            EasingFunction = easing
+        };
+
+        if (beginTime.HasValue)
+        {
+            animation.BeginTime = beginTime.Value;
+        }
+
+        Storyboard.SetTarget(animation, target);
+        Storyboard.SetTargetProperty(animation, new PropertyPath(property));
+        return animation;
     }
 
     private static TransformGroup CreateTransformGroup()
@@ -199,42 +240,25 @@ internal static class PageTransitionAnimator
         ((ScaleTransform)group.Children[1]).ScaleY = scale;
     }
 
-    private static DoubleAnimation CreateAnimation(
-        DependencyObject target,
-        DependencyProperty property,
-        double from,
-        double to,
-        IEasingFunction easing)
-    {
-        var animation = new DoubleAnimation
-        {
-            From = from,
-            To = to,
-            Duration = new Duration(Duration),
-            EasingFunction = easing
-        };
-
-        Storyboard.SetTarget(animation, target);
-        Storyboard.SetTargetProperty(animation, new PropertyPath(property));
-        return animation;
-    }
-
     private static void EnableAnimationCache(FrameworkElement element)
     {
+        RenderOptions.SetCachingHint(element, CachingHint.Cache);
+        RenderOptions.SetCacheInvalidationThresholdMinimum(element, 0.5D);
+        RenderOptions.SetBitmapScalingMode(element, BitmapScalingMode.HighQuality);
         element.CacheMode = new BitmapCache(1D);
-        RenderOptions.SetBitmapScalingMode(element, BitmapScalingMode.LowQuality);
     }
 
     private static void DisableAnimationCache(FrameworkElement element)
     {
         element.CacheMode = null;
+        RenderOptions.SetCachingHint(element, CachingHint.Unspecified);
     }
 
     private static void DetachFromParent(FrameworkElement element)
     {
         switch (element.Parent)
         {
-            case System.Windows.Controls.Panel panel:
+            case Panel panel:
                 panel.Children.Remove(element);
                 return;
             case ContentControl contentControl when ReferenceEquals(contentControl.Content, element):
@@ -245,7 +269,7 @@ internal static class PageTransitionAnimator
                 return;
         }
 
-        if (VisualTreeHelper.GetParent(element) is System.Windows.Controls.Panel visualPanel)
+        if (VisualTreeHelper.GetParent(element) is Panel visualPanel)
         {
             visualPanel.Children.Remove(element);
         }
@@ -253,11 +277,12 @@ internal static class PageTransitionAnimator
 
     private static void PreparePage(FrameworkElement page)
     {
-        page.HorizontalAlignment = System.Windows.HorizontalAlignment.Stretch;
-        page.VerticalAlignment = System.Windows.VerticalAlignment.Stretch;
+        page.HorizontalAlignment = HorizontalAlignment.Stretch;
+        page.VerticalAlignment = VerticalAlignment.Stretch;
         page.Margin = default;
         page.RenderTransform = Transform.Identity;
         page.Opacity = 1D;
         page.CacheMode = null;
+        RenderOptions.SetCachingHint(page, CachingHint.Unspecified);
     }
 }

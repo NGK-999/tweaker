@@ -10,6 +10,7 @@ using System.Windows;
 using System.Windows.Controls;
 using WpfButton = System.Windows.Controls.Button;
 using System.Windows.Input;
+using System.Windows.Media;
 using System.Windows.Threading;
 using ApexTweaker.UI.Wpf.Animations;
 using ApexTweaker.UI.Wpf.Views;
@@ -301,11 +302,20 @@ public partial class MainWindow : Window
         var cancellationToken = transitionCancellation.Token;
 
         SetActiveNav(navigationButton);
-        UpdateHeader(pageKey);
+        var headerTitle = pageKey switch
+        {
+            DashboardPageKey => "Dashboard",
+            ModulesPageKey => "M\u00F3dulos",
+            TelemetryPageKey => "Telemetria",
+            UtilitiesPageKey => "Utilidades",
+            _ => AppInfo.Name
+        };
 
         try
         {
-            await PageTransitionAnimator.ShowAsync(PageHost, page, cancellationToken, skipAnimation: !animate);
+            var headerTask = UiMotion.AnimateHeaderAsync(HeaderTitleText, headerTitle, cancellationToken);
+            var pageTask = PageTransitionAnimator.ShowAsync(PageHost, page, cancellationToken, skipAnimation: !animate);
+            await Task.WhenAll(headerTask, pageTask).ConfigureAwait(true);
             activePageKey = pageKey;
 
             if (string.Equals(pageKey, TelemetryPageKey, StringComparison.OrdinalIgnoreCase) &&
@@ -323,19 +333,10 @@ public partial class MainWindow : Window
             WriteLine($"[AVISO] Transi\u00E7\u00E3o visual reiniciada: {ex.Message}");
             PageHost.Content = page;
             activePageKey = pageKey;
+            HeaderTitleText.Text = headerTitle;
+            HeaderTitleText.Opacity = 1D;
+            HeaderTitleText.RenderTransform = Transform.Identity;
         }
-    }
-
-    private void UpdateHeader(string pageKey)
-    {
-        HeaderTitleText.Text = pageKey switch
-        {
-            DashboardPageKey => "Dashboard",
-            ModulesPageKey => "M\u00F3dulos",
-            TelemetryPageKey => "Telemetria",
-            UtilitiesPageKey => "Utilidades",
-            _ => AppInfo.Name
-        };
     }
 
     private void SetActiveNav(WpfButton selectedButton)

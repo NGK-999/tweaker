@@ -5,36 +5,27 @@
 $ErrorActionPreference = 'Stop'
 
 $installerScript = Join-Path $ProjectRoot 'installer\ApexTweaker.iss'
+$portableExe = Join-Path $ProjectRoot 'release-v2\ApexTweaker.exe'
 $outputDir = Join-Path $ProjectRoot 'release-installer'
+$stagingDir = Join-Path $ProjectRoot 'release-v2-staging'
 
 if (-not (Test-Path -LiteralPath $installerScript)) {
     throw "Script do instalador nao encontrado: $installerScript"
 }
 
-$releaseCandidates = @(
-    @{ Name = 'release-v2'; Dir = '..\release-v2' },
-    @{ Name = 'release-v2-staging'; Dir = '..\release-v2-staging' }
-)
-
-$releaseSource = $releaseCandidates |
-    ForEach-Object {
-        $candidateExe = Join-Path $ProjectRoot ($_.Name + '\ApexTweaker.exe')
-        if (Test-Path -LiteralPath $candidateExe) {
-            [PSCustomObject]@{
-                Name = $_.Name
-                Dir = $_.Dir
-                LastWrite = (Get-Item -LiteralPath $candidateExe).LastWriteTimeUtc
-            }
-        }
-    } |
-    Sort-Object LastWrite -Descending |
-    Select-Object -First 1
-
-if (-not $releaseSource) {
-    throw "Binario portatil nao encontrado. Gere release-v2\ApexTweaker.exe (ou release-v2-staging) antes."
+if (Test-Path -LiteralPath $stagingDir) {
+    Write-Host "Removendo pasta legada release-v2-staging..."
+    try {
+        Remove-Item -LiteralPath $stagingDir -Recurse -Force -ErrorAction Stop
+    }
+    catch {
+        Write-Warning "Nao foi possivel remover release-v2-staging (arquivo em uso). Feche o ApexTweaker e apague a pasta manualmente."
+    }
 }
 
-Write-Host "Usando pasta de release: $($releaseSource.Name)"
+if (-not (Test-Path -LiteralPath $portableExe)) {
+    throw "Binario portatil nao encontrado: $portableExe. Rode scripts\Build-Release.ps1 antes."
+}
 
 function Resolve-InnoSetupCompiler {
     $command = Get-Command ISCC.exe -ErrorAction SilentlyContinue
@@ -116,16 +107,16 @@ Opcao via winget:
   winget install JRSoftware.InnoSetup
 
 Depois rode:
-  powershell -ExecutionPolicy Bypass -File "C:\Apextweaker\scripts\Build-Installer.ps1"
+  powershell -ExecutionPolicy Bypass -File "$ProjectRoot\scripts\Build-Installer.ps1"
 "@
 }
 
 New-Item -ItemType Directory -Force -Path $outputDir | Out-Null
 
-& $iscc "/DReleaseDir=$($releaseSource.Dir)" $installerScript
+Write-Host "Usando pasta de release: release-v2"
+& $iscc $installerScript
 if ($LASTEXITCODE -ne 0) {
     throw "Falha ao compilar o instalador. Codigo de saida: $LASTEXITCODE"
 }
 
 Write-Host "Instalador gerado em: $outputDir"
-

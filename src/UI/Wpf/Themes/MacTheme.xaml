@@ -46,6 +46,14 @@
     <FontFamily x:Key="MacFont">Segoe UI Variable Display, Segoe UI, Arial</FontFamily>
     <FontFamily x:Key="MacMonoFont">Cascadia Mono, Consolas, monospace</FontFamily>
 
+    <!-- Motion -->
+    <Duration x:Key="MotionFast">0:0:0.14</Duration>
+    <Duration x:Key="MotionNormal">0:0:0.22</Duration>
+    <Duration x:Key="MotionSlow">0:0:0.32</Duration>
+    <PowerEase x:Key="MotionEaseOut" EasingMode="EaseOut" Power="4" />
+    <PowerEase x:Key="MotionEaseIn" EasingMode="EaseIn" Power="3" />
+    <CubicEase x:Key="MotionEaseInOut" EasingMode="EaseInOut" />
+
     <!-- Cards -->
     <Style x:Key="MacCardStyle" TargetType="Border">
         <Setter Property="Background" Value="{StaticResource CardBgBrush}" />
@@ -114,23 +122,102 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
-                    <Border x:Name="RootBorder"
-                            Background="{TemplateBinding Background}"
-                            CornerRadius="12"
-                            SnapsToDevicePixels="True">
+                    <Grid x:Name="RootGrid" SnapsToDevicePixels="True">
+                        <Border x:Name="RootBorder"
+                                Background="{StaticResource AccentBrush}"
+                                CornerRadius="12"
+                                RenderTransformOrigin="0.5,0.5">
+                            <Border.RenderTransform>
+                                <ScaleTransform ScaleX="1" ScaleY="1" />
+                            </Border.RenderTransform>
+                        </Border>
+                        <Border x:Name="HoverOverlay"
+                                Background="{StaticResource AccentHoverBrush}"
+                                CornerRadius="12"
+                                Opacity="0"
+                                IsHitTestVisible="False" />
+                        <Border x:Name="PressOverlay"
+                                Background="{StaticResource AccentPressedBrush}"
+                                CornerRadius="12"
+                                Opacity="0"
+                                IsHitTestVisible="False" />
                         <ContentPresenter HorizontalAlignment="Center"
                                           VerticalAlignment="Center"
                                           Margin="{TemplateBinding Padding}" />
-                    </Border>
+                    </Grid>
                     <ControlTemplate.Triggers>
-                        <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="RootBorder" Property="Background" Value="{StaticResource AccentHoverBrush}" />
-                        </Trigger>
+                        <EventTrigger RoutedEvent="MouseEnter">
+                            <BeginStoryboard>
+                                <Storyboard>
+                                    <DoubleAnimation Storyboard.TargetName="HoverOverlay"
+                                                     Storyboard.TargetProperty="Opacity"
+                                                     To="1"
+                                                     Duration="{StaticResource MotionFast}"
+                                                     EasingFunction="{StaticResource MotionEaseOut}" />
+                                </Storyboard>
+                            </BeginStoryboard>
+                        </EventTrigger>
+                        <EventTrigger RoutedEvent="MouseLeave">
+                            <BeginStoryboard>
+                                <Storyboard>
+                                    <DoubleAnimation Storyboard.TargetName="HoverOverlay"
+                                                     Storyboard.TargetProperty="Opacity"
+                                                     To="0"
+                                                     Duration="{StaticResource MotionNormal}"
+                                                     EasingFunction="{StaticResource MotionEaseInOut}" />
+                                    <DoubleAnimation Storyboard.TargetName="PressOverlay"
+                                                     Storyboard.TargetProperty="Opacity"
+                                                     To="0"
+                                                     Duration="{StaticResource MotionFast}" />
+                                </Storyboard>
+                            </BeginStoryboard>
+                        </EventTrigger>
                         <Trigger Property="IsPressed" Value="True">
-                            <Setter TargetName="RootBorder" Property="Background" Value="{StaticResource AccentPressedBrush}" />
+                            <Trigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="PressOverlay"
+                                                         Storyboard.TargetProperty="Opacity"
+                                                         To="1"
+                                                         Duration="0:0:0.08"
+                                                         EasingFunction="{StaticResource MotionEaseOut}" />
+                                        <DoubleAnimation Storyboard.TargetName="RootBorder"
+                                                         Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"
+                                                         To="0.97"
+                                                         Duration="0:0:0.08"
+                                                         EasingFunction="{StaticResource MotionEaseOut}" />
+                                        <DoubleAnimation Storyboard.TargetName="RootBorder"
+                                                         Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)"
+                                                         To="0.97"
+                                                         Duration="0:0:0.08"
+                                                         EasingFunction="{StaticResource MotionEaseOut}" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="PressOverlay"
+                                                         Storyboard.TargetProperty="Opacity"
+                                                         To="0"
+                                                         Duration="{StaticResource MotionFast}"
+                                                         EasingFunction="{StaticResource MotionEaseInOut}" />
+                                        <DoubleAnimation Storyboard.TargetName="RootBorder"
+                                                         Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"
+                                                         To="1"
+                                                         Duration="{StaticResource MotionNormal}"
+                                                         EasingFunction="{StaticResource MotionEaseOut}" />
+                                        <DoubleAnimation Storyboard.TargetName="RootBorder"
+                                                         Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)"
+                                                         To="1"
+                                                         Duration="{StaticResource MotionNormal}"
+                                                         EasingFunction="{StaticResource MotionEaseOut}" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.ExitActions>
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
-                            <Setter TargetName="RootBorder" Property="Opacity" Value="0.45" />
+                            <Setter TargetName="RootGrid" Property="Opacity" Value="0.45" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -145,25 +232,85 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
-                    <Border x:Name="RootBorder"
-                            Background="{TemplateBinding Background}"
-                            BorderBrush="{StaticResource CardBorderBrush}"
-                            BorderThickness="0.5"
-                            CornerRadius="10"
-                            SnapsToDevicePixels="True">
+                    <Grid x:Name="RootGrid" SnapsToDevicePixels="True">
+                        <Border x:Name="RootBorder"
+                                Background="{StaticResource CardElevatedBrush}"
+                                BorderBrush="{StaticResource CardBorderBrush}"
+                                BorderThickness="0.5"
+                                CornerRadius="10"
+                                RenderTransformOrigin="0.5,0.5">
+                            <Border.RenderTransform>
+                                <ScaleTransform ScaleX="1" ScaleY="1" />
+                            </Border.RenderTransform>
+                        </Border>
+                        <Border x:Name="HoverOverlay"
+                                Background="{StaticResource SecondaryHoverBrush}"
+                                CornerRadius="10"
+                                Opacity="0"
+                                IsHitTestVisible="False" />
                         <ContentPresenter HorizontalAlignment="Center"
                                           VerticalAlignment="Center"
                                           Margin="{TemplateBinding Padding}" />
-                    </Border>
+                    </Grid>
                     <ControlTemplate.Triggers>
-                        <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="RootBorder" Property="Background" Value="{StaticResource SecondaryHoverBrush}" />
-                        </Trigger>
+                        <EventTrigger RoutedEvent="MouseEnter">
+                            <BeginStoryboard>
+                                <Storyboard>
+                                    <DoubleAnimation Storyboard.TargetName="HoverOverlay"
+                                                     Storyboard.TargetProperty="Opacity"
+                                                     To="1"
+                                                     Duration="{StaticResource MotionFast}"
+                                                     EasingFunction="{StaticResource MotionEaseOut}" />
+                                </Storyboard>
+                            </BeginStoryboard>
+                        </EventTrigger>
+                        <EventTrigger RoutedEvent="MouseLeave">
+                            <BeginStoryboard>
+                                <Storyboard>
+                                    <DoubleAnimation Storyboard.TargetName="HoverOverlay"
+                                                     Storyboard.TargetProperty="Opacity"
+                                                     To="0"
+                                                     Duration="{StaticResource MotionNormal}"
+                                                     EasingFunction="{StaticResource MotionEaseInOut}" />
+                                </Storyboard>
+                            </BeginStoryboard>
+                        </EventTrigger>
                         <Trigger Property="IsPressed" Value="True">
-                            <Setter TargetName="RootBorder" Property="Opacity" Value="0.85" />
+                            <Trigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="RootBorder"
+                                                         Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"
+                                                         To="0.98"
+                                                         Duration="0:0:0.08"
+                                                         EasingFunction="{StaticResource MotionEaseOut}" />
+                                        <DoubleAnimation Storyboard.TargetName="RootBorder"
+                                                         Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)"
+                                                         To="0.98"
+                                                         Duration="0:0:0.08"
+                                                         EasingFunction="{StaticResource MotionEaseOut}" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="RootBorder"
+                                                         Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"
+                                                         To="1"
+                                                         Duration="{StaticResource MotionNormal}"
+                                                         EasingFunction="{StaticResource MotionEaseOut}" />
+                                        <DoubleAnimation Storyboard.TargetName="RootBorder"
+                                                         Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)"
+                                                         To="1"
+                                                         Duration="{StaticResource MotionNormal}"
+                                                         EasingFunction="{StaticResource MotionEaseOut}" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.ExitActions>
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
-                            <Setter TargetName="RootBorder" Property="Opacity" Value="0.45" />
+                            <Setter TargetName="RootGrid" Property="Opacity" Value="0.45" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -201,23 +348,79 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
-                    <Border x:Name="RootBorder"
-                            Background="{TemplateBinding Background}"
-                            CornerRadius="8"
-                            SnapsToDevicePixels="True">
+                    <Grid SnapsToDevicePixels="True">
+                        <Border x:Name="RootBorder"
+                                Background="Transparent"
+                                CornerRadius="8" />
+                        <Border x:Name="HoverOverlay"
+                                Background="{StaticResource NavHoverBrush}"
+                                CornerRadius="8"
+                                Opacity="0"
+                                IsHitTestVisible="False" />
+                        <Border x:Name="ActiveOverlay"
+                                Background="{StaticResource NavActiveBrush}"
+                                CornerRadius="8"
+                                Opacity="0"
+                                IsHitTestVisible="False" />
                         <ContentPresenter VerticalAlignment="Center"
                                           HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
                                           Margin="{TemplateBinding Padding}" />
-                    </Border>
+                    </Grid>
                     <ControlTemplate.Triggers>
+                        <EventTrigger RoutedEvent="MouseEnter">
+                            <BeginStoryboard>
+                                <Storyboard>
+                                    <DoubleAnimation Storyboard.TargetName="HoverOverlay"
+                                                     Storyboard.TargetProperty="Opacity"
+                                                     To="1"
+                                                     Duration="{StaticResource MotionFast}"
+                                                     EasingFunction="{StaticResource MotionEaseOut}" />
+                                </Storyboard>
+                            </BeginStoryboard>
+                        </EventTrigger>
+                        <EventTrigger RoutedEvent="MouseLeave">
+                            <BeginStoryboard>
+                                <Storyboard>
+                                    <DoubleAnimation Storyboard.TargetName="HoverOverlay"
+                                                     Storyboard.TargetProperty="Opacity"
+                                                     To="0"
+                                                     Duration="{StaticResource MotionNormal}"
+                                                     EasingFunction="{StaticResource MotionEaseInOut}" />
+                                </Storyboard>
+                            </BeginStoryboard>
+                        </EventTrigger>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="RootBorder" Property="Background" Value="{StaticResource NavHoverBrush}" />
                             <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
                         </Trigger>
                         <Trigger Property="Tag" Value="Active">
-                            <Setter TargetName="RootBorder" Property="Background" Value="{StaticResource NavActiveBrush}" />
                             <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
                             <Setter Property="FontWeight" Value="SemiBold" />
+                            <Trigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="ActiveOverlay"
+                                                         Storyboard.TargetProperty="Opacity"
+                                                         To="1"
+                                                         Duration="{StaticResource MotionNormal}"
+                                                         EasingFunction="{StaticResource MotionEaseOut}" />
+                                        <DoubleAnimation Storyboard.TargetName="HoverOverlay"
+                                                         Storyboard.TargetProperty="Opacity"
+                                                         To="0"
+                                                         Duration="{StaticResource MotionFast}" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="ActiveOverlay"
+                                                         Storyboard.TargetProperty="Opacity"
+                                                         To="0"
+                                                         Duration="{StaticResource MotionNormal}"
+                                                         EasingFunction="{StaticResource MotionEaseInOut}" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.ExitActions>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -238,19 +441,44 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
-                    <Border x:Name="RootBorder"
-                            Background="{TemplateBinding Background}"
-                            SnapsToDevicePixels="True">
+                    <Grid SnapsToDevicePixels="True">
+                        <Border x:Name="RootBorder" Background="Transparent" />
+                        <Border x:Name="HoverOverlay"
+                                Background="{StaticResource NavHoverBrush}"
+                                Opacity="0"
+                                IsHitTestVisible="False" />
                         <ContentPresenter HorizontalAlignment="Center"
                                           VerticalAlignment="Center" />
-                    </Border>
+                    </Grid>
                     <ControlTemplate.Triggers>
+                        <EventTrigger RoutedEvent="MouseEnter">
+                            <BeginStoryboard>
+                                <Storyboard>
+                                    <DoubleAnimation Storyboard.TargetName="HoverOverlay"
+                                                     Storyboard.TargetProperty="Opacity"
+                                                     To="1"
+                                                     Duration="{StaticResource MotionFast}"
+                                                     EasingFunction="{StaticResource MotionEaseOut}" />
+                                </Storyboard>
+                            </BeginStoryboard>
+                        </EventTrigger>
+                        <EventTrigger RoutedEvent="MouseLeave">
+                            <BeginStoryboard>
+                                <Storyboard>
+                                    <DoubleAnimation Storyboard.TargetName="HoverOverlay"
+                                                     Storyboard.TargetProperty="Opacity"
+                                                     To="0"
+                                                     Duration="{StaticResource MotionNormal}"
+                                                     EasingFunction="{StaticResource MotionEaseInOut}" />
+                                </Storyboard>
+                            </BeginStoryboard>
+                        </EventTrigger>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="RootBorder" Property="Background" Value="{StaticResource NavHoverBrush}" />
                             <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
                         </Trigger>
                         <Trigger Property="IsPressed" Value="True">
-                            <Setter TargetName="RootBorder" Property="Background" Value="{StaticResource NavActiveBrush}" />
+                            <Setter TargetName="HoverOverlay" Property="Background" Value="{StaticResource NavActiveBrush}" />
+                            <Setter TargetName="HoverOverlay" Property="Opacity" Value="1" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -262,20 +490,44 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
-                    <Border x:Name="RootBorder"
-                            Background="{TemplateBinding Background}"
-                            SnapsToDevicePixels="True">
+                    <Grid SnapsToDevicePixels="True">
+                        <Border x:Name="RootBorder" Background="Transparent" />
+                        <Border x:Name="HoverOverlay"
+                                Background="{StaticResource DestructiveBrush}"
+                                Opacity="0"
+                                IsHitTestVisible="False" />
                         <ContentPresenter HorizontalAlignment="Center"
                                           VerticalAlignment="Center" />
-                    </Border>
+                    </Grid>
                     <ControlTemplate.Triggers>
+                        <EventTrigger RoutedEvent="MouseEnter">
+                            <BeginStoryboard>
+                                <Storyboard>
+                                    <DoubleAnimation Storyboard.TargetName="HoverOverlay"
+                                                     Storyboard.TargetProperty="Opacity"
+                                                     To="1"
+                                                     Duration="{StaticResource MotionFast}"
+                                                     EasingFunction="{StaticResource MotionEaseOut}" />
+                                </Storyboard>
+                            </BeginStoryboard>
+                        </EventTrigger>
+                        <EventTrigger RoutedEvent="MouseLeave">
+                            <BeginStoryboard>
+                                <Storyboard>
+                                    <DoubleAnimation Storyboard.TargetName="HoverOverlay"
+                                                     Storyboard.TargetProperty="Opacity"
+                                                     To="0"
+                                                     Duration="{StaticResource MotionNormal}"
+                                                     EasingFunction="{StaticResource MotionEaseInOut}" />
+                                </Storyboard>
+                            </BeginStoryboard>
+                        </EventTrigger>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="RootBorder" Property="Background" Value="{StaticResource DestructiveBrush}" />
                             <Setter Property="Foreground" Value="White" />
                         </Trigger>
                         <Trigger Property="IsPressed" Value="True">
-                            <Setter TargetName="RootBorder" Property="Background" Value="#D63028" />
-                            <Setter Property="Foreground" Value="White" />
+                            <Setter TargetName="HoverOverlay" Property="Background" Value="#D63028" />
+                            <Setter TargetName="HoverOverlay" Property="Opacity" Value="1" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>

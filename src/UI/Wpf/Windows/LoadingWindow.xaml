@@ -20,12 +20,18 @@
         </ResourceDictionary>
     </Window.Resources>
 
-    <Border Background="{StaticResource CardBgBrush}"
+    <Border x:Name="RootCard"
+            Background="{StaticResource CardBgBrush}"
             BorderBrush="{StaticResource CardBorderBrush}"
             BorderThickness="0.5"
             CornerRadius="16"
             Padding="28,24"
-            ClipToBounds="True">
+            ClipToBounds="True"
+            Opacity="0"
+            RenderTransformOrigin="0.5,0.5">
+        <Border.RenderTransform>
+            <ScaleTransform ScaleX="0.98" ScaleY="0.98" />
+        </Border.RenderTransform>
         <StackPanel VerticalAlignment="Center">
             <TextBlock Text="ApexTweaker"
                        Foreground="{StaticResource TextPrimaryBrush}"
