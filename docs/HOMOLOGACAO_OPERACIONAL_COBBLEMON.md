@@ -1,6 +1,6 @@
 # Homologacao operacional Cobblemon em 4 GB
 
-Versao do fluxo: **ApexTweaker 2.3.0**
+Versao do fluxo: **ApexTweaker 3.0.0**
 Alvo: **Minecraft 1.21.1 + Fabric + Cobblemon em Windows, i3 de quarta geracao e 4 GB de RAM**
 
 ## Estado comprovado em 2026-07-12
@@ -27,7 +27,7 @@ Hashes publicados da base v2.2.0:
 | `ApexTweaker.exe` | `5faf7bd3e43b9e43c0ecafee0f90b0dc4e01ed7c90c3e648aad8dceb4a5c097e` |
 | `ApexTweaker.Native.dll` | `8e9d346f129efbbe8a28ac6d9081d086ac8130396af6b0b571dacf7a2a178b82` |
 
-Hashes dos artefatos v2.3.0 validados localmente antes do upload:
+Hashes historicos dos artefatos v2.3.0 validados localmente antes do upload:
 
 | Asset | SHA-256 |
 |---|---|

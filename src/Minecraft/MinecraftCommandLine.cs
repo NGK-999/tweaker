@@ -35,6 +35,98 @@ internal static class MinecraftCommandLine
                 return true;
             }
 
+            if (HasFlag(args, "--minecraft-scientific-plan"))
+            {
+                var instance = RequireValue(args, "--instance");
+                var service = CreateScientificService(args);
+                var result = service.Plan(instance, ParseFps(args), GetValue(args, "--output"));
+                Console.WriteLine($"Gargalo: {result.Plan.Diagnosis.Primary} ({result.Plan.Diagnosis.Confidence})");
+                Console.WriteLine($"Perfil: {result.Plan.SelectedProfile} | JVM: {result.Plan.JavaMemory.Arguments} | FPS: {result.Plan.MaximumFps}");
+                Console.WriteLine(result.Reports.MarkdownPath);
+                WriteStatusFile(args, "SCIENTIFIC_PLAN_OK", result.Reports.MarkdownPath);
+                return true;
+            }
+
+            if (HasFlag(args, "--minecraft-scientific-start") ||
+                HasFlag(args, "--minecraft-scientific-auto-optimize"))
+            {
+                var instance = RequireValue(args, "--instance");
+                var result = CreateScientificService(args).StartGuided(instance, ParseFps(args));
+                Console.WriteLine($"Experimento: {result.Experiment.ExperimentId}");
+                Console.WriteLine($"Fase: {result.Experiment.Phase}");
+                Console.WriteLine(result.Reports.MarkdownPath);
+                WriteStatusFile(args, "SCIENTIFIC_EXPERIMENT_STARTED", result.Experiment.ExperimentId);
+                return true;
+            }
+
+            if (HasFlag(args, "--minecraft-scientific-record"))
+            {
+                var experimentId = RequireValue(args, "--experiment");
+                var service = CreateScientificService(args);
+                var experiment = service.Load(experimentId);
+                var measurementKind = ParseMeasurementKind(RequireValue(args, "--phase"));
+                var benchmark = CaptureOptionalBenchmark(args, experiment.InstanceRoot);
+                var result = service.RecordMeasurement(
+                    experimentId,
+                    measurementKind,
+                    ParseObservation(args),
+                    benchmark);
+                Console.WriteLine($"{result.Experiment.Phase}: {result.Reports.MarkdownPath}");
+                WriteStatusFile(args, "SCIENTIFIC_MEASUREMENT_RECORDED", result.Reports.MarkdownPath);
+                return true;
+            }
+
+            if (HasFlag(args, "--minecraft-scientific-apply"))
+            {
+                RequireConfirmation(args);
+                var result = CreateScientificService(args).ApplyCandidate(
+                    RequireValue(args, "--experiment"),
+                    userConfirmed: true);
+                Console.WriteLine($"{result.Experiment.Phase}: backup={result.Experiment.AppliedProfileBackupId ?? "SEM_ESCRITA"}");
+                Console.WriteLine(result.Reports.MarkdownPath);
+                WriteStatusFile(args, "SCIENTIFIC_CANDIDATE_APPLIED", result.Reports.MarkdownPath);
+                return true;
+            }
+
+            if (HasFlag(args, "--minecraft-scientific-compare"))
+            {
+                var result = CreateScientificService(args).Compare(RequireValue(args, "--experiment"));
+                Console.WriteLine($"Decisao: {result.Experiment.Comparison?.Decision} | score={result.Experiment.Comparison?.Score} | confianca={result.Experiment.Comparison?.Confidence}");
+                Console.WriteLine(result.Reports.MarkdownPath);
+                WriteStatusFile(args, "SCIENTIFIC_COMPARISON_OK", result.Reports.MarkdownPath);
+                return true;
+            }
+
+            if (HasFlag(args, "--minecraft-scientific-finalize"))
+            {
+                RequireConfirmation(args);
+                var result = CreateScientificService(args).Finalize(
+                    RequireValue(args, "--experiment"),
+                    rollbackConfirmed: true);
+                Console.WriteLine($"Fase final: {result.Experiment.Phase}");
+                Console.WriteLine(result.Reports.MarkdownPath);
+                WriteStatusFile(args, "SCIENTIFIC_EXPERIMENT_FINALIZED", result.Reports.MarkdownPath);
+                return true;
+            }
+
+            if (HasFlag(args, "--minecraft-scientific-show"))
+            {
+                var experiment = CreateScientificService(args).Load(RequireValue(args, "--experiment"));
+                Console.WriteLine($"{experiment.ExperimentId} | {experiment.Phase} | {experiment.Comparison?.Decision.ToString() ?? "SEM_DECISAO"}");
+                WriteStatusFile(args, "SCIENTIFIC_EXPERIMENT_FOUND", experiment.Phase.ToString());
+                return true;
+            }
+
+            if (HasFlag(args, "--minecraft-scientific-list"))
+            {
+                foreach (var experiment in CreateScientificService(args).List())
+                {
+                    Console.WriteLine($"{experiment.ExperimentId} | {experiment.Phase} | {experiment.UpdatedAtUtc:O}");
+                }
+
+                return true;
+            }
+
             if (HasFlag(args, "--minecraft-audit"))
             {
                 var modsDirectory = RequireValue(args, "--mods");
@@ -160,20 +252,7 @@ internal static class MinecraftCommandLine
             if (HasFlag(args, "--minecraft-homologation-report"))
             {
                 var instance = RequireValue(args, "--instance");
-                var observation = new MinecraftOperationalObservation(
-                    GameOpened: HasFlag(args, "--game-opened"),
-                    MenuReached: HasFlag(args, "--menu-reached"),
-                    MenuLoadSeconds: ParseOptionalDecimal(args, "--menu-seconds"),
-                    WorldEntered: HasFlag(args, "--world-entered"),
-                    ServerEntered: HasFlag(args, "--server-entered"),
-                    JoinLoadSeconds: ParseOptionalDecimal(args, "--join-seconds"),
-                    PlayableAt720p: HasFlag(args, "--playable-720p"),
-                    AverageFps: ParseOptionalDouble(args, "--average-fps"),
-                    MinimumFps: ParseOptionalDouble(args, "--minimum-fps"),
-                    SevereDrops: HasFlag(args, "--severe-drops"),
-                    Crashed: HasFlag(args, "--crashed"),
-                    OutOfMemory: HasFlag(args, "--out-of-memory"),
-                    Notes: GetValue(args, "--notes") ?? string.Empty);
+                var observation = ParseObservation(args);
 
                 MinecraftBenchmarkResult? benchmark = null;
                 var benchmarkSecondsText = GetValue(args, "--benchmark-seconds");
@@ -275,6 +354,10 @@ internal static class MinecraftCommandLine
             "SAFE" => MinecraftProfileKind.Safe,
             "LOWEND" => MinecraftProfileKind.LowEnd,
             "EXTREME4GB" => MinecraftProfileKind.Extreme4Gb,
+            "GPULIMITED" => MinecraftProfileKind.GpuLimited,
+            "RAMLIMITED" => MinecraftProfileKind.RamLimited,
+            "CPULIMITED" => MinecraftProfileKind.CpuLimited,
+            "SERVERENTRYCOMPATIBLE" => MinecraftProfileKind.ServerEntryCompatible,
             "COBBLEMONSERVERCLIENT" => MinecraftProfileKind.CobblemonServerClient,
             "BENCHMARK" => MinecraftProfileKind.Benchmark,
             _ => throw new ArgumentException($"Perfil desconhecido: {value}")
@@ -296,6 +379,73 @@ internal static class MinecraftCommandLine
         }
 
         return fps;
+    }
+
+    private static ScientificMeasurementKind ParseMeasurementKind(string value)
+    {
+        return value.Trim().ToUpperInvariant() switch
+        {
+            "BASELINE" => ScientificMeasurementKind.Baseline,
+            "CANDIDATE" or "CANDIDATO" => ScientificMeasurementKind.Candidate,
+            _ => throw new ArgumentException("--phase deve ser baseline ou candidate.")
+        };
+    }
+
+    private static MinecraftScientificExperimentService CreateScientificService(string[] args)
+    {
+        var root = GetValue(args, "--experiment-root");
+        return new MinecraftScientificExperimentService(
+            experimentRoot: root,
+            profileBackupRoot: root is null ? null : Path.Combine(root, "_profile-backups"),
+            profileReportRoot: root is null ? null : Path.Combine(root, "_profile-reports"));
+    }
+
+    private static MinecraftOperationalObservation ParseObservation(string[] args)
+    {
+        return new MinecraftOperationalObservation(
+            GameOpened: HasFlag(args, "--game-opened"),
+            MenuReached: HasFlag(args, "--menu-reached"),
+            MenuLoadSeconds: ParseOptionalDecimal(args, "--menu-seconds"),
+            WorldEntered: HasFlag(args, "--world-entered"),
+            ServerEntered: HasFlag(args, "--server-entered"),
+            JoinLoadSeconds: ParseOptionalDecimal(args, "--join-seconds"),
+            PlayableAt720p: HasFlag(args, "--playable-720p"),
+            AverageFps: ParseOptionalDouble(args, "--average-fps"),
+            MinimumFps: ParseOptionalDouble(args, "--minimum-fps"),
+            SevereDrops: HasFlag(args, "--severe-drops"),
+            Crashed: HasFlag(args, "--crashed"),
+            OutOfMemory: HasFlag(args, "--out-of-memory"),
+            Notes: GetValue(args, "--notes") ?? string.Empty);
+    }
+
+    private static MinecraftBenchmarkResult? CaptureOptionalBenchmark(string[] args, string instanceRoot)
+    {
+        var durationText = GetValue(args, "--benchmark-seconds");
+        if (durationText is null)
+        {
+            return null;
+        }
+
+        if (!int.TryParse(durationText, NumberStyles.Integer, CultureInfo.InvariantCulture, out var seconds) ||
+            seconds is < 10 or > 600)
+        {
+            throw new ArgumentException("--benchmark-seconds deve estar entre 10 e 600.");
+        }
+
+        var waitText = GetValue(args, "--wait-seconds") ?? "0";
+        if (!int.TryParse(waitText, NumberStyles.Integer, CultureInfo.InvariantCulture, out var waitSeconds) ||
+            waitSeconds is < 0 or > 300)
+        {
+            throw new ArgumentException("--wait-seconds deve estar entre 0 e 300.");
+        }
+
+        return new MinecraftBenchmarkService()
+            .CaptureAsync(
+                TimeSpan.FromSeconds(seconds),
+                selectedPath: instanceRoot,
+                processWait: TimeSpan.FromSeconds(waitSeconds))
+            .GetAwaiter()
+            .GetResult();
     }
 
     private static decimal? ParseOptionalDecimal(string[] args, string key)
@@ -369,6 +519,16 @@ internal static class MinecraftCommandLine
     private static void WriteUsage()
     {
         Console.WriteLine("ApexTweaker Minecraft commands:");
+        Console.WriteLine("  scientific commands accept [--experiment-root <path>] for a custom writable store");
+        Console.WriteLine("  --minecraft-scientific-plan --instance <path> [--fps 30|45|60] [--output <path>]");
+        Console.WriteLine("  --minecraft-scientific-auto-optimize --instance <path> [--fps 30|45|60]");
+        Console.WriteLine("  --minecraft-scientific-start --instance <path> [--fps 30|45|60]");
+        Console.WriteLine("  --minecraft-scientific-record --experiment <id> --phase baseline|candidate [observacoes] [--benchmark-seconds 60]");
+        Console.WriteLine("  --minecraft-scientific-apply --experiment <id> --yes");
+        Console.WriteLine("  --minecraft-scientific-compare --experiment <id>");
+        Console.WriteLine("  --minecraft-scientific-finalize --experiment <id> --yes");
+        Console.WriteLine("  --minecraft-scientific-show --experiment <id>");
+        Console.WriteLine("  --minecraft-scientific-list");
         Console.WriteLine("  --minecraft-audit --mods <path> [--output <path>] [--target 1.21.1]");
         Console.WriteLine("  --minecraft-profile-dry-run --instance <path> --profile EXTREME_4GB [--fps 30|45|60] [--output <path>]");
         Console.WriteLine("  --minecraft-apply-profile --instance <path> --profile EXTREME_4GB [--fps 30|45|60] --yes");

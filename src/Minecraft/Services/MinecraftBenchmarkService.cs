@@ -80,6 +80,7 @@ internal sealed class MinecraftBenchmarkService
         var samples = new List<MinecraftBenchmarkSample>();
         var previousCpu = ReadCpuTime(process);
         var previousTime = Stopwatch.GetTimestamp();
+        var initialIo = ReadIoCounters(process);
         var endAt = DateTimeOffset.UtcNow + duration;
         var processExited = false;
 
@@ -104,13 +105,16 @@ internal sealed class MinecraftBenchmarkService
                 var cpuPercent = elapsedSeconds <= 0
                     ? 0
                     : Math.Clamp(cpuDeltaSeconds / elapsedSeconds / Environment.ProcessorCount * 100d, 0d, 100d);
+                var io = ReadIoCounters(process);
 
                 var sample = new MinecraftBenchmarkSample(
                     DateTimeOffset.UtcNow,
                     process.WorkingSet64,
                     process.PrivateMemorySize64,
                     ReadAvailableMemoryGb(),
-                    Math.Round(cpuPercent, 2));
+                    Math.Round(cpuPercent, 2),
+                    Math.Max(0, io.ReadBytes - initialIo.ReadBytes),
+                    Math.Max(0, io.WriteBytes - initialIo.WriteBytes));
                 samples.Add(sample);
                 progress?.Report(sample);
                 previousCpu = currentCpu;
@@ -435,6 +439,21 @@ internal sealed class MinecraftBenchmarkService
         }
     }
 
+    private static (long ReadBytes, long WriteBytes) ReadIoCounters(Process process)
+    {
+        try
+        {
+            return GetProcessIoCounters(process.Handle, out var counters)
+                ? (checked((long)Math.Min(counters.ReadTransferCount, long.MaxValue)),
+                   checked((long)Math.Min(counters.WriteTransferCount, long.MaxValue)))
+                : (0, 0);
+        }
+        catch
+        {
+            return (0, 0);
+        }
+    }
+
     private static decimal ReadAvailableMemoryGb()
     {
         var status = new MemoryStatusEx
@@ -450,6 +469,10 @@ internal sealed class MinecraftBenchmarkService
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool GlobalMemoryStatusEx(ref MemoryStatusEx status);
 
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetProcessIoCounters(nint processHandle, out IoCounters counters);
+
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
     private struct MemoryStatusEx
     {
@@ -462,6 +485,17 @@ internal sealed class MinecraftBenchmarkService
         public ulong TotalVirtual;
         public ulong AvailableVirtual;
         public ulong AvailableExtendedVirtual;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct IoCounters
+    {
+        public ulong ReadOperationCount;
+        public ulong WriteOperationCount;
+        public ulong OtherOperationCount;
+        public ulong ReadTransferCount;
+        public ulong WriteTransferCount;
+        public ulong OtherTransferCount;
     }
 
     private sealed record BenchmarkEvidence(

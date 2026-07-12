@@ -31,6 +31,8 @@ internal static class MinecraftSelfTest
             var audit = new MinecraftAuditService().Audit(modsDirectory);
             Assert(audit.Summary.DuplicateModIds == 1, "O scanner nao detectou o ID duplicado.");
             Assert(audit.Summary.MissingDependencies == 1, "O scanner nao detectou a dependencia ausente.");
+            Assert(audit.Mods.Where(mod => mod.Id == "sample").All(mod => mod.ClassificationTags.Contains(ModClassification.Duplicado)),
+                "A auditoria nao adicionou a tag DUPLICADO a todas as versoes do mesmo ID.");
             messages.Add("PASS: scanner detecta duplicidade e dependencia ausente.");
 
             var reportDirectory = Path.Combine(root, "reports");
@@ -83,6 +85,16 @@ internal static class MinecraftSelfTest
                 "cobblemon",
                 "test",
                 new Dictionary<string, string>());
+            CreateFabricJar(
+                Path.Combine(instanceRoot, "mods", "sodium-test.jar"),
+                "sodium",
+                "0.6.13",
+                new Dictionary<string, string>());
+            CreateFabricJar(
+                Path.Combine(instanceRoot, "mods", "lithium-test.jar"),
+                "lithium",
+                "0.15.4",
+                new Dictionary<string, string>());
             Directory.CreateDirectory(Path.Combine(instanceRoot, "config"));
             var optionsPath = Path.Combine(instanceRoot, "options.txt");
             const string originalOptions = "renderDistance:12\nsimulationDistance:12\nmaxFps:120\ncustomOption:keep\n";
@@ -100,6 +112,9 @@ internal static class MinecraftSelfTest
             var irisPath = Path.Combine(instanceRoot, "config", "iris.properties");
             const string originalIris = "enableShaders=true\nunknown=keep\n";
             File.WriteAllText(irisPath, originalIris, new UTF8Encoding(false));
+            var unmanagedConfigPath = Path.Combine(instanceRoot, "config", "unmanaged.properties");
+            const string originalUnmanagedConfig = "mode=baseline\n";
+            File.WriteAllText(unmanagedConfigPath, originalUnmanagedConfig, new UTF8Encoding(false));
             var instanceConfigPath = Path.Combine(managedRoot, "instance.cfg");
             const string originalInstanceConfig = "name=Test Instance\nOverrideMemory=false\nMinMemAlloc=256\nMaxMemAlloc=4096\niconKey=cobblemon\n";
             File.WriteAllText(instanceConfigPath, originalInstanceConfig, new UTF8Encoding(false));
@@ -132,6 +147,11 @@ internal static class MinecraftSelfTest
                 "O perfil nao aceitou 45 FPS.");
             Assert(profileService.PlanProfile(managedRoot, MinecraftProfileKind.Extreme4Gb, 60).MaximumFps == 60,
                 "O perfil nao aceitou 60 FPS.");
+            Assert(MinecraftProfileService.AvailableProfiles.Any(profile => profile.Kind == MinecraftProfileKind.RamLimited) &&
+                   MinecraftProfileService.AvailableProfiles.Any(profile => profile.Kind == MinecraftProfileKind.CpuLimited) &&
+                   MinecraftProfileService.AvailableProfiles.Any(profile => profile.Kind == MinecraftProfileKind.GpuLimited) &&
+                   MinecraftProfileService.AvailableProfiles.Any(profile => profile.Kind == MinecraftProfileKind.ServerEntryCompatible),
+                "Os perfis cientificos por gargalo nao foram registrados.");
             AssertThrows<ArgumentOutOfRangeException>(
                 () => profileService.PlanProfile(managedRoot, MinecraftProfileKind.Extreme4Gb, 50),
                 "O perfil aceitou um limite fora de 30/45/60 FPS.");
@@ -168,7 +188,7 @@ internal static class MinecraftSelfTest
             Assert(File.Exists(applied.ReportPath), "Relatorio antes/depois do apply nao foi gerado.");
             messages.Add("PASS: EXTREME_4GB altera configs reais, preserva desconhecidas e cria backup.");
 
-            _ = profileService.RollbackLatest(managedRoot);
+            _ = profileService.RollbackBackup(managedRoot, applied.BackupId);
             var rolledBack = File.ReadAllText(optionsPath).Replace("\r\n", "\n");
             Assert(rolledBack == originalOptions, "Rollback nao restaurou o options.txt original.");
             Assert(File.ReadAllText(sodiumPath) == originalSodium, "Rollback nao restaurou Sodium byte a byte.");
@@ -217,6 +237,210 @@ internal static class MinecraftSelfTest
             Assert(File.ReadAllText(optionsPath).Replace("\r\n", "\n") == originalOptions,
                 "Rollback nao aceitou o manifesto legado da v2.1.0.");
             messages.Add("PASS: rollback v2.1.0 restaura ate um options.txt removido.");
+
+            var instanceAudit = new MinecraftAuditService().Audit(managedRoot);
+            var ramAudit = instanceAudit with
+            {
+                Environment = instanceAudit.Environment with
+                {
+                    TotalMemoryGb = 4m,
+                    AvailableMemoryGb = 2.5m,
+                    PageFileAllocatedMb = 4096,
+                    PageFileInUseMb = 256
+                }
+            };
+            var ramDiagnosis = new MinecraftBottleneckDiagnosticService().Diagnose(ramAudit);
+            Assert(ramDiagnosis.Primary == MinecraftBottleneckKind.RamLimited,
+                "O diagnostico nao classificou o hardware sintetico de 4 GB como RAM_LIMITED.");
+            var contractAssessments = new MinecraftModConfigContractCatalog().Assess(instanceAudit, Path.Combine(instanceRoot, "config"));
+            Assert(contractAssessments.Single(contract => contract.ModId == "sodium").Status == ModConfigAutomationStatus.Supported,
+                "O contrato do Sodium instalado nao foi marcado como suportado.");
+            Assert(contractAssessments.Single(contract => contract.ModId == "lithium").Status == ModConfigAutomationStatus.DefaultsRecommended,
+                "Lithium deveria preservar os defaults estaveis.");
+            messages.Add("PASS: diagnostico de gargalo e contratos de configs distinguem fato, inferencia e manual.");
+
+            var scientificRoot = Path.Combine(root, "scientific-experiments");
+            var scientificBackupRoot = Path.Combine(root, "scientific-backups");
+            var scientificReports = Path.Combine(root, "scientific-profile-reports");
+            var scientificService = new MinecraftScientificExperimentService(
+                scientificRoot,
+                scientificBackupRoot,
+                scientificReports);
+            var baselineObservation = new MinecraftOperationalObservation(
+                true, true, 70m, true, true, 110m, true, 30d, 16d, false, false, false,
+                "Baseline sintetico controlado.");
+            var baselineBenchmark = CreateSyntheticBenchmark(
+                instanceAudit.Environment,
+                instanceRoot,
+                averageCpu: 65d,
+                peakWorkingSetMb: 1700,
+                minimumAvailableGb: 0.70m,
+                pageFileDeltaMb: 300);
+
+            var driftStarted = scientificService.StartGuided(managedRoot, 30);
+            _ = scientificService.RecordMeasurement(
+                driftStarted.Experiment.ExperimentId,
+                ScientificMeasurementKind.Baseline,
+                baselineObservation,
+                baselineBenchmark);
+            File.WriteAllText(unmanagedConfigPath, "mode=external-drift\n", new UTF8Encoding(false));
+            AssertThrows<InvalidOperationException>(
+                () => scientificService.ApplyCandidate(driftStarted.Experiment.ExperimentId, userConfirmed: true),
+                "Apply cientifico aceitou drift de config posterior ao baseline.");
+            File.WriteAllText(unmanagedConfigPath, originalUnmanagedConfig, new UTF8Encoding(false));
+
+            var started = scientificService.StartGuided(managedRoot, 30);
+            Assert(started.Experiment.Phase == ScientificExperimentPhase.BaselinePending,
+                "Experimento cientifico nao iniciou aguardando baseline.");
+            var baselineRecorded = scientificService.RecordMeasurement(
+                started.Experiment.ExperimentId,
+                ScientificMeasurementKind.Baseline,
+                baselineObservation,
+                baselineBenchmark);
+            Assert(baselineRecorded.Experiment.Phase == ScientificExperimentPhase.BaselineRecorded,
+                "Baseline cientifico nao foi persistido.");
+            var candidateApplied = scientificService.ApplyCandidate(started.Experiment.ExperimentId, userConfirmed: true);
+            Assert(candidateApplied.Experiment.Phase == ScientificExperimentPhase.CandidateApplied,
+                "Candidato cientifico nao foi aplicado.");
+            var candidateObservation = baselineObservation with
+            {
+                MenuLoadSeconds = 58m,
+                JoinLoadSeconds = 88m,
+                AverageFps = 38d,
+                MinimumFps = 22d,
+                Notes = "Candidato sintetico na mesma cena."
+            };
+            var candidateBenchmark = CreateSyntheticBenchmark(
+                instanceAudit.Environment,
+                instanceRoot,
+                averageCpu: 50d,
+                peakWorkingSetMb: 1450,
+                minimumAvailableGb: 0.95m,
+                pageFileDeltaMb: 80);
+            var candidateRecorded = scientificService.RecordMeasurement(
+                started.Experiment.ExperimentId,
+                ScientificMeasurementKind.Candidate,
+                candidateObservation,
+                candidateBenchmark);
+            Assert(candidateRecorded.Experiment.Phase == ScientificExperimentPhase.CandidateRecorded,
+                "Candidato cientifico nao foi persistido.");
+            var compared = scientificService.Compare(started.Experiment.ExperimentId);
+            Assert(compared.Experiment.Comparison?.Decision == ScientificDecision.Keep,
+                "O comparador nao manteve um candidato com melhora consistente.");
+            var finalized = scientificService.Finalize(started.Experiment.ExperimentId, rollbackConfirmed: false);
+            Assert(finalized.Experiment.Phase == ScientificExperimentPhase.Kept,
+                "Experimento aprovado nao terminou em KEPT.");
+            Assert(File.Exists(finalized.Reports.JsonPath) &&
+                   File.Exists(finalized.Reports.MarkdownPath) &&
+                   File.Exists(finalized.Reports.TextPath),
+                "Relatorios cientificos JSON/Markdown/TXT nao foram gerados.");
+            var store = new MinecraftScientificExperimentStore(scientificRoot);
+            Assert(store.Load(started.Experiment.ExperimentId).Phase == ScientificExperimentPhase.Kept,
+                "Store nao persistiu o estado final do experimento.");
+            AssertThrows<ArgumentException>(() => store.Load("../experimento-invalido"),
+                "Store aceitou path traversal no ID do experimento.");
+
+            Assert(finalized.Experiment.AppliedProfileBackupId is not null,
+                "Experimento KEEP nao registrou o backup aplicado para auditoria.");
+            _ = new MinecraftProfileService(scientificBackupRoot, scientificReports)
+                .RollbackBackup(managedRoot, finalized.Experiment.AppliedProfileBackupId!);
+            Assert(File.ReadAllText(optionsPath).Replace("\r\n", "\n") == originalOptions,
+                "Preparacao do teste REVERT nao restaurou o baseline original.");
+
+            var revertStarted = scientificService.StartGuided(managedRoot, 30);
+            _ = scientificService.RecordMeasurement(
+                revertStarted.Experiment.ExperimentId,
+                ScientificMeasurementKind.Baseline,
+                baselineObservation,
+                baselineBenchmark);
+            _ = scientificService.ApplyCandidate(revertStarted.Experiment.ExperimentId, userConfirmed: true);
+            var failingObservation = candidateObservation with
+            {
+                Crashed = true,
+                OutOfMemory = true,
+                ServerEntered = false,
+                Notes = "Regressao sintetica para validar rollback."
+            };
+            var failingBenchmark = candidateBenchmark with
+            {
+                Status = BenchmarkStatus.Failed,
+                CrashEvidence = true,
+                OutOfMemoryEvidence = true
+            };
+            _ = scientificService.RecordMeasurement(
+                revertStarted.Experiment.ExperimentId,
+                ScientificMeasurementKind.Candidate,
+                failingObservation,
+                failingBenchmark);
+            var revertCompared = scientificService.Compare(revertStarted.Experiment.ExperimentId);
+            Assert(revertCompared.Experiment.Comparison?.Decision == ScientificDecision.Revert,
+                "Experimento com crash/OOM nao decidiu REVERT.");
+            var reverted = scientificService.Finalize(
+                revertStarted.Experiment.ExperimentId,
+                rollbackConfirmed: true);
+            Assert(reverted.Experiment.Phase == ScientificExperimentPhase.Reverted,
+                "Experimento degradado nao terminou em REVERTED.");
+            Assert(File.ReadAllText(optionsPath).Replace("\r\n", "\n") == originalOptions,
+                "Rollback cientifico nao restaurou options.txt ao baseline.");
+
+            var contaminatedStarted = scientificService.StartGuided(managedRoot, 30);
+            _ = scientificService.RecordMeasurement(
+                contaminatedStarted.Experiment.ExperimentId,
+                ScientificMeasurementKind.Baseline,
+                baselineObservation,
+                baselineBenchmark);
+            var contaminatedApplied = scientificService.ApplyCandidate(
+                contaminatedStarted.Experiment.ExperimentId,
+                userConfirmed: true);
+            File.WriteAllText(unmanagedConfigPath, "mode=contaminated\n", new UTF8Encoding(false));
+            _ = scientificService.RecordMeasurement(
+                contaminatedStarted.Experiment.ExperimentId,
+                ScientificMeasurementKind.Candidate,
+                candidateObservation,
+                candidateBenchmark);
+            var contaminatedCompared = scientificService.Compare(contaminatedStarted.Experiment.ExperimentId);
+            var contaminatedComparison = contaminatedCompared.Experiment.Comparison
+                ?? throw new InvalidOperationException("Comparacao contaminada nao foi gerada.");
+            Assert(contaminatedComparison.Decision == ScientificDecision.Retest &&
+                   contaminatedComparison.Confidence == ScientificConfidence.Low,
+                "Mudanca fora da hipotese nao rebaixou a decisao para RETEST com baixa confianca.");
+            Assert(contaminatedComparison.Rationale.Any(item =>
+                    item.Contains("fora da hipotese", StringComparison.OrdinalIgnoreCase)),
+                "Comparacao contaminada nao explicou o arquivo externo.");
+            var contaminatedFinalized = scientificService.Finalize(
+                contaminatedStarted.Experiment.ExperimentId,
+                rollbackConfirmed: true);
+            Assert(contaminatedFinalized.Experiment.Phase == ScientificExperimentPhase.NeedsRetest,
+                "Experimento contaminado nao terminou em NEEDS_RETEST.");
+            Assert(contaminatedApplied.Experiment.AppliedProfileBackupId is not null,
+                "Experimento contaminado nao registrou backup para limpeza do teste.");
+            File.WriteAllText(unmanagedConfigPath, originalUnmanagedConfig, new UTF8Encoding(false));
+            Assert(File.ReadAllText(optionsPath).Replace("\r\n", "\n") == originalOptions,
+                "NEEDS_RETEST nao restaurou options.txt pelo backup gerenciado.");
+
+            var metricsService = new MinecraftScientificMetricsService();
+            var comparisonService = new MinecraftScientificComparisonService();
+            var stableMetrics = metricsService.Build(baselineObservation, baselineBenchmark);
+            var failedMetrics = metricsService.Build(
+                candidateObservation with { Crashed = true, OutOfMemory = true },
+                candidateBenchmark with { CrashEvidence = true, OutOfMemoryEvidence = true, Status = BenchmarkStatus.Failed });
+            var emptyEvidence = new MinecraftInstanceEvidence(
+                DateTimeOffset.UtcNow,
+                new Dictionary<string, string>(),
+                new Dictionary<string, string>(),
+                new Dictionary<string, string>(),
+                []);
+            var criticalComparison = comparisonService.Compare(
+                new MinecraftExperimentMeasurement(
+                    "measure-baseline-test", ScientificMeasurementKind.Baseline, DateTimeOffset.UtcNow,
+                    baselineObservation, baselineBenchmark, stableMetrics, emptyEvidence, string.Empty),
+                new MinecraftExperimentMeasurement(
+                    "measure-candidate-test", ScientificMeasurementKind.Candidate, DateTimeOffset.UtcNow,
+                    candidateObservation with { Crashed = true, OutOfMemory = true }, candidateBenchmark,
+                    failedMetrics, emptyEvidence, string.Empty));
+            Assert(criticalComparison.Decision == ScientificDecision.Revert && criticalComparison.CriticalRegression,
+                "Crash/OOM novo nao gerou decisao REVERT critica.");
+            messages.Add("PASS: motor cientifico bloqueia drift, detecta contaminacao e executa KEEP/REVERT auditaveis.");
 
             var operationalService = new MinecraftOperationalHomologationService();
             var checklist = operationalService.BuildChecklist(audit, quarantinePlan, dryRun);
@@ -323,6 +547,57 @@ internal static class MinecraftSelfTest
         var dependencyJson = JsonSerializer.Serialize(dependencies);
 
         writer.Write($"{{\"schemaVersion\":1,\"id\":\"{id}\",\"name\":\"{id}\",\"version\":\"{version}\",\"environment\":\"*\",\"depends\":{dependencyJson}}}");
+    }
+
+    private static MinecraftBenchmarkResult CreateSyntheticBenchmark(
+        MinecraftEnvironmentSnapshot environment,
+        string instanceRoot,
+        double averageCpu,
+        int peakWorkingSetMb,
+        decimal minimumAvailableGb,
+        long pageFileDeltaMb)
+    {
+        var started = DateTimeOffset.UtcNow;
+        var before = environment with { PageFileInUseMb = 200 };
+        var after = environment with
+        {
+            AvailableMemoryGb = minimumAvailableGb + 0.10m,
+            PageFileInUseMb = 200 + pageFileDeltaMb
+        };
+        var samples = Enumerable.Range(0, 20)
+            .Select(index => new MinecraftBenchmarkSample(
+                started.AddSeconds(index + 1),
+                (peakWorkingSetMb - (index % 3) * 10L) * 1024L * 1024L,
+                (peakWorkingSetMb + 100L) * 1024L * 1024L,
+                minimumAvailableGb + (index % 2) * 0.05m,
+                averageCpu,
+                index * 4L * 1024L * 1024L,
+                index * 1L * 1024L * 1024L))
+            .ToArray();
+        return new MinecraftBenchmarkResult(
+            started,
+            TimeSpan.FromSeconds(20),
+            instanceRoot,
+            before,
+            after,
+            "javaw",
+            4242,
+            BenchmarkStatus.Approved,
+            peakWorkingSetMb * 1024L * 1024L,
+            (peakWorkingSetMb + 100L) * 1024L * 1024L,
+            minimumAvailableGb,
+            FpsMeasured: false,
+            samples,
+            [],
+            new Dictionary<string, string>(),
+            new Dictionary<string, string>(),
+            null,
+            null,
+            null,
+            null,
+            OutOfMemoryEvidence: false,
+            CrashEvidence: false,
+            ["Synthetic self-test benchmark"]);
     }
 
     private static void Assert(bool condition, string message)

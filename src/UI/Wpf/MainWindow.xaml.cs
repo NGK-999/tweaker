@@ -47,6 +47,7 @@ public partial class MainWindow : Window
     private readonly MinecraftSurvivalPlanService minecraftSurvivalPlanService = new();
     private readonly MinecraftInstanceService minecraftInstanceService = new();
     private readonly MinecraftOperationalHomologationService minecraftOperationalHomologationService = new();
+    private readonly MinecraftScientificExperimentService minecraftScientificExperimentService = new();
     private readonly EtwFrameTracker etwFrameTracker;
     private DashboardView? dashboardView;
     private ModulesView? modulesView;
@@ -62,6 +63,7 @@ public partial class MainWindow : Window
     private MinecraftAuditResult? latestMinecraftAuditResult;
     private MinecraftProfilePlan? latestMinecraftProfilePlan;
     private MinecraftBenchmarkResult? latestMinecraftBenchmarkResult;
+    private MinecraftScientificExperiment? latestMinecraftScientificExperiment;
     private bool isTweaking;
     private bool telemetryRunning;
     private bool baselineCaptured;
@@ -174,6 +176,9 @@ public partial class MainWindow : Window
             minecraftView.BenchmarkRequested += RunMinecraftBenchmarkAsync;
             minecraftView.ExportChecklistRequested += ExportMinecraftOperationalChecklistAsync;
             minecraftView.SaveHomologationRequested += SaveMinecraftOperationalHomologationAsync;
+            minecraftView.ScientificPlanRequested += RunMinecraftScientificPlanAsync;
+            minecraftView.ScientificStartRequested += StartMinecraftScientificExperimentAsync;
+            minecraftView.ScientificAdvanceRequested += AdvanceMinecraftScientificExperimentAsync;
             minecraftView.OpenReportsRequested += OpenMinecraftReports;
 
             var defaultModsPath = Path.Combine(
@@ -775,6 +780,7 @@ public partial class MainWindow : Window
             Minecraft.MarkProfileApplied();
             latestMinecraftProfilePlan = plan;
             latestMinecraftBenchmarkResult = null;
+            InvalidateMinecraftScientificState("Experimento invalidado: um perfil foi aplicado fora do motor cientifico.");
             WriteLine($"Relatorio antes/depois: {result.ReportPath}");
             SetStatus($"Minecraft: perfil {profile} aplicado e verificavel por rollback.");
         }
@@ -817,6 +823,7 @@ public partial class MainWindow : Window
             Minecraft.SetOperationText($"Rollback concluido: {result.BackupId}");
             latestMinecraftProfilePlan = null;
             latestMinecraftBenchmarkResult = null;
+            InvalidateMinecraftScientificState("Experimento invalidado: ocorreu rollback externo de perfil.");
             SetStatus("Minecraft: configuracao anterior restaurada.");
         }
         catch (Exception ex)
@@ -906,6 +913,7 @@ public partial class MainWindow : Window
                 $"Quarentena aplicada: {result.MovedFiles.Count} JAR(s). Backup: {result.BackupDirectory}");
             latestMinecraftQuarantinePlan = null;
             latestMinecraftBenchmarkResult = null;
+            InvalidateMinecraftScientificState("Experimento invalidado: o conjunto de mods mudou por quarentena.");
             Minecraft.InvalidateQuarantinePlan();
             SetStatus("Minecraft: quarentena aplicada. Teste o servidor; use rollback se houver incompatibilidade.");
         }
@@ -952,6 +960,7 @@ public partial class MainWindow : Window
                 $"Rollback da quarentena concluido: {result.RestoredFiles.Count} JAR(s) restaurado(s).");
             latestMinecraftQuarantinePlan = null;
             latestMinecraftBenchmarkResult = null;
+            InvalidateMinecraftScientificState("Experimento invalidado: o conjunto de mods mudou por rollback da quarentena.");
             Minecraft.InvalidateQuarantinePlan();
             SetStatus("Minecraft: JARs restaurados e verificados por SHA-256.");
         }
@@ -1128,6 +1137,223 @@ public partial class MainWindow : Window
         finally
         {
             EndTweaking();
+        }
+    }
+
+    private async Task RunMinecraftScientificPlanAsync(string selectedPath, int maximumFps)
+    {
+        const string section = "Diagnostico cientifico Minecraft";
+        if (!TryBeginTweaking(section))
+        {
+            return;
+        }
+
+        try
+        {
+            var result = await Task.Run(() => minecraftScientificExperimentService.Plan(
+                selectedPath,
+                maximumFps));
+            Minecraft.SetScientificPlan(result.Plan, result.Reports.MarkdownPath);
+            WriteLine($"Gargalo principal: {result.Plan.Diagnosis.Primary} ({result.Plan.Diagnosis.Confidence})");
+            WriteLine($"Perfil candidato: {result.Plan.SelectedProfile} | {result.Plan.JavaMemory.Arguments} | {result.Plan.MaximumFps} FPS");
+            WriteLine($"Relatorio cientifico: {result.Reports.MarkdownPath}");
+            SetStatus("Minecraft: diagnostico cientifico concluido em dry-run.");
+        }
+        catch (Exception ex)
+        {
+            Minecraft.SetOperationText($"Diagnostico cientifico falhou: {ex.Message}");
+            WriteLine($"Falha no diagnostico cientifico: {ex.Message}");
+        }
+        finally
+        {
+            EndTweaking();
+        }
+    }
+
+    private async Task StartMinecraftScientificExperimentAsync(string selectedPath, int maximumFps)
+    {
+        const string section = "Novo experimento cientifico Minecraft";
+        if (!TryBeginTweaking(section))
+        {
+            return;
+        }
+
+        try
+        {
+            var result = await Task.Run(() => minecraftScientificExperimentService.StartGuided(
+                selectedPath,
+                maximumFps));
+            latestMinecraftScientificExperiment = result.Experiment;
+            latestMinecraftBenchmarkResult = null;
+            Minecraft.ClearOperationalObservation();
+            Minecraft.SetScientificExperiment(result.Experiment, result.Reports.MarkdownPath);
+            WriteLine($"Experimento: {result.Experiment.ExperimentId}");
+            WriteLine($"Fase: {result.Experiment.Phase}");
+            WriteLine($"Hipotese: {result.Experiment.Hypothesis.Statement}");
+            SetStatus("Minecraft: experimento criado. Execute o baseline e o benchmark antes de avancar.");
+        }
+        catch (Exception ex)
+        {
+            Minecraft.SetOperationText($"Experimento nao iniciado: {ex.Message}");
+            WriteLine($"Falha ao iniciar experimento: {ex.Message}");
+        }
+        finally
+        {
+            EndTweaking();
+        }
+    }
+
+    private async Task AdvanceMinecraftScientificExperimentAsync(
+        string selectedPath,
+        MinecraftOperationalObservation observation)
+    {
+        var experiment = latestMinecraftScientificExperiment;
+        if (experiment is null)
+        {
+            Minecraft.SetOperationText("Inicie um experimento cientifico antes de avancar.");
+            return;
+        }
+
+        if (!minecraftInstanceService.TryResolve(selectedPath, out var selectedInstance) ||
+            !string.Equals(
+                Path.GetFullPath(selectedInstance.GameDirectory),
+                Path.GetFullPath(experiment.InstanceRoot),
+                StringComparison.OrdinalIgnoreCase))
+        {
+            Minecraft.SetOperationText("A instancia selecionada nao corresponde ao experimento ativo.");
+            return;
+        }
+
+        const string section = "Avanco cientifico Minecraft";
+        if (!TryBeginTweaking(section))
+        {
+            return;
+        }
+
+        try
+        {
+            MinecraftScientificOperationResult result;
+            switch (experiment.Phase)
+            {
+                case ScientificExperimentPhase.BaselinePending:
+                    var baselineBenchmark = RequireScientificBenchmark(experiment);
+                    result = await Task.Run(() => minecraftScientificExperimentService.RecordMeasurement(
+                        experiment.ExperimentId,
+                        ScientificMeasurementKind.Baseline,
+                        observation,
+                        baselineBenchmark));
+                    latestMinecraftBenchmarkResult = null;
+                    Minecraft.ClearOperationalObservation();
+                    break;
+
+                case ScientificExperimentPhase.BaselineRecorded:
+                    var plan = experiment.OptimizationPlan;
+                    var changed = plan.ProfilePlan.Changes.Count(change => change.WillWrite);
+                    if (System.Windows.MessageBox.Show(
+                            $"Aplicar o candidato {plan.SelectedProfile}?\n\n" +
+                            $"Alteracoes planejadas: {changed}\n" +
+                            $"JVM: {plan.JavaMemory.Arguments}\n" +
+                            $"FPS: {plan.MaximumFps}\n\n" +
+                            "Mods nao serao movidos. Um backup exato sera criado antes da escrita.",
+                            "Scientific Auto Optimize",
+                            MessageBoxButton.YesNo,
+                            MessageBoxImage.Warning) != MessageBoxResult.Yes)
+                    {
+                        return;
+                    }
+
+                    result = await Task.Run(() => minecraftScientificExperimentService.ApplyCandidate(
+                        experiment.ExperimentId,
+                        userConfirmed: true));
+                    latestMinecraftBenchmarkResult = null;
+                    Minecraft.ClearOperationalObservation();
+                    break;
+
+                case ScientificExperimentPhase.CandidateApplied:
+                    var candidateBenchmark = RequireScientificBenchmark(experiment);
+                    result = await Task.Run(() => minecraftScientificExperimentService.RecordMeasurement(
+                        experiment.ExperimentId,
+                        ScientificMeasurementKind.Candidate,
+                        observation,
+                        candidateBenchmark));
+                    latestMinecraftBenchmarkResult = null;
+                    Minecraft.ClearOperationalObservation();
+                    break;
+
+                case ScientificExperimentPhase.CandidateRecorded:
+                    result = await Task.Run(() => minecraftScientificExperimentService.Compare(experiment.ExperimentId));
+                    break;
+
+                case ScientificExperimentPhase.Compared:
+                    var comparison = experiment.Comparison
+                        ?? throw new InvalidOperationException("Comparacao ausente no experimento.");
+                    var prompt = comparison.Decision == ScientificDecision.Revert
+                        ? "A medicao recomenda REVERT. Restaurar agora o backup exato deste experimento?"
+                        : comparison.Decision == ScientificDecision.Keep
+                            ? "A medicao recomenda KEEP. Manter o candidato aplicado e finalizar?"
+                            : $"A decisao {comparison.Decision} e inconclusiva. Restaurar o backup gerenciado e finalizar como NEEDS_RETEST?";
+                    if (System.Windows.MessageBox.Show(
+                            prompt,
+                            "Finalizar experimento cientifico",
+                            MessageBoxButton.YesNo,
+                            comparison.Decision == ScientificDecision.Keep
+                                ? MessageBoxImage.Question
+                                : MessageBoxImage.Warning) != MessageBoxResult.Yes)
+                    {
+                        return;
+                    }
+
+                    result = await Task.Run(() => minecraftScientificExperimentService.Finalize(
+                        experiment.ExperimentId,
+                        rollbackConfirmed: true));
+                    break;
+
+                default:
+                    throw new InvalidOperationException($"A fase {experiment.Phase} nao aceita avanco automatico.");
+            }
+
+            latestMinecraftScientificExperiment = result.Experiment;
+            Minecraft.SetScientificExperiment(result.Experiment, result.Reports.MarkdownPath);
+            WriteLines(result.Messages);
+            WriteLine($"Experimento {result.Experiment.ExperimentId}: {result.Experiment.Phase}");
+            SetStatus($"Minecraft scientific engine: {result.Experiment.Phase}.");
+        }
+        catch (Exception ex)
+        {
+            Minecraft.SetOperationText($"Etapa cientifica nao concluida: {ex.Message}");
+            WriteLine($"Falha na etapa cientifica: {ex.Message}");
+        }
+        finally
+        {
+            EndTweaking();
+        }
+    }
+
+    private MinecraftBenchmarkResult RequireScientificBenchmark(MinecraftScientificExperiment experiment)
+    {
+        var benchmark = latestMinecraftBenchmarkResult;
+        if (benchmark is null ||
+            benchmark.Status == BenchmarkStatus.NotTested ||
+            benchmark.Samples.Count < 3 ||
+            benchmark.InstanceRoot is null ||
+            !string.Equals(
+                Path.GetFullPath(benchmark.InstanceRoot),
+                Path.GetFullPath(experiment.InstanceRoot),
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                "Execute Benchmark 60 s com o jogo aberto nesta instancia antes de registrar a rodada.");
+        }
+
+        return benchmark;
+    }
+
+    private void InvalidateMinecraftScientificState(string reason)
+    {
+        latestMinecraftScientificExperiment = null;
+        if (minecraftView is not null)
+        {
+            minecraftView.InvalidateScientificExperiment(reason);
         }
     }
 

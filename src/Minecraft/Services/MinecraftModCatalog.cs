@@ -122,6 +122,15 @@ internal static class MinecraftModCatalog
         "entity_texture_features"
     };
 
+    public static readonly HashSet<string> CosmeticIds = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "continuity",
+        "entity_model_features",
+        "entity_texture_features",
+        "iris",
+        "distanthorizons"
+    };
+
     public static IReadOnlyList<ModRecommendation> BuildRecommendations(
         IReadOnlyCollection<MinecraftModDescriptor> mods)
     {

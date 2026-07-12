@@ -4,11 +4,11 @@ Utilitario Windows em .NET 10 + WPF para diagnostico de hardware, telemetria,
 otimizacoes reversiveis e preparacao segura de Minecraft/Cobblemon em hardware
 limitado.
 
-Versao: **2.3.0** | Autor: **Igor Silva**
+Versao: **3.0.0** | Autor: **Igor Silva**
 
-## Cobblemon Low-End Lab
+## Minecraft Scientific Optimization Engine
 
-A aba **Cobblemon** adiciona um fluxo separado das mutacoes de Windows:
+A aba **Cobblemon** adiciona um motor experimental separado das mutacoes de Windows:
 
 - le `fabric.mod.json`, metadados Forge/NeoForge e JARs aninhados;
 - identifica loader, versao, ambiente, dependencias, `provides` e `breaks`;
@@ -25,9 +25,18 @@ A aba **Cobblemon** adiciona um fluxo separado das mutacoes de Windows:
 - gera checklist e resultado de homologacao sem inventar FPS ou entrada no servidor;
 - exige confirmacao adicional do manifesto para quarentenar mod possivelmente server-side;
 - nunca exclui mods e nunca preseleciona candidatos de quarentena.
+- diagnostica gargalos de RAM, CPU, GPU, disco, heap, pagefile, configs e mods;
+- cria experimentos persistentes com hipotese, baseline, candidato e hashes;
+- compara metricas com limiares declarados e decide `KEEP`, `REVERT` ou `RETEST`;
+- restaura pelo backup exato do experimento quando existe regressao;
+- distingue fato medido, inferencia e recomendacao manual;
+- oferece perfis `GPU_LIMITED`, `RAM_LIMITED`, `CPU_LIMITED` e
+  `SERVER_ENTRY_COMPATIBLE` alem dos perfis anteriores.
 
 Documentacao completa: [docs/COBBLEMON_LOW_END.md](docs/COBBLEMON_LOW_END.md).
 Fluxo para o PC real: [docs/HOMOLOGACAO_OPERACIONAL_COBBLEMON.md](docs/HOMOLOGACAO_OPERACIONAL_COBBLEMON.md).
+Motor cientifico e CLI: [docs/SCIENTIFIC_ENGINE.md](docs/SCIENTIFIC_ENGINE.md).
+Arquitetura da v3: [docs/ARCHITECTURE_V3.md](docs/ARCHITECTURE_V3.md).
 
 ## Interface
 
@@ -36,7 +45,7 @@ Fluxo para o PC real: [docs/HOMOLOGACAO_OPERACIONAL_COBBLEMON.md](docs/HOMOLOGAC
 | **Dashboard** | Auto-Tuning, restore point e resumo de hardware |
 | **Modulos** | Tweaks individuais de energia, CPU, GPU e rede |
 | **Telemetria** | Teste A/B, frametime, metricas e console |
-| **Cobblemon** | Dry-run, perfil real, quarentena, benchmark e rollback Minecraft |
+| **Cobblemon** | Diagnostico, experimento A/B, perfis, quarentena, benchmark e rollback Minecraft |
 | **Utilidades** | Rollback mestre, desinstalacao e suporte |
 
 ## Linha de comando
@@ -59,12 +68,26 @@ dotnet run --project ApexTweaker.csproj -- --minecraft-self-test
 Use `--minecraft-help` para listar os demais comandos. Operacoes de escrita por
 CLI exigem `--yes` e uma instancia valida com `options.txt` e subpasta `mods`.
 
+Inicio de um experimento cientifico:
+
+```powershell
+dotnet ApexTweaker.dll --minecraft-scientific-start `
+  --instance "C:\PrismLauncher\instances\Cobblemon Low-End\.minecraft" `
+  --fps 30
+```
+
+O baseline precisa ser registrado antes de qualquer escrita. O fluxo completo,
+incluindo os comandos de medicao e finalizacao, esta em
+[docs/SCIENTIFIC_ENGINE.md](docs/SCIENTIFIC_ENGINE.md).
+
 ## Distribuicao
 
 Artefatos oficiais:
 
 - [ApexTweaker.exe](https://github.com/NGK-999/tweaker/releases/latest/download/ApexTweaker.exe)
+- [ApexTweaker.Native.dll](https://github.com/NGK-999/tweaker/releases/latest/download/ApexTweaker.Native.dll)
 - [ApexTweaker-Setup.exe](https://github.com/NGK-999/tweaker/releases/latest/download/ApexTweaker-Setup.exe)
+- [ApexTweaker-Portable-v3.0.0.zip](https://github.com/NGK-999/tweaker/releases/download/v3.0.0/ApexTweaker-Portable-v3.0.0.zip)
 
 O executavel publicado e self-contained, pede Administrador pelo manifesto e
 nao exige .NET instalado.
@@ -85,6 +108,7 @@ Requisito: Visual Studio Build Tools com suporte a C++ para compilar
 - Backups de perfis Minecraft: `C:\ProgramData\ApexTweaker\MinecraftBackups`
 - Backups de quarentena: `C:\ProgramData\ApexTweaker\MinecraftQuarantineBackups`
 - Relatorios Minecraft: `C:\ProgramData\ApexTweaker\MinecraftReports`
+- Experimentos cientificos: `C:\ProgramData\ApexTweaker\MinecraftExperiments`
 - Logs: `C:\ProgramData\ApexTweaker\Logs\latest_runtime.log`
 - O perfil altera `options.txt` e apenas chaves existentes validadas de Sodium,
   ImmediatelyFast e EntityCulling, alem de desativar Iris por chave reconhecida.

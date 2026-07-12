@@ -2,7 +2,7 @@
 
 ApexTweaker e um utilitario Windows (.NET 10) focado em performance, telemetria de frametime, backup e rollback reversivel. A shell ativa e **WPF**; codigo WinForms legado ainda compila no mesmo assembly, mas nao e iniciado por `Program.cs`.
 
-Versao atual: **2.3.0**.
+Versao atual: **3.0.0**.
 
 ## Pastas principais
 
@@ -20,7 +20,8 @@ Shell WPF ativa (unica UI do app):
 - `Views/DashboardView` — Auto-Tuning e restore point.
 - `Views/ModulesView` — modulos individuais de otimizacao.
 - `Views/TelemetryView` — teste A/B, grafico, metricas e console.
-- `Views/MinecraftView` - auditoria Cobblemon, perfis, benchmark e rollback.
+- `Views/MinecraftView` - diagnostico cientifico, experimentos, auditoria,
+  perfis, benchmark e rollback.
 - `Views/UtilitiesView` — revert, desinstalar, sobre, suporte Riot.
 - `Windows/StartupDisclaimerWindow` — aviso legal inicial.
 - `Windows/LoadingWindow` — warmup de hardware durante o boot da UI.
@@ -60,6 +61,8 @@ Comandos estruturados em `ExtremeMutationCommands.cs` e `MemoryCompressionTweakC
 Modulo isolado para Minecraft/Cobblemon:
 
 - `Models/MinecraftAuditModels.cs` - contratos de auditoria, perfil, quarentena, benchmark e homologacao.
+- `Models/MinecraftScientificModels.cs` - contratos de evidencia, gargalo,
+  hipotese, medicao, comparacao, decisao e experimento persistente.
 - `Services/ModJarScanner.cs` - metadados Fabric/Forge/NeoForge e JARs aninhados.
 - `Services/MinecraftAuditService.cs` - classificacao, dependencias e conflitos.
 - `Services/MinecraftEnvironmentService.cs` - hardware, Java, pagefile e launchers.
@@ -70,6 +73,24 @@ Modulo isolado para Minecraft/Cobblemon:
 - `Services/MinecraftBenchmarkService.cs` - ambiente, processo, configs, logs e crashes.
 - `Services/MinecraftOperationalHomologationService.cs` - checklist e avaliacao da rodada real.
 - `Services/MinecraftReportService.cs` - JSON, Markdown e TXT.
+- `Services/MinecraftInstanceEvidenceService.cs` - hashes de configs/mods,
+  opcoes vanilla e resource packs ativos.
+- `Services/MinecraftBottleneckDiagnosticService.cs` - regras de diagnostico
+  rastreaveis e nivel de confianca.
+- `Services/MinecraftModConfigContractCatalog.cs` - contratos de configuracao
+  suportados, manuais ou sem necessidade de escrita.
+- `Services/MinecraftScientificMetricsService.cs` - consolida telemetria,
+  observacao guiada, logs e resultados detalhados.
+- `Services/MinecraftScientificComparisonService.cs` - limiares, pesos,
+  regressao critica e decisao `KEEP`/`REVERT`/`RETEST`.
+- `Services/MinecraftScientificAutoOptimizeService.cs` - plano conservador por
+  gargalo; nunca movimenta mods automaticamente.
+- `Services/MinecraftScientificExperimentStore.cs` - armazenamento JSON atomico
+  e validacao de identificadores.
+- `Services/MinecraftScientificExperimentService.cs` - maquina de estados do
+  baseline ate a finalizacao e rollback pelo backup exato.
+- `Services/MinecraftScientificReportService.cs` - relatorios cientificos JSON,
+  Markdown e TXT.
 - `MinecraftCommandLine.cs` - automacao headless.
 - `MinecraftSelfTest.cs` - teste integrado sem pacotes externos.
 
@@ -137,6 +158,7 @@ Orquestrado por `MutationExecutor` com ledger em `BackupService`. Nenhuma mutaca
 | `C:\ProgramData\ApexTweaker\MinecraftBackups` | Backups de perfis de instancia Minecraft |
 | `C:\ProgramData\ApexTweaker\MinecraftQuarantineBackups` | Backups e manifestos de JARs em quarentena |
 | `C:\ProgramData\ApexTweaker\MinecraftReports` | Auditorias e benchmarks Minecraft |
+| `C:\ProgramData\ApexTweaker\MinecraftExperiments` | Estado e relatorios dos experimentos cientificos |
 | `C:\ProgramData\ApexTweaker\Logs\latest_runtime.log` | Log da sessao em execucao |
 
 ## Pastas geradas pelo .NET

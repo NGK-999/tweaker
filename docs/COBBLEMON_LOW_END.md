@@ -1,4 +1,4 @@
-# Cobblemon Low-End Lab v2.3.0
+# Cobblemon Low-End Lab v3.0.0
 
 ## Objetivo
 
@@ -22,6 +22,9 @@ Nesse hardware, o objetivo e abrir o jogo e obter estabilidade minima em
 8. `Manual recommendations`: gera o Plano de Sobrevivencia 4 GB.
 9. `Operational checklist`: prepara a rodada real sem declarar sucesso antecipado.
 10. `Operational result`: combina observacao manual com processo, logs e crashes.
+11. `Scientific plan`: diagnostica o gargalo e gera um candidato em dry-run.
+12. `Scientific experiment`: exige baseline, aplica uma unica hipotese,
+    registra candidato, compara e mantem ou reverte.
 
 ## Instancias reconhecidas
 
@@ -64,6 +67,11 @@ debug do ImmediatelyFast nao sao ativadas.
 
 Configs de Sodium Extra, More Culling, Dynamic FPS, ModernFix e Noisium sao
 detectadas, mas permanecem sem escrita automatica nesta versao.
+
+Lithium, FerriteCore, Noisium e Reese's Sodium Options nao recebem chaves
+inventadas: quando o mod usa defaults seguros ou nao exige config para seu ganho
+principal, o motor apenas registra o contrato. Consulte
+[SCIENTIFIC_ENGINE.md](SCIENTIFIC_ENGINE.md) para a matriz completa.
 
 ## Memoria Java
 
@@ -129,6 +137,7 @@ C:\Users\igor.silva\Downloads\mods\mods
 Resultado em 2026-07-12:
 
 - 88 JARs Fabric;
+- agregado SHA-256 do conjunto: `debf68ca0762e31af47c834648c361adbfc2f307763014749865484da895f935`;
 - zero dependencias obrigatorias ausentes;
 - um ID duplicado (`mega_showdown`);
 - Sodium 0.6.13 fornece `indium`, mas existe Indium separado;
@@ -190,7 +199,29 @@ FPS nunca e inventado. Use F3, Spark, PresentMon ou ferramenta equivalente.
 9. Teste a entrada no servidor.
 10. Use o rollback correspondente se houver falha.
 
+Para o fluxo cientifico, use o cartao verde no topo da aba:
+
+1. `Diagnosticar`: gera somente o plano e nao escreve arquivos.
+2. `Novo experimento`: congela hipotese, hashes e perfil candidato.
+3. Com o jogo na cena de teste, execute `Benchmark 60 s`.
+4. Preencha a observacao guiada e avance para registrar o baseline.
+5. Avance novamente, revise o dialogo e confirme a aplicacao com backup.
+6. Repita exatamente a mesma cena e o benchmark.
+7. Registre o candidato, compare e finalize.
+8. Somente `KEEP` permanece aplicado. `REVERT`, `RETEST` e
+   `INSUFFICIENT_DATA` restauram o backup gerenciado depois de nova confirmacao.
+
 ## CLI
+
+Plano cientifico somente leitura:
+
+```powershell
+dotnet ApexTweaker.dll --minecraft-scientific-plan `
+  --instance "C:\caminho\da\instancia" --fps 30
+```
+
+Experimentos completos estao documentados em
+[SCIENTIFIC_ENGINE.md](SCIENTIFIC_ENGINE.md).
 
 Auditoria:
 

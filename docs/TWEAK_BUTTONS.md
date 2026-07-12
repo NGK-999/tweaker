@@ -2,7 +2,7 @@
 
 O objetivo do app e otimizar o Windows para jogos, principalmente VALORANT, mantendo alteracoes rastreaveis e reversiveis.
 
-Versao: **2.3.0** · Shell ativa: **WPF** (`MainWindow`).
+Versao: **3.0.0** · Shell ativa: **WPF** (`MainWindow`).
 
 ## Mapa da interface WPF
 

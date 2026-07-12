@@ -154,6 +154,10 @@ internal sealed class MinecraftAuditService
         }
 
         ClassifyMods(mods, conflictedPaths);
+        ApplyClassificationTags(
+            mods,
+            duplicateGroups.Select(group => group[0].Id).ToHashSet(StringComparer.OrdinalIgnoreCase),
+            conflictedPaths);
         AddExtremeProfileAdvisories(mods, issues, manualActions);
 
         var recommendations = MinecraftModCatalog.BuildRecommendations(mods);
@@ -278,6 +282,62 @@ internal sealed class MinecraftAuditService
                 mod.Classification = ModClassification.ServerRequiredPossivel;
                 mod.ClassificationReason = "Mod de conteudo ou gameplay comum aos dois lados; nao remover sem manifesto do servidor.";
             }
+        }
+    }
+
+    private static void ApplyClassificationTags(
+        IEnumerable<MinecraftModDescriptor> mods,
+        IReadOnlySet<string> duplicateIds,
+        IReadOnlySet<string> conflictedPaths)
+    {
+        foreach (var mod in mods)
+        {
+            var tags = new HashSet<ModClassification> { mod.Classification };
+            if (duplicateIds.Contains(mod.Id))
+            {
+                tags.Add(ModClassification.Duplicado);
+            }
+
+            if (conflictedPaths.Contains(mod.FullPath))
+            {
+                tags.Add(ModClassification.IncompativelPossivel);
+            }
+
+            if (string.Equals(mod.Environment, "client", StringComparison.OrdinalIgnoreCase))
+            {
+                tags.Add(ModClassification.ClientOnly);
+            }
+            else if (string.Equals(mod.Environment, "server", StringComparison.OrdinalIgnoreCase))
+            {
+                tags.Add(ModClassification.ServerSide);
+            }
+            else
+            {
+                tags.Add(ModClassification.ServerRequiredPossivel);
+            }
+
+            if (MinecraftModCatalog.PerformanceIds.Contains(mod.Id))
+            {
+                tags.Add(ModClassification.Performance);
+            }
+
+            if (MinecraftModCatalog.LibraryIds.Contains(mod.Id))
+            {
+                tags.Add(ModClassification.Dependencia);
+            }
+
+            if (MinecraftModCatalog.ExtremeRemovalCandidates.Contains(mod.Id))
+            {
+                tags.Add(ModClassification.PesadoVisual);
+                tags.Add(ModClassification.RemovivelProvavel);
+            }
+
+            if (MinecraftModCatalog.CosmeticIds.Contains(mod.Id))
+            {
+                tags.Add(ModClassification.Cosmetico);
+            }
+
+            mod.ClassificationTags = tags.OrderBy(tag => tag).ToList();
         }
     }
 

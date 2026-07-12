@@ -8,10 +8,11 @@ Pasta: `release-v2/`
 |---------|-----------|
 | `ApexTweaker.exe` | Executavel principal, self-contained, single-file |
 | `ApexTweaker.Native.dll` | DLL nativa C++ (topologia/afinidade de CPU) |
+| `ApexTweaker-Portable-v3.0.0.zip` | Pacote portatil com os dois arquivos acima |
 
 O cliente nao precisa instalar .NET. Target: **Windows 10/11 64-bit**.
 
-Versao atual: **2.3.0**.
+Versao atual: **3.0.0**.
 
 ## Como gerar o portatil
 
@@ -62,9 +63,11 @@ Start-Process "release-v2\ApexTweaker.exe" -Verb RunAs
 1. Fechar todas as instancias do ApexTweaker.
 2. `scripts\Build-Release.ps1` (ou `dotnet publish ... -o release-v2`)
 3. Confirmar data/tamanho de `ApexTweaker.exe`.
-4. Testar navegacao, Auto-Tuning, telemetria e fechamento.
-5. Rebuild do instalador, se necessario.
-6. Criar release no GitHub com os artefatos.
+4. Executar `--minecraft-self-test` no EXE publicado.
+5. Conferir versoes, SHA-256 e conteudo do ZIP.
+6. Testar navegacao, Auto-Tuning, telemetria e fechamento.
+7. Rebuild do instalador.
+8. Criar release no GitHub com os quatro artefatos.
 
 ## Observacoes
 

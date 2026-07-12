@@ -35,6 +35,18 @@ internal sealed partial class MinecraftProfileService
             [MinecraftProfileKind.Extreme4Gb] = CreateProfile(
                 MinecraftProfileKind.Extreme4Gb, "EXTREME_4GB", 4, 4, "0.50", 2, 0, 0, 45, false, 2560,
                 "Prioriza inicializacao, RAM e estabilidade em 720p."),
+            [MinecraftProfileKind.GpuLimited] = CreateProfile(
+                MinecraftProfileKind.GpuLimited, "GPU_LIMITED", 4, 4, "0.45", 2, 0, 0, 30, false, 2560,
+                "Reduz pixels, efeitos, distancia e carga de entidades para GPU integrada."),
+            [MinecraftProfileKind.RamLimited] = CreateProfile(
+                MinecraftProfileKind.RamLimited, "RAM_LIMITED", 4, 4, "0.45", 2, 0, 0, 30, false, 2048,
+                "Reserva memoria para Windows e pagefile; usa heap conservador de 2048 MB."),
+            [MinecraftProfileKind.CpuLimited] = CreateProfile(
+                MinecraftProfileKind.CpuLimited, "CPU_LIMITED", 5, 4, "0.50", 2, 0, 0, 30, false, 2304,
+                "Limita simulacao, entidades e FPS para estabilizar o tempo de frame da CPU."),
+            [MinecraftProfileKind.ServerEntryCompatible] = CreateProfile(
+                MinecraftProfileKind.ServerEntryCompatible, "SERVER_ENTRY_COMPATIBLE", 5, 4, "0.60", 2, 0, 0, 45, false, 2304,
+                "Mantem todos os mods e aplica somente configuracoes client-side reversiveis."),
             [MinecraftProfileKind.CobblemonServerClient] = CreateProfile(
                 MinecraftProfileKind.CobblemonServerClient, "COBBLEMON_SERVER_CLIENT", 5, 4, "0.60", 2, 0, 1, 60, false, 2560,
                 "Cliente leve sem alterar mods possivelmente exigidos pelo servidor."),
@@ -207,8 +219,50 @@ internal sealed partial class MinecraftProfileService
 
         var manifestPath = FindLatestPendingManifest(selectedPath)
             ?? throw new InvalidOperationException("Nenhum backup Minecraft pendente foi encontrado para esta instancia.");
+        return RollbackManifest(selectedPath, manifestPath, expectedBackupId: null);
+    }
+
+    public MinecraftRollbackResult RollbackBackup(string selectedPath, string backupId)
+    {
+        if (string.IsNullOrWhiteSpace(backupId) ||
+            backupId.Any(character => !char.IsAsciiLetterOrDigit(character) && character != '-'))
+        {
+            throw new ArgumentException("Identificador de backup invalido.", nameof(backupId));
+        }
+
+        var root = Path.GetFullPath(backupRoot);
+        var backupDirectory = Path.GetFullPath(Path.Combine(root, backupId));
+        if (!string.Equals(Path.GetDirectoryName(backupDirectory), root, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidDataException("O backup solicitado esta fora da raiz gerenciada.");
+        }
+
+        var manifestPath = Path.Combine(backupDirectory, ManifestFileName);
+        if (!File.Exists(manifestPath))
+        {
+            throw new FileNotFoundException("Manifesto do backup solicitado nao foi encontrado.", manifestPath);
+        }
+
+        return RollbackManifest(selectedPath, manifestPath, backupId);
+    }
+
+    private static MinecraftRollbackResult RollbackManifest(
+        string selectedPath,
+        string manifestPath,
+        string? expectedBackupId)
+    {
         var manifest = JsonSerializer.Deserialize<MinecraftBackupManifest>(File.ReadAllText(manifestPath), JsonOptions)
             ?? throw new InvalidDataException("Manifesto de backup invalido.");
+        if (manifest.RolledBackAtUtc is not null)
+        {
+            throw new InvalidOperationException("Este backup ja foi restaurado.");
+        }
+
+        if (expectedBackupId is not null &&
+            !string.Equals(manifest.BackupId, expectedBackupId, StringComparison.Ordinal))
+        {
+            throw new InvalidDataException("O ID interno do manifesto nao corresponde ao backup solicitado.");
+        }
 
         var manifestGameDirectory = string.IsNullOrWhiteSpace(manifest.GameDirectory)
             ? manifest.InstanceRoot

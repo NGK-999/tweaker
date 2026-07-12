@@ -17,6 +17,7 @@ public partial class MinecraftView : WpfUserControl
     private bool instanceDetected;
     private bool profilePreviewReady;
     private bool quarantinePlanReady;
+    private ScientificExperimentPhase? scientificPhase;
 
     public event Action? BrowseRequested;
 
@@ -37,6 +38,12 @@ public partial class MinecraftView : WpfUserControl
     internal event Func<string, int, Task>? ExportChecklistRequested;
 
     internal event Func<string, MinecraftOperationalObservation, Task>? SaveHomologationRequested;
+
+    internal event Func<string, int, Task>? ScientificPlanRequested;
+
+    internal event Func<string, int, Task>? ScientificStartRequested;
+
+    internal event Func<string, MinecraftOperationalObservation, Task>? ScientificAdvanceRequested;
 
     public event Action? OpenReportsRequested;
 
@@ -72,6 +79,7 @@ public partial class MinecraftView : WpfUserControl
         auditAvailable = false;
         profilePreviewReady = false;
         quarantinePlanReady = false;
+        scientificPhase = null;
         QuarantineList.ItemsSource = null;
         InstanceStateText.Text = instanceDetected
             ? "Instancia valida detectada. Perfis e rollback estao disponiveis."
@@ -177,6 +185,60 @@ public partial class MinecraftView : WpfUserControl
         OperationalStatusText.Text = $"Checklist exportado: {reportPath}";
     }
 
+    internal void SetScientificPlan(MinecraftScientificOptimizationPlan plan, string reportPath)
+    {
+        ScientificStatusText.Text =
+            $"Gargalo {plan.Diagnosis.Primary} ({plan.Diagnosis.Confidence}). " +
+            $"Candidato {plan.SelectedProfile}, {plan.JavaMemory.Arguments}, {plan.MaximumFps} FPS. " +
+            $"Bloqueadores: {(plan.HasCriticalBlockers ? "SIM" : "NAO")}. Relatorio: {reportPath}";
+    }
+
+    internal void SetScientificExperiment(MinecraftScientificExperiment experiment, string reportPath)
+    {
+        scientificPhase = experiment.Phase;
+        ScientificStatusText.Text =
+            $"{experiment.ExperimentId} | fase {experiment.Phase} | " +
+            $"decisao {experiment.Comparison?.Decision.ToString() ?? "PENDENTE"}. Relatorio: {reportPath}";
+        ScientificAdvanceButton.Content = experiment.Phase switch
+        {
+            ScientificExperimentPhase.BaselinePending => "Registrar baseline",
+            ScientificExperimentPhase.BaselineRecorded => "Aplicar candidato",
+            ScientificExperimentPhase.CandidateApplied => "Registrar candidato",
+            ScientificExperimentPhase.CandidateRecorded => "Comparar rodadas",
+            ScientificExperimentPhase.Compared => "Finalizar decisao",
+            ScientificExperimentPhase.NeedsRetest => "Novo teste necessario",
+            ScientificExperimentPhase.Kept => "Candidato mantido",
+            ScientificExperimentPhase.Reverted => "Rollback concluido",
+            _ => "Experimento falhou"
+        };
+        UpdateActionState();
+    }
+
+    public void ClearOperationalObservation()
+    {
+        GameOpenedCheckBox.IsChecked = false;
+        MenuReachedCheckBox.IsChecked = false;
+        WorldEnteredCheckBox.IsChecked = false;
+        ServerEnteredCheckBox.IsChecked = false;
+        Playable720pCheckBox.IsChecked = false;
+        SevereDropsCheckBox.IsChecked = false;
+        CrashedCheckBox.IsChecked = false;
+        OutOfMemoryCheckBox.IsChecked = false;
+        MenuSecondsTextBox.Clear();
+        JoinSecondsTextBox.Clear();
+        AverageFpsTextBox.Clear();
+        MinimumFpsTextBox.Clear();
+        OperationalNotesTextBox.Clear();
+    }
+
+    public void InvalidateScientificExperiment(string reason)
+    {
+        scientificPhase = null;
+        ScientificAdvanceButton.Content = "Avancar etapa";
+        ScientificStatusText.Text = reason;
+        UpdateActionState();
+    }
+
     private void UpdateActionState()
     {
         BrowseButton.IsEnabled = !busy;
@@ -191,6 +253,14 @@ public partial class MinecraftView : WpfUserControl
         ApplyQuarantineButton.IsEnabled = !busy && quarantinePlanReady && QuarantineList.SelectedItems.Count > 0;
         RollbackQuarantineButton.IsEnabled = !busy && DirectoryPathAvailable();
         BenchmarkButton.IsEnabled = !busy;
+        ScientificPlanButton.IsEnabled = !busy && instanceDetected;
+        ScientificStartButton.IsEnabled = !busy && instanceDetected;
+        ScientificAdvanceButton.IsEnabled = !busy && scientificPhase is
+            ScientificExperimentPhase.BaselinePending or
+            ScientificExperimentPhase.BaselineRecorded or
+            ScientificExperimentPhase.CandidateApplied or
+            ScientificExperimentPhase.CandidateRecorded or
+            ScientificExperimentPhase.Compared;
         ExportChecklistButton.IsEnabled = !busy && auditAvailable;
         SaveHomologationButton.IsEnabled = !busy && instanceDetected;
         OpenReportsButton.IsEnabled = !busy;
@@ -212,6 +282,7 @@ public partial class MinecraftView : WpfUserControl
         auditAvailable = false;
         profilePreviewReady = false;
         quarantinePlanReady = false;
+        scientificPhase = null;
         if (QuarantineList is not null)
         {
             QuarantineList.ItemsSource = null;
@@ -308,6 +379,39 @@ public partial class MinecraftView : WpfUserControl
         await SaveHomologationRequested.Invoke(SelectedPath, observation);
     }
 
+    private async void ScientificPlanButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (ScientificPlanRequested is not null)
+        {
+            await ScientificPlanRequested.Invoke(SelectedPath, SelectedFps);
+        }
+    }
+
+    private async void ScientificStartButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (ScientificStartRequested is not null)
+        {
+            await ScientificStartRequested.Invoke(SelectedPath, SelectedFps);
+        }
+    }
+
+    private async void ScientificAdvanceButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (ScientificAdvanceRequested is null || scientificPhase is null)
+        {
+            return;
+        }
+
+        var observation = EmptyObservation();
+        if (scientificPhase is ScientificExperimentPhase.BaselinePending or ScientificExperimentPhase.CandidateApplied &&
+            !TryReadOperationalObservation(out observation))
+        {
+            return;
+        }
+
+        await ScientificAdvanceRequested.Invoke(SelectedPath, observation);
+    }
+
     private int SelectedFps => FpsComboBox.SelectedItem is int fps ? fps : 45;
 
     private bool TryReadOperationalObservation(out MinecraftOperationalObservation observation)
@@ -385,6 +489,12 @@ public partial class MinecraftView : WpfUserControl
             "Homologacao operacional",
             MessageBoxButton.OK,
             MessageBoxImage.Information);
+    }
+
+    private static MinecraftOperationalObservation EmptyObservation()
+    {
+        return new MinecraftOperationalObservation(
+            false, false, null, false, false, null, false, null, null, false, false, false, string.Empty);
     }
 
     private bool DirectoryPathAvailable()

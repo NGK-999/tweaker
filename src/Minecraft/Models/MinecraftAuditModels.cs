@@ -18,7 +18,11 @@ internal enum ModClassification
     Performance,
     Dependencia,
     ClientOnly,
+    ServerSide,
     ServerRequiredPossivel,
+    Cosmetico,
+    PesadoVisual,
+    Duplicado,
     RemovivelProvavel,
     IncompativelPossivel,
     Desconhecido
@@ -47,6 +51,10 @@ internal enum MinecraftProfileKind
     Safe,
     LowEnd,
     Extreme4Gb,
+    GpuLimited,
+    RamLimited,
+    CpuLimited,
+    ServerEntryCompatible,
     CobblemonServerClient,
     Benchmark
 }
@@ -144,6 +152,8 @@ internal sealed class MinecraftModDescriptor
     public List<string> Warnings { get; init; } = [];
 
     public ModClassification Classification { get; set; } = ModClassification.Desconhecido;
+
+    public List<ModClassification> ClassificationTags { get; set; } = [];
 
     public string ClassificationReason { get; set; } = string.Empty;
 
@@ -295,7 +305,9 @@ internal sealed record MinecraftBenchmarkSample(
     long WorkingSetBytes,
     long PrivateMemoryBytes,
     decimal AvailableMemoryGb,
-    double CpuPercent);
+    double CpuPercent,
+    long DiskReadBytes,
+    long DiskWriteBytes);
 
 internal sealed record MinecraftBenchmarkResult(
     DateTimeOffset StartedAtUtc,

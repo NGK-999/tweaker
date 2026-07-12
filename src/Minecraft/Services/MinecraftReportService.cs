@@ -61,6 +61,7 @@ internal sealed class MinecraftReportService
             .AppendLine($"- Duracao: `{result.Duration.TotalSeconds:0.0} s`")
             .AppendLine($"- Pico RAM Java: `{FormatBytes(result.PeakWorkingSetBytes)}`")
             .AppendLine($"- Menor RAM livre: `{result.MinimumAvailableMemoryGb:0.00} GB`")
+            .AppendLine($"- Disco Java leitura/escrita: `{FormatBytes(result.Samples.Count == 0 ? 0 : result.Samples.Max(sample => sample.DiskReadBytes))}` / `{FormatBytes(result.Samples.Count == 0 ? 0 : result.Samples.Max(sample => sample.DiskWriteBytes))}`")
             .AppendLine($"- Mods ativos: `{result.ActiveMods.Count}`")
             .AppendLine($"- FPS automatico: `{(result.FpsMeasured ? "SIM" : "NAO")}`")
             .AppendLine($"- Evidencia OOM: `{(result.OutOfMemoryEvidence ? "SIM" : "NAO")}`")
@@ -84,6 +85,8 @@ internal sealed class MinecraftReportService
             $"PROCESS={result.ProcessName ?? "NAO DETECTADO"}\r\n" +
             $"PEAK_WORKING_SET={result.PeakWorkingSetBytes}\r\n" +
             $"MIN_AVAILABLE_GB={result.MinimumAvailableMemoryGb:0.00}\r\n" +
+            $"DISK_READ_BYTES={(result.Samples.Count == 0 ? 0 : result.Samples.Max(sample => sample.DiskReadBytes))}\r\n" +
+            $"DISK_WRITE_BYTES={(result.Samples.Count == 0 ? 0 : result.Samples.Max(sample => sample.DiskWriteBytes))}\r\n" +
             $"FPS_MEASURED={result.FpsMeasured}\r\n" +
             $"OOM={result.OutOfMemoryEvidence}\r\n" +
             $"CRASH={result.CrashEvidence}\r\n",
@@ -410,12 +413,13 @@ internal sealed class MinecraftReportService
         builder.AppendLine();
         builder.AppendLine("## Classificacao dos mods");
         builder.AppendLine();
-        builder.AppendLine("| Arquivo | ID | Versao | Loader | Classificacao | Motivo |");
-        builder.AppendLine("|---|---|---|---|---|---|");
+        builder.AppendLine("| Arquivo | ID | Versao | Loader | Classificacao principal | Tags | Motivo |");
+        builder.AppendLine("|---|---|---|---|---|---|---|");
         foreach (var mod in result.Mods)
         {
             builder.AppendLine(
-                $"| {EscapeTable(mod.FileName)} | {EscapeTable(mod.Id)} | {EscapeTable(mod.Version)} | {mod.Loader} | {mod.Classification} | {EscapeTable(mod.ClassificationReason)} |");
+                $"| {EscapeTable(mod.FileName)} | {EscapeTable(mod.Id)} | {EscapeTable(mod.Version)} | {mod.Loader} | {mod.Classification} | " +
+                $"{EscapeTable(string.Join(", ", mod.ClassificationTags))} | {EscapeTable(mod.ClassificationReason)} |");
         }
 
         builder.AppendLine();
