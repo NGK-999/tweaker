@@ -48,7 +48,22 @@ internal static class MinecraftSelfTest
             var quarantineReport = new MinecraftReportService().WriteQuarantinePlan(quarantinePlan, reportDirectory);
             Assert(File.Exists(quarantineReport), "O relatorio dry-run da quarentena nao foi gerado.");
 
-            var quarantined = quarantineService.Apply(quarantinePlan, [olderDuplicate.FileName]);
+            AssertThrows<InvalidOperationException>(
+                () => quarantineService.Apply(
+                    quarantinePlan,
+                    [olderDuplicate.FileName],
+                    new MinecraftQuarantineConfirmation(false, false)),
+                "A quarentena aceitou uma operacao sem confirmacao explicita.");
+            AssertThrows<InvalidOperationException>(
+                () => quarantineService.Apply(
+                    quarantinePlan,
+                    [olderDuplicate.FileName],
+                    new MinecraftQuarantineConfirmation(true, false)),
+                "A quarentena aceitou mod comum sem confirmar o manifesto do servidor.");
+            var quarantined = quarantineService.Apply(
+                quarantinePlan,
+                [olderDuplicate.FileName],
+                new MinecraftQuarantineConfirmation(true, true));
             Assert(!File.Exists(olderDuplicate.FullPath), "O JAR selecionado permaneceu na origem depois do apply.");
             Assert(File.Exists(Path.Combine(quarantined.QuarantineDirectory, olderDuplicate.FileName)),
                 "O JAR nao chegou a quarentena.");
@@ -82,6 +97,9 @@ internal static class MinecraftSelfTest
             var entityCullingPath = Path.Combine(instanceRoot, "config", "entityculling.json");
             const string originalEntityCulling = "{\"debugMode\":true,\"skipEntityCulling\":true,\"skipBlockEntityCulling\":true,\"tickCulling\":false,\"unknown\":\"keep\"}";
             File.WriteAllText(entityCullingPath, originalEntityCulling, new UTF8Encoding(false));
+            var irisPath = Path.Combine(instanceRoot, "config", "iris.properties");
+            const string originalIris = "enableShaders=true\nunknown=keep\n";
+            File.WriteAllText(irisPath, originalIris, new UTF8Encoding(false));
             var instanceConfigPath = Path.Combine(managedRoot, "instance.cfg");
             const string originalInstanceConfig = "name=Test Instance\nOverrideMemory=false\nMinMemAlloc=256\nMaxMemAlloc=4096\niconKey=cobblemon\n";
             File.WriteAllText(instanceConfigPath, originalInstanceConfig, new UTF8Encoding(false));
@@ -89,9 +107,18 @@ internal static class MinecraftSelfTest
             var profileService = new MinecraftProfileService(
                 Path.Combine(root, "backups"),
                 reportDirectory);
-            var dryRun = profileService.PlanProfile(managedRoot, MinecraftProfileKind.Extreme4Gb);
+            var safeMemory = MinecraftEnvironmentService.RecommendJavaMemory(4m, 2.5m);
+            var balancedMemory = MinecraftEnvironmentService.RecommendJavaMemory(4m, 3m);
+            var aggressiveMemory = MinecraftEnvironmentService.RecommendJavaMemory(4m, 3.5m);
+            Assert(safeMemory.MaximumHeapMb == 2048, "O patamar seguro de memoria nao retornou Xmx2048M.");
+            Assert(balancedMemory.MaximumHeapMb == 2304, "O patamar balanceado nao retornou Xmx2304M.");
+            Assert(aggressiveMemory.MaximumHeapMb == 2560, "O patamar agressivo nao retornou Xmx2560M.");
+            messages.Add("PASS: memoria de 4 GB escolhe somente Xmx2048M, Xmx2304M ou Xmx2560M pela RAM livre.");
+
+            var dryRun = profileService.PlanProfile(managedRoot, MinecraftProfileKind.Extreme4Gb, 30);
             Assert(dryRun.Instance.Launcher == MinecraftLauncherKind.PrismLauncher,
                 "A instancia Prism nao foi reconhecida.");
+            Assert(dryRun.MaximumFps == 30, "O dry-run nao preservou o limite de 30 FPS selecionado.");
             Assert(dryRun.Changes.Any(change => change.Setting == "performance.useEntityCulling" && change.WillWrite),
                 "O dry-run nao planejou a config existente do Sodium.");
             Assert(dryRun.Changes.Any(change => change.Setting == "MaxMemAlloc" && change.WillWrite),
@@ -101,12 +128,20 @@ internal static class MinecraftSelfTest
             Assert(File.ReadAllText(sodiumPath) == originalSodium, "O dry-run alterou Sodium.");
             Assert(File.ReadAllText(instanceConfigPath).Replace("\r\n", "\n") == originalInstanceConfig,
                 "O dry-run alterou instance.cfg.");
-            messages.Add("PASS: dry-run planeja options, JSONs e Prism sem escrever.");
+            Assert(profileService.PlanProfile(managedRoot, MinecraftProfileKind.Extreme4Gb, 45).MaximumFps == 45,
+                "O perfil nao aceitou 45 FPS.");
+            Assert(profileService.PlanProfile(managedRoot, MinecraftProfileKind.Extreme4Gb, 60).MaximumFps == 60,
+                "O perfil nao aceitou 60 FPS.");
+            AssertThrows<ArgumentOutOfRangeException>(
+                () => profileService.PlanProfile(managedRoot, MinecraftProfileKind.Extreme4Gb, 50),
+                "O perfil aceitou um limite fora de 30/45/60 FPS.");
+            messages.Add("PASS: dry-run planeja options, JSONs, Iris, FPS e Prism sem escrever.");
 
-            var applied = profileService.ApplyProfile(managedRoot, MinecraftProfileKind.Extreme4Gb);
+            var applied = profileService.ApplyProfile(managedRoot, MinecraftProfileKind.Extreme4Gb, 30);
             var changedOptions = File.ReadAllText(optionsPath);
             Assert(changedOptions.Contains("renderDistance:4", StringComparison.Ordinal), "Render distance nao foi aplicada.");
             Assert(changedOptions.Contains("simulationDistance:4", StringComparison.Ordinal), "Simulation distance nao foi aplicada.");
+            Assert(changedOptions.Contains("maxFps:30", StringComparison.Ordinal), "O limite selecionado de 30 FPS nao foi aplicado.");
             Assert(changedOptions.Contains("customOption:keep", StringComparison.Ordinal), "Opcao desconhecida foi perdida.");
             Assert(Directory.Exists(applied.BackupDirectory), "Backup nao foi criado.");
             using (var sodium = JsonDocument.Parse(File.ReadAllText(sodiumPath)))
@@ -118,14 +153,18 @@ internal static class MinecraftSelfTest
 
             using (var immediatelyFast = JsonDocument.Parse(File.ReadAllText(immediatelyFastPath)))
             {
-                Assert(immediatelyFast.RootElement.GetProperty("hud_batching").GetBoolean(),
-                    "HUD batching do ImmediatelyFast nao foi ativado.");
+                Assert(!immediatelyFast.RootElement.GetProperty("hud_batching").GetBoolean(),
+                    "HUD batching do ImmediatelyFast nao foi preservado para compatibilidade.");
                 Assert(!immediatelyFast.RootElement.GetProperty("experimental_screen_batching").GetBoolean(),
                     "Opcao experimental do ImmediatelyFast foi alterada.");
             }
 
             Assert(File.ReadAllText(instanceConfigPath).Contains("OverrideMemory=true", StringComparison.Ordinal),
                 "Override de memoria do Prism nao foi ativado.");
+            Assert(File.ReadAllText(irisPath).Contains("enableShaders=false", StringComparison.Ordinal),
+                "Iris nao teve shaders desativados.");
+            Assert(File.ReadAllText(irisPath).Contains("unknown=keep", StringComparison.Ordinal),
+                "Iris perdeu uma propriedade desconhecida.");
             Assert(File.Exists(applied.ReportPath), "Relatorio antes/depois do apply nao foi gerado.");
             messages.Add("PASS: EXTREME_4GB altera configs reais, preserva desconhecidas e cria backup.");
 
@@ -137,6 +176,8 @@ internal static class MinecraftSelfTest
                 "Rollback nao restaurou ImmediatelyFast byte a byte.");
             Assert(File.ReadAllText(entityCullingPath) == originalEntityCulling,
                 "Rollback nao restaurou EntityCulling byte a byte.");
+            Assert(File.ReadAllText(irisPath).Replace("\r\n", "\n") == originalIris,
+                "Rollback nao restaurou iris.properties byte a byte.");
             Assert(File.ReadAllText(instanceConfigPath).Replace("\r\n", "\n") == originalInstanceConfig,
                 "Rollback nao restaurou instance.cfg.");
             Assert(!File.Exists(Path.Combine(instanceRoot, "apextweaker-java-args.txt")),
@@ -176,6 +217,51 @@ internal static class MinecraftSelfTest
             Assert(File.ReadAllText(optionsPath).Replace("\r\n", "\n") == originalOptions,
                 "Rollback nao aceitou o manifesto legado da v2.1.0.");
             messages.Add("PASS: rollback v2.1.0 restaura ate um options.txt removido.");
+
+            var operationalService = new MinecraftOperationalHomologationService();
+            var checklist = operationalService.BuildChecklist(audit, quarantinePlan, dryRun);
+            var checklistPath = new MinecraftReportService().WriteOperationalChecklist(checklist, reportDirectory);
+            Assert(File.Exists(checklistPath) &&
+                   File.Exists(Path.ChangeExtension(checklistPath, ".json")) &&
+                   File.Exists(Path.ChangeExtension(checklistPath, ".txt")),
+                "Checklist operacional nao gerou JSON, Markdown e TXT.");
+            var approvedObservation = new MinecraftOperationalObservation(
+                true,
+                true,
+                45m,
+                true,
+                true,
+                70m,
+                true,
+                32d,
+                18d,
+                false,
+                false,
+                false,
+                "Rodada sintetica do self-test.");
+            var approved = operationalService.Evaluate(managedRoot, approvedObservation);
+            Assert(approved.Status == OperationalHomologationStatus.Approved,
+                "A homologacao aprovada nao foi classificada corretamente.");
+            var operationalPath = new MinecraftReportService().WriteOperationalHomologation(approved, reportDirectory);
+            Assert(File.Exists(operationalPath) && File.Exists(Path.ChangeExtension(operationalPath, ".json")),
+                "Relatorio operacional nao foi gerado.");
+            var failed = operationalService.Evaluate(
+                managedRoot,
+                approvedObservation with { Crashed = true, OutOfMemory = true });
+            Assert(failed.Status == OperationalHomologationStatus.Failed,
+                "Crash/OOM nao reprovou a homologacao.");
+            var unstable = operationalService.Evaluate(
+                managedRoot,
+                approvedObservation with { AverageFps = 24d, SevereDrops = true });
+            Assert(unstable.Status == OperationalHomologationStatus.Unstable,
+                "FPS baixo e quedas severas nao marcaram a homologacao como instavel.");
+            var notTested = operationalService.Evaluate(
+                managedRoot,
+                new MinecraftOperationalObservation(
+                    false, false, null, false, false, null, false, null, null, false, false, false, string.Empty));
+            Assert(notTested.Status == OperationalHomologationStatus.NotTested,
+                "Observacao vazia nao foi marcada como nao testada.");
+            messages.Add("PASS: checklist e homologacao distinguem APROVADO, INSTAVEL, FALHOU e NAO_TESTADO.");
 
             Directory.CreateDirectory(Path.Combine(instanceRoot, "logs"));
             Directory.CreateDirectory(Path.Combine(instanceRoot, "crash-reports"));
@@ -245,6 +331,21 @@ internal static class MinecraftSelfTest
         {
             throw new InvalidOperationException(message);
         }
+    }
+
+    private static void AssertThrows<TException>(Action action, string message)
+        where TException : Exception
+    {
+        try
+        {
+            action();
+        }
+        catch (TException)
+        {
+            return;
+        }
+
+        throw new InvalidOperationException(message);
     }
 
     private static string ComputeSha256(string path)

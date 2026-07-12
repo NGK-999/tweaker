@@ -2,7 +2,7 @@
 
 ApexTweaker e um utilitario Windows (.NET 10) focado em performance, telemetria de frametime, backup e rollback reversivel. A shell ativa e **WPF**; codigo WinForms legado ainda compila no mesmo assembly, mas nao e iniciado por `Program.cs`.
 
-Versao atual: **2.2.0**.
+Versao atual: **2.3.0**.
 
 ## Pastas principais
 
@@ -59,7 +59,7 @@ Comandos estruturados em `ExtremeMutationCommands.cs` e `MemoryCompressionTweakC
 
 Modulo isolado para Minecraft/Cobblemon:
 
-- `Models/MinecraftAuditModels.cs` - contratos de auditoria, perfil, quarentena e benchmark.
+- `Models/MinecraftAuditModels.cs` - contratos de auditoria, perfil, quarentena, benchmark e homologacao.
 - `Services/ModJarScanner.cs` - metadados Fabric/Forge/NeoForge e JARs aninhados.
 - `Services/MinecraftAuditService.cs` - classificacao, dependencias e conflitos.
 - `Services/MinecraftEnvironmentService.cs` - hardware, Java, pagefile e launchers.
@@ -68,6 +68,7 @@ Modulo isolado para Minecraft/Cobblemon:
 - `Services/MinecraftQuarantineService.cs` - movimentacao reversivel de JARs com SHA-256.
 - `Services/MinecraftSurvivalPlanService.cs` - veredito e plano manual para 4 GB.
 - `Services/MinecraftBenchmarkService.cs` - ambiente, processo, configs, logs e crashes.
+- `Services/MinecraftOperationalHomologationService.cs` - checklist e avaliacao da rodada real.
 - `Services/MinecraftReportService.cs` - JSON, Markdown e TXT.
 - `MinecraftCommandLine.cs` - automacao headless.
 - `MinecraftSelfTest.cs` - teste integrado sem pacotes externos.

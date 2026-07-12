@@ -76,6 +76,7 @@ internal enum MinecraftProfileChangeKind
 {
     Options,
     JsonConfig,
+    PropertiesConfig,
     LauncherMemory,
     GeneratedInstruction
 }
@@ -86,6 +87,24 @@ internal enum QuarantineRisk
     Low,
     Medium,
     High
+}
+
+[JsonConverter(typeof(JsonStringEnumConverter))]
+internal enum JavaMemoryTier
+{
+    Safe2048,
+    Balanced2304,
+    Aggressive2560,
+    Standard
+}
+
+[JsonConverter(typeof(JsonStringEnumConverter))]
+internal enum OperationalHomologationStatus
+{
+    NotTested,
+    Approved,
+    Unstable,
+    Failed
 }
 
 internal sealed class MinecraftModDescriptor
@@ -181,6 +200,12 @@ internal sealed record MinecraftEnvironmentSnapshot(
     IReadOnlyList<ProcessMemoryInfo> HeavyProcesses,
     string RecommendedJavaArguments,
     IReadOnlyList<string> ManualRecommendations);
+
+internal sealed record JavaMemoryRecommendation(
+    int MaximumHeapMb,
+    string Arguments,
+    JavaMemoryTier Tier,
+    string Reason);
 
 internal sealed record MinecraftAuditSummary(
     int TotalMods,
@@ -322,6 +347,9 @@ internal sealed record MinecraftProfilePlan(
     MinecraftInstanceDescriptor Instance,
     MinecraftProfileKind Profile,
     string JavaArguments,
+    int MaximumHeapMb,
+    int MaximumFps,
+    string JavaMemoryReason,
     IReadOnlyList<MinecraftProfileSettingChange> Changes,
     IReadOnlyList<string> Messages)
 {
@@ -337,7 +365,17 @@ internal sealed record MinecraftQuarantineCandidate(
     string Reason,
     QuarantineRisk Risk,
     bool RecommendedForExtreme,
-    bool RequiresServerConfirmation);
+    bool RequiresServerConfirmation,
+    string Environment,
+    string SideAssessment,
+    string ServerEntryImpact,
+    string CobblemonImpact,
+    string PerformanceImpact,
+    string OperationalRecommendation);
+
+internal sealed record MinecraftQuarantineConfirmation(
+    bool UserConfirmed,
+    bool ServerManifestConfirmed);
 
 internal sealed record MinecraftQuarantinePlan(
     string PlanId,
@@ -393,4 +431,50 @@ internal sealed record MinecraftSurvivalPlan(
     IReadOnlyList<string> QuarantineCandidates,
     IReadOnlyList<string> GraphicsSettings,
     IReadOnlyList<string> Risks,
+    IReadOnlyList<string> ManualActions);
+
+internal sealed record MinecraftOperationalChecklist(
+    DateTimeOffset CreatedAtUtc,
+    string ModsDirectory,
+    string? InstanceRoot,
+    bool InstanceDetected,
+    string JavaArguments,
+    int MaximumFps,
+    IReadOnlyList<string> PreflightChecks,
+    IReadOnlyList<string> InstanceSetupSteps,
+    IReadOnlyList<string> ProfileSteps,
+    IReadOnlyList<string> BenchmarkSteps,
+    IReadOnlyList<string> SuccessCriteria,
+    IReadOnlyList<string> SafetyRules,
+    IReadOnlyList<string> ModDecisions,
+    IReadOnlyList<string> RemainingRisks);
+
+internal sealed record MinecraftOperationalObservation(
+    bool GameOpened,
+    bool MenuReached,
+    decimal? MenuLoadSeconds,
+    bool WorldEntered,
+    bool ServerEntered,
+    decimal? JoinLoadSeconds,
+    bool PlayableAt720p,
+    double? AverageFps,
+    double? MinimumFps,
+    bool SevereDrops,
+    bool Crashed,
+    bool OutOfMemory,
+    string Notes);
+
+internal sealed record MinecraftHomologationCriterion(
+    string Name,
+    bool Passed,
+    string Evidence);
+
+internal sealed record MinecraftOperationalHomologationResult(
+    DateTimeOffset CreatedAtUtc,
+    string InstanceRoot,
+    OperationalHomologationStatus Status,
+    MinecraftOperationalObservation Observation,
+    MinecraftBenchmarkResult? AutomaticBenchmark,
+    IReadOnlyList<MinecraftHomologationCriterion> Criteria,
+    IReadOnlyList<string> RemainingRisks,
     IReadOnlyList<string> ManualActions);

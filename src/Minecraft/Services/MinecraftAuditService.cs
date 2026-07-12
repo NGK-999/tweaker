@@ -160,7 +160,7 @@ internal sealed class MinecraftAuditService
         var immediatelyFast = recommendations.First(item => item.Id == "immediatelyfast");
         if (!immediatelyFast.Installed)
         {
-            manualActions.Add("Instale ImmediatelyFast para Fabric 1.21.1 em uma copia de teste e valide HUD, mapas e batalhas antes de promover ao pacote principal.");
+            manualActions.Add("Teste ImmediatelyFast 1.6.11+1.21.1 Fabric sozinho na pasta mods; valide HUD, mapas e batalhas e remova o JAR se houver crash.");
         }
 
         if (environment.TotalMemoryGb <= 4.5m)

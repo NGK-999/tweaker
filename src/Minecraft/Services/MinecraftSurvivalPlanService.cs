@@ -7,6 +7,9 @@ internal sealed class MinecraftSurvivalPlanService
     public MinecraftSurvivalPlan Build(MinecraftAuditResult audit, MinecraftQuarantinePlan quarantine)
     {
         var environment = audit.Environment;
+        var targetMemory = MinecraftEnvironmentService.RecommendJavaMemory(
+            Math.Min(environment.TotalMemoryGb, 4m),
+            Math.Min(environment.AvailableMemoryGb, 4m));
         var verdict = environment.TotalMemoryGb <= 4.5m
             ? "EXPERIMENTAL: pode abrir em 720p minimo, mas estabilidade nao e garantida."
             : "VIAVEL PARA TESTE: valide no mundo e servidor reais antes de concluir.";
@@ -56,7 +59,7 @@ internal sealed class MinecraftSurvivalPlanService
         return new MinecraftSurvivalPlan(
             DateTimeOffset.UtcNow,
             verdict,
-            environment.RecommendedJavaArguments,
+            targetMemory.Arguments,
             required,
             recommended,
             quarantineCandidates,

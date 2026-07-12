@@ -67,7 +67,10 @@ internal sealed class MinecraftQuarantineService
                         $"{provider.Name} {provider.Version} ja fornece o ID '{providedId}'.",
                         QuarantineRisk.Medium,
                         recommended: true,
-                        requiresServerConfirmation: true);
+                        requiresServerConfirmation: !string.Equals(
+                            collision.Environment,
+                            "client",
+                            StringComparison.OrdinalIgnoreCase));
                 }
             }
         }
@@ -117,8 +120,14 @@ internal sealed class MinecraftQuarantineService
 
     public MinecraftQuarantineApplyResult Apply(
         MinecraftQuarantinePlan plan,
-        IEnumerable<string> selectedFiles)
+        IEnumerable<string> selectedFiles,
+        MinecraftQuarantineConfirmation confirmation)
     {
+        if (!confirmation.UserConfirmed)
+        {
+            throw new InvalidOperationException("Quarentena bloqueada: falta confirmacao explicita do usuario.");
+        }
+
         var selectedNames = selectedFiles
             .Where(value => !string.IsNullOrWhiteSpace(value))
             .Select(Path.GetFileName)
@@ -133,6 +142,13 @@ internal sealed class MinecraftQuarantineService
         {
             var unknown = selectedNames.Except(selected.Select(item => item.FileName), StringComparer.OrdinalIgnoreCase);
             throw new InvalidOperationException($"Arquivos fora do plano: {string.Join(", ", unknown)}");
+        }
+
+        if (selected.Any(candidate => candidate.RequiresServerConfirmation) &&
+            !confirmation.ServerManifestConfirmed)
+        {
+            throw new InvalidOperationException(
+                "Quarentena bloqueada: confirme o manifesto do servidor para os candidatos selecionados.");
         }
 
         var modsDirectory = Path.GetFullPath(plan.ModsDirectory);
@@ -378,7 +394,91 @@ internal sealed class MinecraftQuarantineService
             reason,
             risk,
             recommended,
-            requiresServerConfirmation);
+            requiresServerConfirmation,
+            mod.Environment,
+            AssessSide(mod),
+            AssessServerEntryImpact(mod),
+            AssessCobblemonImpact(mod),
+            AssessPerformanceImpact(mod),
+            AssessOperationalRecommendation(mod));
+    }
+
+    private static string AssessSide(MinecraftModDescriptor mod)
+    {
+        return mod.Environment.ToLowerInvariant() switch
+        {
+            "client" => "CLIENT_ONLY",
+            "server" => "SERVER_ONLY",
+            _ => "CLIENT_AND_SERVER_POSSIBLE"
+        };
+    }
+
+    private static string AssessServerEntryImpact(MinecraftModDescriptor mod)
+    {
+        if (string.Equals(mod.Id, "indium", StringComparison.OrdinalIgnoreCase))
+        {
+            return "BAIXO: metadata client-only; o servidor normalmente nao exige este JAR.";
+        }
+
+        if (string.Equals(mod.Id, "mega_showdown", StringComparison.OrdinalIgnoreCase))
+        {
+            return "ALTO: addon comum aos dois lados; a versao pode ser validada pelo servidor.";
+        }
+
+        return string.Equals(mod.Environment, "client", StringComparison.OrdinalIgnoreCase)
+            ? "BAIXO: metadata client-only."
+            : "DESCONHECIDO: compare com o manifesto do servidor.";
+    }
+
+    private static string AssessCobblemonImpact(MinecraftModDescriptor mod)
+    {
+        if (string.Equals(mod.Id, "mega_showdown", StringComparison.OrdinalIgnoreCase))
+        {
+            return "ALTO: adiciona mecanicas ao Cobblemon; mantenha exatamente uma versao compativel.";
+        }
+
+        if (string.Equals(mod.Id, "indium", StringComparison.OrdinalIgnoreCase))
+        {
+            return "BAIXO no pacote atual: Sodium 0.6.x ja fornece a API; valide texturas apos remover.";
+        }
+
+        return MinecraftModCatalog.ExtremeRemovalCandidates.Contains(mod.Id)
+            ? "BAIXO para gameplay; pode afetar apenas recursos visuais ou packs."
+            : "DESCONHECIDO: requer teste controlado.";
+    }
+
+    private static string AssessPerformanceImpact(MinecraftModDescriptor mod)
+    {
+        if (string.Equals(mod.Id, "indium", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Pode causar incompatibilidade e carga redundante com Sodium 0.6.13.";
+        }
+
+        if (string.Equals(mod.Id, "mega_showdown", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Duplicidade impede o loader antes de qualquer medicao; ganho de FPS nao e o motivo da quarentena.";
+        }
+
+        return MinecraftModCatalog.ExtremeRemovalCandidates.Contains(mod.Id)
+            ? "Pode reduzir RAM, GPU ou stutter quando testado sem o recurso visual."
+            : "Impacto nao medido.";
+    }
+
+    private static string AssessOperationalRecommendation(MinecraftModDescriptor mod)
+    {
+        if (string.Equals(mod.Id, "mega_showdown", StringComparison.OrdinalIgnoreCase))
+        {
+            return "INVESTIGAR_MANIFESTO_E_MANTER_EXATAMENTE_UMA_VERSAO";
+        }
+
+        if (string.Equals(mod.Id, "indium", StringComparison.OrdinalIgnoreCase))
+        {
+            return "TESTAR_SEM_E_QUARENTENAR_SE_ESTAVEL";
+        }
+
+        return MinecraftModCatalog.ExtremeRemovalCandidates.Contains(mod.Id)
+            ? "TESTAR_SEM_EM_COPIA_DA_INSTANCIA"
+            : "INVESTIGAR_ANTES_DE_MOVER";
     }
 
     private static void ValidateDirectory(string path)

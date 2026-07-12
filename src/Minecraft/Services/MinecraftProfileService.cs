@@ -58,7 +58,6 @@ internal sealed partial class MinecraftProfileService
         {
             ["font_atlas_resizing"] = true,
             ["map_atlas_generation"] = true,
-            ["hud_batching"] = true,
             ["fast_text_lookup"] = true,
             ["fast_buffer_upload"] = true
         };
@@ -98,14 +97,20 @@ internal sealed partial class MinecraftProfileService
         return resolved;
     }
 
-    public MinecraftProfilePlan PlanProfile(string selectedPath, MinecraftProfileKind profileKind)
+    public MinecraftProfilePlan PlanProfile(
+        string selectedPath,
+        MinecraftProfileKind profileKind,
+        int? maximumFps = null)
     {
-        return BuildOperation(selectedPath, profileKind).Plan;
+        return BuildOperation(selectedPath, profileKind, maximumFps).Plan;
     }
 
-    public MinecraftProfileApplyResult ApplyProfile(string selectedPath, MinecraftProfileKind profileKind)
+    public MinecraftProfileApplyResult ApplyProfile(
+        string selectedPath,
+        MinecraftProfileKind profileKind,
+        int? maximumFps = null)
     {
-        var operation = BuildOperation(selectedPath, profileKind);
+        var operation = BuildOperation(selectedPath, profileKind, maximumFps);
         var plan = operation.Plan;
         var changedMutations = operation.Mutations.Where(mutation => mutation.Changed).ToArray();
         if (changedMutations.Length == 0)
@@ -178,6 +183,7 @@ internal sealed partial class MinecraftProfileService
                 reportPath,
                 [
                     $"Perfil {Profiles[profileKind].DisplayName} aplicado com verificacao antes/depois.",
+                    $"Limite de FPS: {plan.MaximumFps}. Heap: {plan.MaximumHeapMb} MB.",
                     launcherMessage,
                     "Nenhum JAR foi excluido, movido ou modificado.",
                     $"Backup transacional: {backupDirectory}"
@@ -247,7 +253,10 @@ internal sealed partial class MinecraftProfileService
             ]);
     }
 
-    private ProfileOperation BuildOperation(string selectedPath, MinecraftProfileKind profileKind)
+    private ProfileOperation BuildOperation(
+        string selectedPath,
+        MinecraftProfileKind profileKind,
+        int? maximumFps)
     {
         if (!instanceService.TryResolve(selectedPath, out var instance))
         {
@@ -261,18 +270,30 @@ internal sealed partial class MinecraftProfileService
         }
 
         var environment = environmentService.Capture();
-        var recommendedHeapMb = ParseMaximumHeapMb(environment.RecommendedJavaArguments);
-        var profileHeapMb = Math.Min(recommendedHeapMb, profile.PreferredHeapMb);
+        var memory = MinecraftEnvironmentService.RecommendJavaMemory(
+            environment.TotalMemoryGb,
+            environment.AvailableMemoryGb);
+        var profileHeapMb = Math.Min(memory.MaximumHeapMb, profile.PreferredHeapMb);
         var javaArguments = $"-Xms512M -Xmx{profileHeapMb}M";
+        var javaMemoryReason = profileHeapMb < memory.MaximumHeapMb
+            ? memory.Reason + $" O perfil limitou o heap a {profileHeapMb} MB."
+            : memory.Reason;
+        var fpsLimit = ResolveMaximumFps(profile, maximumFps);
+        var desiredOptions = new Dictionary<string, string>(profile.Options, StringComparer.OrdinalIgnoreCase)
+        {
+            ["maxFps"] = fpsLimit.ToString(CultureInfo.InvariantCulture)
+        };
         var mutations = new List<FileMutation>();
         var changes = new List<MinecraftProfileSettingChange>();
         var messages = new List<string>
         {
             "DRY-RUN: este plano nao altera arquivos ate ApplyProfile ser chamado.",
-            $"Instancia detectada como {instance.Launcher}: {instance.GameDirectory}"
+            $"Instancia detectada como {instance.Launcher}: {instance.GameDirectory}",
+            $"Heap escolhido: {profileHeapMb} MB. {javaMemoryReason}",
+            $"Limite de FPS escolhido para homologacao: {fpsLimit}."
         };
 
-        var optionsMutation = BuildOptionsMutation(instance.OptionsPath, profile.Options);
+        var optionsMutation = BuildOptionsMutation(instance.OptionsPath, desiredOptions);
         mutations.Add(optionsMutation);
         changes.AddRange(optionsMutation.Changes);
 
@@ -283,6 +304,19 @@ internal sealed partial class MinecraftProfileService
             mutations,
             changes,
             messages);
+
+        AddKeyValueMutationIfExists(
+            Path.Combine(instance.ConfigDirectory, "iris.properties"),
+            "Iris",
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["enableShaders"] = "false"
+            },
+            mutations,
+            changes,
+            messages);
+        messages.Add("Resource packs nao sao removidos automaticamente; desative packs pesados manualmente apos revisar requisitos do servidor.");
+        messages.Add("ImmediatelyFast hud_batching e preservado para nao reativar uma opcao desabilitada por compatibilidade.");
         AddJsonMutation(
             Path.Combine(instance.ConfigDirectory, "immediatelyfast.json"),
             "ImmediatelyFast 1.6.11",
@@ -302,6 +336,8 @@ internal sealed partial class MinecraftProfileService
         var javaContent =
             $"# ApexTweaker {profile.DisplayName}\r\n" +
             $"# Launcher detectado: {instance.Launcher}\r\n" +
+            $"# FPS: {fpsLimit} | Heap: {profileHeapMb} MB\r\n" +
+            $"# Motivo: {javaMemoryReason}\r\n" +
             "# Use esta linha quando o launcher nao possuir integracao automatica.\r\n" +
             $"{javaArguments}\r\n";
         var javaMutation = BuildWholeFileMutation(
@@ -339,6 +375,9 @@ internal sealed partial class MinecraftProfileService
             instance,
             profileKind,
             javaArguments,
+            profileHeapMb,
+            fpsLimit,
+            javaMemoryReason,
             changes,
             messages);
         return new ProfileOperation(plan, mutations);
@@ -373,6 +412,34 @@ internal sealed partial class MinecraftProfileService
         {
             messages.Add($"{contractName}: JSON invalido, ignorado com seguranca ({ex.Message}).");
         }
+    }
+
+    private static void AddKeyValueMutationIfExists(
+        string path,
+        string contractName,
+        IReadOnlyDictionary<string, string> desired,
+        ICollection<FileMutation> mutations,
+        ICollection<MinecraftProfileSettingChange> changes,
+        ICollection<string> messages)
+    {
+        if (!File.Exists(path))
+        {
+            messages.Add($"{contractName}: config ausente; confirme manualmente que shaders estao desligados.");
+            return;
+        }
+
+        var mutation = BuildKeyValueMutation(
+            path,
+            desired,
+            MinecraftProfileChangeKind.PropertiesConfig,
+            "Chave reconhecida do mod alterada com backup para o perfil low-end.");
+        mutations.Add(mutation);
+        foreach (var change in mutation.Changes)
+        {
+            changes.Add(change);
+        }
+
+        messages.Add($"{contractName}: shaders serao desativados por propriedade reconhecida.");
     }
 
     private static FileMutation BuildOptionsMutation(
@@ -480,19 +547,21 @@ internal sealed partial class MinecraftProfileService
 
     private static FileMutation BuildKeyValueMutation(
         string path,
-        IReadOnlyDictionary<string, string> desired)
+        IReadOnlyDictionary<string, string> desired,
+        MinecraftProfileChangeKind kind = MinecraftProfileChangeKind.LauncherMemory,
+        string reason = "Chave oficial de memoria por instancia Prism/MultiMC.")
     {
         var existing = File.Exists(path) ? File.ReadAllLines(path) : [];
         var current = ParseKeyValueLines(existing, '=');
         var updated = BuildUpdatedKeyValueLines(existing, desired, '=');
         var changes = desired.Select(item => new MinecraftProfileSettingChange(
-            MinecraftProfileChangeKind.LauncherMemory,
+            kind,
             path,
             item.Key,
             current.GetValueOrDefault(item.Key),
             item.Value,
             !HasOnlyDesiredValue(existing, item.Key, item.Value, '='),
-            "Chave oficial de memoria por instancia Prism/MultiMC."))
+            reason))
             .ToArray();
         return new FileMutation(path, string.Join(Environment.NewLine, updated) + Environment.NewLine, changes);
     }
@@ -783,7 +852,8 @@ internal sealed partial class MinecraftProfileService
             Path.GetFullPath(Path.Combine(instance.GameDirectory, JavaArgumentsFileName)),
             Path.GetFullPath(Path.Combine(instance.ConfigDirectory, "sodium-options.json")),
             Path.GetFullPath(Path.Combine(instance.ConfigDirectory, "immediatelyfast.json")),
-            Path.GetFullPath(Path.Combine(instance.ConfigDirectory, "entityculling.json"))
+            Path.GetFullPath(Path.Combine(instance.ConfigDirectory, "entityculling.json")),
+            Path.GetFullPath(Path.Combine(instance.ConfigDirectory, "iris.properties"))
         };
         if (instance.LauncherConfigPath is not null)
         {
@@ -842,6 +912,23 @@ internal sealed partial class MinecraftProfileService
     {
         var match = MaximumHeapRegex().Match(javaArguments);
         return match.Success && int.TryParse(match.Groups[1].Value, out var result) ? result : 2048;
+    }
+
+    private static int ResolveMaximumFps(MinecraftProfileDefinition profile, int? requested)
+    {
+        if (requested is not null && requested is not (30 or 45 or 60))
+        {
+            throw new ArgumentOutOfRangeException(nameof(requested), "Use limite de FPS 30, 45 ou 60.");
+        }
+
+        if (requested is not null)
+        {
+            return requested.Value;
+        }
+
+        return int.TryParse(profile.Options["maxFps"], NumberStyles.Integer, CultureInfo.InvariantCulture, out var value)
+            ? value
+            : 45;
     }
 
     private static void AtomicWriteAllText(string path, string content)

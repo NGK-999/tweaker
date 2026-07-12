@@ -9,6 +9,17 @@ $releaseDir = Join-Path $ProjectRoot 'release-v2'
 $stagingDir = Join-Path $ProjectRoot 'release-v2-staging'
 $portableExe = Join-Path $releaseDir 'ApexTweaker.exe'
 
+$projectRootFull = [System.IO.Path]::GetFullPath($ProjectRoot).TrimEnd('\')
+$releaseDirFull = [System.IO.Path]::GetFullPath($releaseDir).TrimEnd('\')
+$expectedPrefix = $projectRootFull + [System.IO.Path]::DirectorySeparatorChar
+if (-not $releaseDirFull.StartsWith($expectedPrefix, [System.StringComparison]::OrdinalIgnoreCase) -or
+    -not [System.String]::Equals(
+        [System.IO.Path]::GetFileName($releaseDirFull),
+        'release-v2',
+        [System.StringComparison]::OrdinalIgnoreCase)) {
+    throw "Pasta de release insegura ou inesperada: $releaseDirFull"
+}
+
 if (-not (Test-Path -LiteralPath $projectFile)) {
     throw "Projeto nao encontrado: $projectFile"
 }
@@ -18,6 +29,14 @@ if ($running) {
     Write-Host "Encerrando instancia(s) de ApexTweaker em execucao..."
     $running | Stop-Process -Force -ErrorAction SilentlyContinue
     Start-Sleep -Seconds 2
+}
+
+if (Test-Path -LiteralPath $releaseDirFull) {
+    Write-Host "Limpando artefatos antigos da pasta de release validada..."
+    Get-ChildItem -LiteralPath $releaseDirFull -Force | Remove-Item -Recurse -Force
+}
+else {
+    New-Item -ItemType Directory -Path $releaseDirFull | Out-Null
 }
 
 Write-Host "Publicando release portatil em: $releaseDir"

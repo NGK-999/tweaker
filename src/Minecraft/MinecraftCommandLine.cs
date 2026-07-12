@@ -1,4 +1,5 @@
 using System.IO;
+using System.Globalization;
 using ApexTweaker.Minecraft.Models;
 using ApexTweaker.Minecraft.Services;
 
@@ -24,11 +25,13 @@ internal static class MinecraftCommandLine
 
             if (HasFlag(args, "--minecraft-self-test"))
             {
-                foreach (var line in MinecraftSelfTest.Run())
+                var selfTest = MinecraftSelfTest.Run();
+                foreach (var line in selfTest)
                 {
                     Console.WriteLine(line);
                 }
 
+                WriteStatusFile(args, "SELF_TEST_OK", string.Join(Environment.NewLine, selfTest));
                 return true;
             }
 
@@ -57,7 +60,7 @@ internal static class MinecraftCommandLine
             {
                 var instance = RequireValue(args, "--instance");
                 var profile = ParseProfile(GetValue(args, "--profile") ?? "EXTREME_4GB");
-                var plan = new MinecraftProfileService().PlanProfile(instance, profile);
+                var plan = new MinecraftProfileService().PlanProfile(instance, profile, ParseFps(args));
                 var path = new MinecraftReportService().WriteProfilePlan(
                     plan,
                     applied: false,
@@ -73,7 +76,7 @@ internal static class MinecraftCommandLine
                 RequireConfirmation(args);
                 var instance = RequireValue(args, "--instance");
                 var profile = ParseProfile(GetValue(args, "--profile") ?? "EXTREME_4GB");
-                var result = new MinecraftProfileService().ApplyProfile(instance, profile);
+                var result = new MinecraftProfileService().ApplyProfile(instance, profile, ParseFps(args));
                 Console.WriteLine($"{result.Profile}: {result.InstanceRoot}");
                 Console.WriteLine($"Backup: {result.BackupDirectory}");
                 Console.WriteLine($"Relatorio: {result.ReportPath}");
@@ -100,7 +103,8 @@ internal static class MinecraftCommandLine
                 foreach (var candidate in plan.Candidates)
                 {
                     Console.WriteLine(
-                        $"{candidate.FileName} | {candidate.Risk} | recomendado={candidate.RecommendedForExtreme} | {candidate.Reason}");
+                        $"{candidate.FileName} | {candidate.SideAssessment} | {candidate.Risk} | " +
+                        $"servidor={candidate.ServerEntryImpact} | acao={candidate.OperationalRecommendation}");
                 }
 
                 Console.WriteLine(path);
@@ -116,11 +120,84 @@ internal static class MinecraftCommandLine
                     .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
                 var audit = new MinecraftAuditService().Audit(modsDirectory);
                 var plan = new MinecraftQuarantineService().BuildPlan(audit);
-                var result = new MinecraftQuarantineService().Apply(plan, fileList);
+                var result = new MinecraftQuarantineService().Apply(
+                    plan,
+                    fileList,
+                    new MinecraftQuarantineConfirmation(
+                        UserConfirmed: true,
+                        ServerManifestConfirmed: HasFlag(args, "--server-manifest-confirmed")));
                 Console.WriteLine($"Quarentena: {result.QuarantineDirectory}");
                 Console.WriteLine($"Backup: {result.BackupDirectory}");
                 Console.WriteLine($"Manifesto: {result.ManifestPath}");
                 WriteStatusFile(args, "QUARANTINE_APPLY_OK", result.ManifestPath);
+                return true;
+            }
+
+            if (HasFlag(args, "--minecraft-operational-checklist"))
+            {
+                var modsDirectory = RequireValue(args, "--mods");
+                var audit = new MinecraftAuditService().Audit(modsDirectory);
+                var quarantine = new MinecraftQuarantineService().BuildPlan(audit);
+                MinecraftProfilePlan? profilePlan = null;
+                var instance = GetValue(args, "--instance");
+                if (!string.IsNullOrWhiteSpace(instance))
+                {
+                    profilePlan = new MinecraftProfileService().PlanProfile(
+                        instance,
+                        MinecraftProfileKind.Extreme4Gb,
+                        ParseFps(args));
+                }
+
+                var checklist = new MinecraftOperationalHomologationService()
+                    .BuildChecklist(audit, quarantine, profilePlan);
+                var path = new MinecraftReportService()
+                    .WriteOperationalChecklist(checklist, GetValue(args, "--output"));
+                Console.WriteLine(path);
+                WriteStatusFile(args, "OPERATIONAL_CHECKLIST_OK", path);
+                return true;
+            }
+
+            if (HasFlag(args, "--minecraft-homologation-report"))
+            {
+                var instance = RequireValue(args, "--instance");
+                var observation = new MinecraftOperationalObservation(
+                    GameOpened: HasFlag(args, "--game-opened"),
+                    MenuReached: HasFlag(args, "--menu-reached"),
+                    MenuLoadSeconds: ParseOptionalDecimal(args, "--menu-seconds"),
+                    WorldEntered: HasFlag(args, "--world-entered"),
+                    ServerEntered: HasFlag(args, "--server-entered"),
+                    JoinLoadSeconds: ParseOptionalDecimal(args, "--join-seconds"),
+                    PlayableAt720p: HasFlag(args, "--playable-720p"),
+                    AverageFps: ParseOptionalDouble(args, "--average-fps"),
+                    MinimumFps: ParseOptionalDouble(args, "--minimum-fps"),
+                    SevereDrops: HasFlag(args, "--severe-drops"),
+                    Crashed: HasFlag(args, "--crashed"),
+                    OutOfMemory: HasFlag(args, "--out-of-memory"),
+                    Notes: GetValue(args, "--notes") ?? string.Empty);
+
+                MinecraftBenchmarkResult? benchmark = null;
+                var benchmarkSecondsText = GetValue(args, "--benchmark-seconds");
+                if (benchmarkSecondsText is not null)
+                {
+                    if (!int.TryParse(benchmarkSecondsText, out var benchmarkSeconds) || benchmarkSeconds is < 10 or > 600)
+                    {
+                        throw new ArgumentException("--benchmark-seconds deve estar entre 10 e 600.");
+                    }
+
+                    benchmark = new MinecraftBenchmarkService()
+                        .CaptureAsync(
+                            TimeSpan.FromSeconds(benchmarkSeconds),
+                            selectedPath: instance)
+                        .GetAwaiter()
+                        .GetResult();
+                }
+
+                var result = new MinecraftOperationalHomologationService()
+                    .Evaluate(instance, observation, benchmark);
+                var path = new MinecraftReportService()
+                    .WriteOperationalHomologation(result, GetValue(args, "--output"));
+                Console.WriteLine($"{result.Status}: {path}");
+                WriteStatusFile(args, "HOMOLOGATION_REPORT_OK", path);
                 return true;
             }
 
@@ -204,6 +281,55 @@ internal static class MinecraftCommandLine
         };
     }
 
+    private static int? ParseFps(string[] args)
+    {
+        var value = GetValue(args, "--fps");
+        if (value is null)
+        {
+            return null;
+        }
+
+        if (!int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var fps) ||
+            fps is not (30 or 45 or 60))
+        {
+            throw new ArgumentException("--fps deve ser 30, 45 ou 60.");
+        }
+
+        return fps;
+    }
+
+    private static decimal? ParseOptionalDecimal(string[] args, string key)
+    {
+        var value = GetValue(args, key);
+        if (value is null)
+        {
+            return null;
+        }
+
+        if (!decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out var result) || result < 0)
+        {
+            throw new ArgumentException($"{key} deve ser um numero positivo usando ponto decimal.");
+        }
+
+        return result;
+    }
+
+    private static double? ParseOptionalDouble(string[] args, string key)
+    {
+        var value = GetValue(args, key);
+        if (value is null)
+        {
+            return null;
+        }
+
+        if (!double.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out var result) || result < 0)
+        {
+            throw new ArgumentException($"{key} deve ser um numero positivo usando ponto decimal.");
+        }
+
+        return result;
+    }
+
     private static string RequireValue(string[] args, string key)
     {
         return GetValue(args, key) ?? throw new ArgumentException($"Parametro obrigatorio ausente: {key}");
@@ -244,14 +370,19 @@ internal static class MinecraftCommandLine
     {
         Console.WriteLine("ApexTweaker Minecraft commands:");
         Console.WriteLine("  --minecraft-audit --mods <path> [--output <path>] [--target 1.21.1]");
-        Console.WriteLine("  --minecraft-profile-dry-run --instance <path> --profile EXTREME_4GB [--output <path>]");
-        Console.WriteLine("  --minecraft-apply-profile --instance <path> --profile EXTREME_4GB --yes");
+        Console.WriteLine("  --minecraft-profile-dry-run --instance <path> --profile EXTREME_4GB [--fps 30|45|60] [--output <path>]");
+        Console.WriteLine("  --minecraft-apply-profile --instance <path> --profile EXTREME_4GB [--fps 30|45|60] --yes");
         Console.WriteLine("  --minecraft-rollback --instance <path> --yes");
         Console.WriteLine("  --minecraft-quarantine-dry-run --mods <path> [--output <path>]");
-        Console.WriteLine("  --minecraft-quarantine-apply --mods <path> --files \"a.jar;b.jar\" --yes");
+        Console.WriteLine("  --minecraft-quarantine-apply --mods <path> --files \"a.jar;b.jar\" --yes [--server-manifest-confirmed]");
         Console.WriteLine("  --minecraft-quarantine-rollback --mods <path> --yes");
         Console.WriteLine("  --minecraft-discover-instances");
         Console.WriteLine("  --minecraft-benchmark [--instance <path>] [--seconds 60] [--wait-seconds 30] [--output <path>]");
+        Console.WriteLine("  --minecraft-operational-checklist --mods <path> [--instance <path>] [--fps 30|45|60] [--output <path>]");
+        Console.WriteLine("  --minecraft-homologation-report --instance <path> [observacoes] [--benchmark-seconds 60] [--output <path>]");
+        Console.WriteLine("    observacoes: --game-opened --menu-reached --menu-seconds N --world-entered --server-entered");
+        Console.WriteLine("                 --join-seconds N --playable-720p --average-fps N --minimum-fps N");
+        Console.WriteLine("                 --severe-drops --crashed --out-of-memory --notes \"texto\"");
         Console.WriteLine("  --minecraft-self-test");
     }
 }

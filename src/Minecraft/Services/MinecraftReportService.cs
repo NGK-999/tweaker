@@ -120,6 +120,9 @@ internal sealed class MinecraftReportService
             .AppendLine($"- Launcher: `{plan.Instance.Launcher}`")
             .AppendLine($"- Instancia: `{plan.Instance.GameDirectory}`")
             .AppendLine($"- JVM: `{plan.JavaArguments}`")
+            .AppendLine($"- Heap maximo: `{plan.MaximumHeapMb} MB`")
+            .AppendLine($"- Limite de FPS: `{plan.MaximumFps}`")
+            .AppendLine($"- Motivo da memoria: {plan.JavaMemoryReason}")
             .AppendLine($"- Backup: `{backupDirectory ?? "NAO CRIADO EM DRY-RUN"}`")
             .AppendLine()
             .AppendLine("## Antes e depois")
@@ -143,6 +146,10 @@ internal sealed class MinecraftReportService
             $"MODE={(applied ? "APPLY" : "DRY_RUN")}\r\n" +
             $"PROFILE={plan.Profile}\r\n" +
             $"INSTANCE={plan.Instance.GameDirectory}\r\n" +
+            $"JAVA={plan.JavaArguments}\r\n" +
+            $"HEAP_MB={plan.MaximumHeapMb}\r\n" +
+            $"MAX_FPS={plan.MaximumFps}\r\n" +
+            $"MEMORY_REASON={plan.JavaMemoryReason}\r\n" +
             $"CHANGES={changed.Length}\r\n" +
             string.Join("\r\n", changed.Select(change =>
                 $"{change.FilePath} | {change.Setting} | {Compact(change.Before)} -> {Compact(change.After)}")) + "\r\n",
@@ -167,17 +174,21 @@ internal sealed class MinecraftReportService
             .AppendLine($"- Destino proposto: `{plan.QuarantineDirectory}`")
             .AppendLine("- Arquivos movidos: `0`")
             .AppendLine()
-            .AppendLine("| Arquivo | Mod | Risco | Recomendado | Confirmar servidor | Motivo |")
-            .AppendLine("|---|---|---|---|---|---|");
+            .AppendLine("| Arquivo | Mod | Lado | Risco | Confirmar servidor | Motivo | Servidor | Cobblemon | Performance | Recomendacao |")
+            .AppendLine("|---|---|---|---|---|---|---|---|---|---|");
         foreach (var candidate in plan.Candidates)
         {
             markdown.AppendLine(
                 $"| {EscapeTable(candidate.FileName)} | {EscapeTable(candidate.ModId)} {EscapeTable(candidate.Version)} | " +
-                $"{candidate.Risk} | {(candidate.RecommendedForExtreme ? "SIM" : "NAO")} | " +
-                $"{(candidate.RequiresServerConfirmation ? "SIM" : "NAO")} | {EscapeTable(candidate.Reason)} |");
+                $"{EscapeTable(candidate.SideAssessment)} | {candidate.Risk} | " +
+                $"{(candidate.RequiresServerConfirmation ? "SIM" : "NAO")} | {EscapeTable(candidate.Reason)} | " +
+                $"{EscapeTable(candidate.ServerEntryImpact)} | {EscapeTable(candidate.CobblemonImpact)} | " +
+                $"{EscapeTable(candidate.PerformanceImpact)} | {EscapeTable(candidate.OperationalRecommendation)} |");
         }
 
-        markdown.AppendLine().AppendLine("> Este relatorio nao move JARs. Apply exige selecao e confirmacao explicitas.");
+        markdown.AppendLine()
+            .AppendLine("> Este relatorio nao move JARs. Apply exige selecao e confirmacao explicitas.")
+            .AppendLine("> Candidatos que podem ser exigidos pelo servidor tambem exigem confirmacao do manifesto.");
         File.WriteAllText(markdownPath, markdown.ToString(), Utf8WithoutBom());
         File.WriteAllText(
             textPath,
@@ -186,8 +197,129 @@ internal sealed class MinecraftReportService
             $"CANDIDATES={plan.Candidates.Count}\r\n" +
             "FILES_MOVED=0\r\n" +
             string.Join("\r\n", plan.Candidates.Select(candidate =>
-                $"{candidate.FileName} | {candidate.Risk} | {candidate.Reason}")) + "\r\n",
+                $"{candidate.FileName} | {candidate.SideAssessment} | {candidate.Risk} | " +
+                $"SERVER_CONFIRMATION={candidate.RequiresServerConfirmation} | REASON={candidate.Reason} | " +
+                $"SERVER={candidate.ServerEntryImpact} | COBBLEMON={candidate.CobblemonImpact} | " +
+                $"PERFORMANCE={candidate.PerformanceImpact} | ACTION={candidate.OperationalRecommendation}")) + "\r\n",
             Utf8WithoutBom());
+        return markdownPath;
+    }
+
+    public string WriteOperationalChecklist(
+        MinecraftOperationalChecklist checklist,
+        string? outputDirectory = null)
+    {
+        var directory = ResolveDirectory(outputDirectory);
+        var baseName = $"minecraft-operational-checklist-{checklist.CreatedAtUtc:yyyyMMdd-HHmmss-fff}";
+        var jsonPath = Path.Combine(directory, baseName + ".json");
+        var markdownPath = Path.Combine(directory, baseName + ".md");
+        var textPath = Path.Combine(directory, baseName + ".txt");
+        File.WriteAllText(jsonPath, JsonSerializer.Serialize(checklist, JsonOptions), Utf8WithoutBom());
+
+        var builder = new StringBuilder()
+            .AppendLine("# Checklist de homologacao operacional Cobblemon")
+            .AppendLine()
+            .AppendLine($"- Mods: `{checklist.ModsDirectory}`")
+            .AppendLine($"- Instancia: `{checklist.InstanceRoot ?? "NAO DETECTADA"}`")
+            .AppendLine($"- Instancia valida: `{(checklist.InstanceDetected ? "SIM" : "NAO")}`")
+            .AppendLine($"- JVM: `{checklist.JavaArguments}`")
+            .AppendLine($"- Limite inicial de FPS: `{checklist.MaximumFps}`")
+            .AppendLine();
+        AppendList(builder, "Pre-flight", checklist.PreflightChecks);
+        AppendList(builder, "Criacao e deteccao da instancia", checklist.InstanceSetupSteps);
+        AppendList(builder, "Aplicacao do perfil", checklist.ProfileSteps);
+        AppendList(builder, "Benchmark", checklist.BenchmarkSteps);
+        AppendList(builder, "Criterios de sucesso", checklist.SuccessCriteria);
+        AppendList(builder, "Regras de seguranca", checklist.SafetyRules);
+        AppendList(builder, "Decisoes sobre mods", checklist.ModDecisions);
+        AppendList(builder, "Riscos restantes", checklist.RemainingRisks);
+        File.WriteAllText(markdownPath, builder.ToString(), Utf8WithoutBom());
+
+        var lines = new List<string>
+        {
+            "APEXTWEAKER - CHECKLIST DE HOMOLOGACAO OPERACIONAL",
+            $"MODS={checklist.ModsDirectory}",
+            $"INSTANCE={checklist.InstanceRoot ?? "NAO DETECTADA"}",
+            $"INSTANCE_DETECTED={checklist.InstanceDetected}",
+            $"JAVA={checklist.JavaArguments}",
+            $"MAX_FPS={checklist.MaximumFps}"
+        };
+        AppendPlainList(lines, "PREFLIGHT", checklist.PreflightChecks);
+        AppendPlainList(lines, "INSTANCE", checklist.InstanceSetupSteps);
+        AppendPlainList(lines, "PROFILE", checklist.ProfileSteps);
+        AppendPlainList(lines, "BENCHMARK", checklist.BenchmarkSteps);
+        AppendPlainList(lines, "SUCCESS", checklist.SuccessCriteria);
+        AppendPlainList(lines, "SAFETY", checklist.SafetyRules);
+        AppendPlainList(lines, "MOD", checklist.ModDecisions);
+        AppendPlainList(lines, "RISK", checklist.RemainingRisks);
+        File.WriteAllLines(textPath, lines, Utf8WithoutBom());
+        return markdownPath;
+    }
+
+    public string WriteOperationalHomologation(
+        MinecraftOperationalHomologationResult result,
+        string? outputDirectory = null)
+    {
+        var directory = ResolveDirectory(outputDirectory);
+        var baseName = $"minecraft-operational-result-{result.CreatedAtUtc:yyyyMMdd-HHmmss-fff}";
+        var jsonPath = Path.Combine(directory, baseName + ".json");
+        var markdownPath = Path.Combine(directory, baseName + ".md");
+        var textPath = Path.Combine(directory, baseName + ".txt");
+        File.WriteAllText(jsonPath, JsonSerializer.Serialize(result, JsonOptions), Utf8WithoutBom());
+
+        var observation = result.Observation;
+        var builder = new StringBuilder()
+            .AppendLine("# Resultado da homologacao operacional Cobblemon")
+            .AppendLine()
+            .AppendLine($"- Status: `{result.Status}`")
+            .AppendLine($"- Instancia: `{result.InstanceRoot}`")
+            .AppendLine($"- Jogo abriu: `{YesNo(observation.GameOpened)}`")
+            .AppendLine($"- Menu alcancado: `{YesNo(observation.MenuReached)}` em `{FormatSeconds(observation.MenuLoadSeconds)}`")
+            .AppendLine($"- Mundo: `{YesNo(observation.WorldEntered)}`")
+            .AppendLine($"- Servidor: `{YesNo(observation.ServerEntered)}` em `{FormatSeconds(observation.JoinLoadSeconds)}`")
+            .AppendLine($"- Jogavel em 720p: `{YesNo(observation.PlayableAt720p)}`")
+            .AppendLine($"- FPS medio/minimo: `{FormatNumber(observation.AverageFps)} / {FormatNumber(observation.MinimumFps)}`")
+            .AppendLine($"- Quedas severas: `{YesNo(observation.SevereDrops)}`")
+            .AppendLine($"- Crash/OOM: `{YesNo(observation.Crashed)} / {YesNo(observation.OutOfMemory)}`")
+            .AppendLine($"- Observacoes: {observation.Notes}")
+            .AppendLine()
+            .AppendLine("## Criterios")
+            .AppendLine()
+            .AppendLine("| Criterio | Resultado | Evidencia |")
+            .AppendLine("|---|---|---|");
+        foreach (var criterion in result.Criteria)
+        {
+            builder.AppendLine(
+                $"| {EscapeTable(criterion.Name)} | {(criterion.Passed ? "APROVADO" : "FALHOU")} | {EscapeTable(criterion.Evidence)} |");
+        }
+
+        builder.AppendLine();
+        AppendList(builder, "Riscos restantes", result.RemainingRisks);
+        AppendList(builder, "Acoes manuais", result.ManualActions);
+        File.WriteAllText(markdownPath, builder.ToString(), Utf8WithoutBom());
+
+        var lines = new List<string>
+        {
+            "APEXTWEAKER - RESULTADO DE HOMOLOGACAO OPERACIONAL",
+            $"STATUS={result.Status}",
+            $"INSTANCE={result.InstanceRoot}",
+            $"GAME_OPENED={observation.GameOpened}",
+            $"MENU_REACHED={observation.MenuReached}",
+            $"MENU_SECONDS={observation.MenuLoadSeconds?.ToString() ?? "NAO_MEDIDO"}",
+            $"WORLD_ENTERED={observation.WorldEntered}",
+            $"SERVER_ENTERED={observation.ServerEntered}",
+            $"JOIN_SECONDS={observation.JoinLoadSeconds?.ToString() ?? "NAO_MEDIDO"}",
+            $"PLAYABLE_720P={observation.PlayableAt720p}",
+            $"AVERAGE_FPS={FormatNumber(observation.AverageFps)}",
+            $"MINIMUM_FPS={FormatNumber(observation.MinimumFps)}",
+            $"SEVERE_DROPS={observation.SevereDrops}",
+            $"CRASHED={observation.Crashed}",
+            $"OUT_OF_MEMORY={observation.OutOfMemory}",
+            $"NOTES={observation.Notes}"
+        };
+        AppendPlainList(lines, "RISK", result.RemainingRisks);
+        AppendPlainList(lines, "MANUAL", result.ManualActions);
+        File.WriteAllLines(textPath, lines, Utf8WithoutBom());
         return markdownPath;
     }
 
@@ -433,6 +565,20 @@ internal sealed class MinecraftReportService
 
         builder.AppendLine();
     }
+
+    private static void AppendPlainList(ICollection<string> lines, string prefix, IEnumerable<string> items)
+    {
+        foreach (var item in items)
+        {
+            lines.Add($"{prefix}={item}");
+        }
+    }
+
+    private static string YesNo(bool value) => value ? "SIM" : "NAO";
+
+    private static string FormatSeconds(decimal? value) => value is null ? "NAO MEDIDO" : $"{value:0.0} s";
+
+    private static string FormatNumber(double? value) => value is null ? "NAO MEDIDO" : $"{value:0.0}";
 
     private static string FormatBytes(long bytes)
     {

@@ -46,6 +46,7 @@ public partial class MainWindow : Window
     private readonly MinecraftQuarantineService minecraftQuarantineService = new();
     private readonly MinecraftSurvivalPlanService minecraftSurvivalPlanService = new();
     private readonly MinecraftInstanceService minecraftInstanceService = new();
+    private readonly MinecraftOperationalHomologationService minecraftOperationalHomologationService = new();
     private readonly EtwFrameTracker etwFrameTracker;
     private DashboardView? dashboardView;
     private ModulesView? modulesView;
@@ -58,6 +59,9 @@ public partial class MainWindow : Window
     private CancellationTokenSource? minecraftBenchmarkCancellation;
     private Task<MinecraftBenchmarkResult>? minecraftBenchmarkTask;
     private MinecraftQuarantinePlan? latestMinecraftQuarantinePlan;
+    private MinecraftAuditResult? latestMinecraftAuditResult;
+    private MinecraftProfilePlan? latestMinecraftProfilePlan;
+    private MinecraftBenchmarkResult? latestMinecraftBenchmarkResult;
     private bool isTweaking;
     private bool telemetryRunning;
     private bool baselineCaptured;
@@ -168,6 +172,8 @@ public partial class MainWindow : Window
             minecraftView.ApplyQuarantineRequested += ApplyMinecraftQuarantineAsync;
             minecraftView.RollbackQuarantineRequested += RollbackMinecraftQuarantineAsync;
             minecraftView.BenchmarkRequested += RunMinecraftBenchmarkAsync;
+            minecraftView.ExportChecklistRequested += ExportMinecraftOperationalChecklistAsync;
+            minecraftView.SaveHomologationRequested += SaveMinecraftOperationalHomologationAsync;
             minecraftView.OpenReportsRequested += OpenMinecraftReports;
 
             var defaultModsPath = Path.Combine(
@@ -648,6 +654,9 @@ public partial class MainWindow : Window
             var survival = minecraftSurvivalPlanService.Build(result, quarantine);
             var survivalReport = await Task.Run(() => minecraftReportService.WriteSurvivalPlan(survival));
             latestMinecraftQuarantinePlan = quarantine;
+            latestMinecraftAuditResult = result;
+            latestMinecraftProfilePlan = null;
+            latestMinecraftBenchmarkResult = null;
 
             Minecraft.SetAuditResult(result, reports, quarantine, survival);
             WriteLine($"Mods encontrados: {result.Summary.TotalMods}");
@@ -674,7 +683,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private async Task PreviewMinecraftProfileAsync(string path, MinecraftProfileKind profile)
+    private async Task PreviewMinecraftProfileAsync(string path, MinecraftProfileKind profile, int maximumFps)
     {
         const string section = "Dry-run do perfil Minecraft";
         if (!TryBeginTweaking(section))
@@ -687,7 +696,7 @@ public partial class MainWindow : Window
 
         try
         {
-            var plan = await Task.Run(() => minecraftProfileService.PlanProfile(path, profile));
+            var plan = await Task.Run(() => minecraftProfileService.PlanProfile(path, profile, maximumFps));
             var reportPath = await Task.Run(() => minecraftReportService.WriteProfilePlan(plan, applied: false));
             var changedFiles = plan.Changes
                 .Where(change => change.WillWrite)
@@ -695,6 +704,7 @@ public partial class MainWindow : Window
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToArray();
             Minecraft.SetProfilePlan(plan, reportPath);
+            latestMinecraftProfilePlan = plan;
             WriteLine($"DRY-RUN: {plan.Changes.Count(change => change.WillWrite)} alteracoes propostas.");
             foreach (var file in changedFiles)
             {
@@ -716,12 +726,12 @@ public partial class MainWindow : Window
         }
     }
 
-    private async Task ApplyMinecraftProfileAsync(string path, MinecraftProfileKind profile)
+    private async Task ApplyMinecraftProfileAsync(string path, MinecraftProfileKind profile, int maximumFps)
     {
         MinecraftProfilePlan plan;
         try
         {
-            plan = await Task.Run(() => minecraftProfileService.PlanProfile(path, profile));
+            plan = await Task.Run(() => minecraftProfileService.PlanProfile(path, profile, maximumFps));
         }
         catch (Exception ex)
         {
@@ -737,6 +747,8 @@ public partial class MainWindow : Window
                 $"Alteracoes: {changed.Length}\n" +
                 $"Arquivos: {string.Join(", ", files)}\n" +
                 $"JVM: {plan.JavaArguments}\n\n" +
+                $"FPS: {plan.MaximumFps}\n" +
+                $"Motivo da memoria: {plan.JavaMemoryReason}\n\n" +
                 "Todos os arquivos serao copiados antes da escrita. Mods nao serao movidos por este fluxo.",
                 "Aplicar perfil Minecraft",
                 MessageBoxButton.YesNo,
@@ -756,11 +768,13 @@ public partial class MainWindow : Window
 
         try
         {
-            var result = await Task.Run(() => minecraftProfileService.ApplyProfile(path, profile));
+            var result = await Task.Run(() => minecraftProfileService.ApplyProfile(path, profile, maximumFps));
             WriteLines(result.Messages);
             Minecraft.SetJavaArguments(result.JavaArguments);
             Minecraft.SetOperationText($"{profile} aplicado. Backup: {result.BackupDirectory}");
             Minecraft.MarkProfileApplied();
+            latestMinecraftProfilePlan = plan;
+            latestMinecraftBenchmarkResult = null;
             WriteLine($"Relatorio antes/depois: {result.ReportPath}");
             SetStatus($"Minecraft: perfil {profile} aplicado e verificavel por rollback.");
         }
@@ -801,6 +815,8 @@ public partial class MainWindow : Window
             var result = await Task.Run(() => minecraftProfileService.RollbackLatest(path));
             WriteLines(result.Messages);
             Minecraft.SetOperationText($"Rollback concluido: {result.BackupId}");
+            latestMinecraftProfilePlan = null;
+            latestMinecraftBenchmarkResult = null;
             SetStatus("Minecraft: configuracao anterior restaurada.");
         }
         catch (Exception ex)
@@ -846,6 +862,26 @@ public partial class MainWindow : Window
             return;
         }
 
+        var serverCandidates = selected
+            .Where(candidate => candidate.RequiresServerConfirmation)
+            .ToArray();
+        var serverManifestConfirmed = serverCandidates.Length == 0;
+        if (serverCandidates.Length > 0)
+        {
+            serverManifestConfirmed = System.Windows.MessageBox.Show(
+                "Estes mods podem ser exigidos pelo servidor:\n\n" +
+                string.Join("\n", serverCandidates.Select(candidate => $"- {candidate.FileName}")) +
+                "\n\nClique Sim somente se voce comparou os IDs e versoes com o manifesto exato do servidor.",
+                "Confirmar manifesto do servidor",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Stop) == MessageBoxResult.Yes;
+            if (!serverManifestConfirmed)
+            {
+                Minecraft.SetOperationText("Quarentena cancelada: manifesto do servidor nao confirmado.");
+                return;
+            }
+        }
+
         const string section = "Quarentena Minecraft";
         if (!TryBeginTweaking(section))
         {
@@ -857,13 +893,19 @@ public partial class MainWindow : Window
 
         try
         {
-            var result = await Task.Run(() => minecraftQuarantineService.Apply(plan, selectedFiles));
+            var result = await Task.Run(() => minecraftQuarantineService.Apply(
+                plan,
+                selectedFiles,
+                new MinecraftQuarantineConfirmation(
+                    UserConfirmed: true,
+                    ServerManifestConfirmed: serverManifestConfirmed)));
             WriteLines(result.Messages);
             WriteLine($"Manifesto: {result.ManifestPath}");
             Minecraft.ClearQuarantineSelection();
             Minecraft.SetOperationText(
                 $"Quarentena aplicada: {result.MovedFiles.Count} JAR(s). Backup: {result.BackupDirectory}");
             latestMinecraftQuarantinePlan = null;
+            latestMinecraftBenchmarkResult = null;
             Minecraft.InvalidateQuarantinePlan();
             SetStatus("Minecraft: quarentena aplicada. Teste o servidor; use rollback se houver incompatibilidade.");
         }
@@ -909,6 +951,7 @@ public partial class MainWindow : Window
             Minecraft.SetOperationText(
                 $"Rollback da quarentena concluido: {result.RestoredFiles.Count} JAR(s) restaurado(s).");
             latestMinecraftQuarantinePlan = null;
+            latestMinecraftBenchmarkResult = null;
             Minecraft.InvalidateQuarantinePlan();
             SetStatus("Minecraft: JARs restaurados e verificados por SHA-256.");
         }
@@ -954,6 +997,7 @@ public partial class MainWindow : Window
                 selectedPath,
                 TimeSpan.FromSeconds(15));
             var result = await minecraftBenchmarkTask;
+            latestMinecraftBenchmarkResult = result;
             var reportPath = await Task.Run(() => minecraftReportService.WriteBenchmark(result));
             WriteLine($"Status: {result.Status}");
             WriteLine($"Pico de RAM Java: {result.PeakWorkingSetBytes / 1024d / 1024d:0} MB");
@@ -990,6 +1034,99 @@ public partial class MainWindow : Window
             minecraftBenchmarkTask = null;
             minecraftBenchmarkCancellation?.Dispose();
             minecraftBenchmarkCancellation = null;
+            EndTweaking();
+        }
+    }
+
+    private async Task ExportMinecraftOperationalChecklistAsync(string selectedPath, int maximumFps)
+    {
+        var audit = latestMinecraftAuditResult;
+        var quarantine = latestMinecraftQuarantinePlan;
+        if (audit is null || quarantine is null)
+        {
+            Minecraft.SetOperationText("Execute a auditoria antes de exportar o checklist operacional.");
+            return;
+        }
+
+        const string section = "Checklist operacional Minecraft";
+        if (!TryBeginTweaking(section))
+        {
+            return;
+        }
+
+        try
+        {
+            MinecraftProfilePlan? profilePlan = null;
+            if (minecraftInstanceService.TryResolve(selectedPath, out var instance))
+            {
+                profilePlan = latestMinecraftProfilePlan is not null &&
+                              latestMinecraftProfilePlan.MaximumFps == maximumFps &&
+                              string.Equals(
+                                  Path.GetFullPath(latestMinecraftProfilePlan.Instance.GameDirectory),
+                                  Path.GetFullPath(instance.GameDirectory),
+                                  StringComparison.OrdinalIgnoreCase)
+                    ? latestMinecraftProfilePlan
+                    : await Task.Run(() => minecraftProfileService.PlanProfile(
+                        selectedPath,
+                        MinecraftProfileKind.Extreme4Gb,
+                        maximumFps));
+            }
+
+            var checklist = minecraftOperationalHomologationService.BuildChecklist(audit, quarantine, profilePlan);
+            var reportPath = await Task.Run(() => minecraftReportService.WriteOperationalChecklist(checklist));
+            latestMinecraftProfilePlan = profilePlan;
+            Minecraft.SetOperationalChecklist(reportPath);
+            WriteLine($"Checklist operacional: {reportPath}");
+            SetStatus("Minecraft: checklist operacional exportado sem alterar arquivos.");
+        }
+        catch (Exception ex)
+        {
+            Minecraft.SetOperationText($"Checklist nao gerado: {ex.Message}");
+            WriteLine($"Falha no checklist operacional: {ex.Message}");
+        }
+        finally
+        {
+            EndTweaking();
+        }
+    }
+
+    private async Task SaveMinecraftOperationalHomologationAsync(
+        string selectedPath,
+        MinecraftOperationalObservation observation)
+    {
+        const string section = "Homologacao operacional Minecraft";
+        if (!TryBeginTweaking(section))
+        {
+            return;
+        }
+
+        try
+        {
+            MinecraftBenchmarkResult? benchmark = null;
+            if (latestMinecraftBenchmarkResult is not null &&
+                minecraftInstanceService.TryResolve(selectedPath, out var instance) &&
+                string.Equals(
+                    Path.GetFullPath(latestMinecraftBenchmarkResult.InstanceRoot ?? string.Empty),
+                    Path.GetFullPath(instance.GameDirectory),
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                benchmark = latestMinecraftBenchmarkResult;
+            }
+
+            var result = minecraftOperationalHomologationService.Evaluate(selectedPath, observation, benchmark);
+            var reportPath = await Task.Run(() => minecraftReportService.WriteOperationalHomologation(result));
+            Minecraft.SetOperationalResult(result.Status, reportPath);
+            WriteLine($"Homologacao operacional: {result.Status}");
+            WriteLine($"Relatorio: {reportPath}");
+            SetStatus($"Minecraft: homologacao registrada como {result.Status}.");
+        }
+        catch (Exception ex)
+        {
+            Minecraft.SetOperationText($"Homologacao nao registrada: {ex.Message}");
+            WriteLine($"Falha na homologacao operacional: {ex.Message}");
+        }
+        finally
+        {
             EndTweaking();
         }
     }

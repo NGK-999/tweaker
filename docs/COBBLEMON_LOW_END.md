@@ -1,4 +1,4 @@
-# Cobblemon Low-End Lab v2.2.0
+# Cobblemon Low-End Lab v2.3.0
 
 ## Objetivo
 
@@ -20,6 +20,8 @@ Nesse hardware, o objetivo e abrir o jogo e obter estabilidade minima em
 6. `Quarantine rollback`: restaura os JARs sem sobrescrever arquivo divergente.
 7. `Benchmark`: registra ambiente, processo, mods, configs, logs e crashes.
 8. `Manual recommendations`: gera o Plano de Sobrevivencia 4 GB.
+9. `Operational checklist`: prepara a rodada real sem declarar sucesso antecipado.
+10. `Operational result`: combina observacao manual com processo, logs e crashes.
 
 ## Instancias reconhecidas
 
@@ -47,7 +49,7 @@ O perfil altera `options.txt` para:
 - biome blend 0;
 - mipmap 0;
 - nuvens, sombras de entidades e VSync desligados;
-- limite inicial de 45 FPS;
+- limite selecionavel de 30, 45 ou 60 FPS;
 - screen effect 0.25 e FOV effect 0.50.
 
 O perfil considera somente chaves existentes nos JSONs abaixo:
@@ -55,6 +57,7 @@ O perfil considera somente chaves existentes nos JSONs abaixo:
 - `config/sodium-options.json`;
 - `config/immediatelyfast.json`;
 - `config/entityculling.json`.
+- `config/iris.properties`, somente para `enableShaders=false`.
 
 Se o arquivo ou a chave nao existir, nada e inventado. Opcoes experimentais e
 debug do ImmediatelyFast nao sao ativadas.
@@ -93,6 +96,7 @@ depois. O rollback rejeita caminhos fora da lista gerenciada e restaura:
 - `options.txt`;
 - `apextweaker-java-args.txt`;
 - os tres JSONs suportados, quando alterados;
+- `iris.properties`, quando alterado;
 - `instance.cfg`, quando alterado.
 
 O rollback de perfil nao mexe na quarentena de mods.
@@ -111,6 +115,8 @@ Ao aplicar:
 6. origem, destino, backup, hash e motivo entram no manifesto.
 
 Nenhum JAR e excluido. Em falha parcial, os arquivos ja movidos sao restaurados.
+Apply exige confirmacao explicita. Candidatos comuns aos dois lados tambem
+exigem confirmacao separada de que o manifesto do servidor foi comparado.
 
 ## Auditoria real do pacote local
 
@@ -143,7 +149,9 @@ Candidatos encontrados:
 | `entity_texture_features_1.21-fabric-7.1.jar` | Medio | Testar sem texturas extras |
 
 As duas primeiras aparecem como recomendadas pelo plano, mas continuam exigindo
-confirmacao humana. As cinco visuais nao sao selecionadas automaticamente.
+confirmacao humana. Mega Showdown exige confirmacao de manifesto; Indium e
+client-only e deve ser testado fora apenas em uma copia. As cinco visuais nao
+sao selecionadas automaticamente.
 
 ## Benchmark
 
@@ -197,7 +205,7 @@ Dry-run do perfil:
 ```powershell
 dotnet ApexTweaker.dll --minecraft-profile-dry-run `
   --instance "C:\caminho\da\instancia" `
-  --profile EXTREME_4GB
+  --profile EXTREME_4GB --fps 30
 ```
 
 Apply e rollback do perfil:
@@ -205,7 +213,7 @@ Apply e rollback do perfil:
 ```powershell
 dotnet ApexTweaker.dll --minecraft-apply-profile `
   --instance "C:\caminho\da\instancia" `
-  --profile EXTREME_4GB --yes
+  --profile EXTREME_4GB --fps 30 --yes
 
 dotnet ApexTweaker.dll --minecraft-rollback `
   --instance "C:\caminho\da\instancia" --yes
@@ -237,7 +245,21 @@ dotnet ApexTweaker.dll --minecraft-benchmark `
   --seconds 60 --wait-seconds 30
 ```
 
+Checklist e homologacao:
+
+```powershell
+dotnet ApexTweaker.dll --minecraft-operational-checklist `
+  --mods "$env:USERPROFILE\Downloads\mods\mods" `
+  --instance "C:\caminho\da\instancia" --fps 30
+
+dotnet ApexTweaker.dll --minecraft-homologation-report `
+  --instance "C:\caminho\da\instancia" `
+  --game-opened --menu-reached --server-entered --playable-720p `
+  --average-fps 30 --minimum-fps 15
+```
+
 ## Leitura complementar
 
 - [Autoauditoria v2.1.0 -> v2.2.0](V2_2_IMPLEMENTATION_AUDIT.md)
 - [Matriz Fabric 1.21.1](COBBLEMON_COMPATIBILITY_1.21.1.md)
+- [Homologacao operacional no PC real](HOMOLOGACAO_OPERACIONAL_COBBLEMON.md)

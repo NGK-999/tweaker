@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
@@ -12,6 +13,7 @@ namespace ApexTweaker.UI.Wpf.Views;
 public partial class MinecraftView : WpfUserControl
 {
     private bool busy;
+    private bool auditAvailable;
     private bool instanceDetected;
     private bool profilePreviewReady;
     private bool quarantinePlanReady;
@@ -20,9 +22,9 @@ public partial class MinecraftView : WpfUserControl
 
     public event Func<string, Task>? AuditRequested;
 
-    internal event Func<string, MinecraftProfileKind, Task>? ApplyProfileRequested;
+    internal event Func<string, MinecraftProfileKind, int, Task>? ApplyProfileRequested;
 
-    internal event Func<string, MinecraftProfileKind, Task>? PreviewProfileRequested;
+    internal event Func<string, MinecraftProfileKind, int, Task>? PreviewProfileRequested;
 
     public event Func<string, Task>? RollbackRequested;
 
@@ -31,6 +33,10 @@ public partial class MinecraftView : WpfUserControl
     public event Func<string, Task>? RollbackQuarantineRequested;
 
     public event Func<string, Task>? BenchmarkRequested;
+
+    internal event Func<string, int, Task>? ExportChecklistRequested;
+
+    internal event Func<string, MinecraftOperationalObservation, Task>? SaveHomologationRequested;
 
     public event Action? OpenReportsRequested;
 
@@ -42,7 +48,14 @@ public partial class MinecraftView : WpfUserControl
             .ToArray();
         ProfileComboBox.SelectedItem = MinecraftProfileService.AvailableProfiles
             .First(profile => profile.Kind == MinecraftProfileKind.Extreme4Gb);
+        FpsComboBox.ItemsSource = new[] { 30, 45, 60 };
+        FpsComboBox.SelectedItem = 45;
         ProfileComboBox.SelectionChanged += (_, _) =>
+        {
+            profilePreviewReady = false;
+            UpdateActionState();
+        };
+        FpsComboBox.SelectionChanged += (_, _) =>
         {
             profilePreviewReady = false;
             UpdateActionState();
@@ -56,6 +69,7 @@ public partial class MinecraftView : WpfUserControl
     {
         PathTextBox.Text = path;
         instanceDetected = MinecraftProfileService.TryResolveInstanceRoot(path, out _);
+        auditAvailable = false;
         profilePreviewReady = false;
         quarantinePlanReady = false;
         QuarantineList.ItemsSource = null;
@@ -76,6 +90,7 @@ public partial class MinecraftView : WpfUserControl
         DuplicateModsText.Text = result.Summary.DuplicateModIds.ToString();
         IssuesText.Text = result.Summary.PossibleConflicts.ToString();
         instanceDetected = result.InstanceRootDetected;
+        auditAvailable = true;
 
         EnvironmentText.Text =
             $"{result.Environment.Processor}\n" +
@@ -112,7 +127,8 @@ public partial class MinecraftView : WpfUserControl
         var changed = plan.Changes.Where(change => change.WillWrite).ToArray();
         OperationText.Text =
             $"DRY-RUN: {changed.Length} alteracoes em {changed.Select(change => change.FilePath).Distinct(StringComparer.OrdinalIgnoreCase).Count()} arquivo(s). " +
-            $"Relatorio: {reportPath}";
+            $"FPS {plan.MaximumFps}, heap {plan.MaximumHeapMb} MB. Relatorio: {reportPath}";
+        OperationalStatusText.Text = plan.JavaMemoryReason;
         UpdateActionState();
     }
 
@@ -151,12 +167,23 @@ public partial class MinecraftView : WpfUserControl
         JavaArgumentsTextBox.Text = arguments;
     }
 
+    internal void SetOperationalResult(OperationalHomologationStatus status, string reportPath)
+    {
+        OperationalStatusText.Text = $"Resultado {status}. Relatorio: {reportPath}";
+    }
+
+    public void SetOperationalChecklist(string reportPath)
+    {
+        OperationalStatusText.Text = $"Checklist exportado: {reportPath}";
+    }
+
     private void UpdateActionState()
     {
         BrowseButton.IsEnabled = !busy;
         AuditButton.IsEnabled = !busy;
         PathTextBox.IsEnabled = !busy;
         ProfileComboBox.IsEnabled = !busy && instanceDetected;
+        FpsComboBox.IsEnabled = !busy && instanceDetected;
         PreviewProfileButton.IsEnabled = !busy && instanceDetected;
         ApplyProfileButton.IsEnabled = !busy && instanceDetected && profilePreviewReady;
         RollbackButton.IsEnabled = !busy && instanceDetected;
@@ -164,6 +191,8 @@ public partial class MinecraftView : WpfUserControl
         ApplyQuarantineButton.IsEnabled = !busy && quarantinePlanReady && QuarantineList.SelectedItems.Count > 0;
         RollbackQuarantineButton.IsEnabled = !busy && DirectoryPathAvailable();
         BenchmarkButton.IsEnabled = !busy;
+        ExportChecklistButton.IsEnabled = !busy && auditAvailable;
+        SaveHomologationButton.IsEnabled = !busy && instanceDetected;
         OpenReportsButton.IsEnabled = !busy;
     }
 
@@ -180,6 +209,7 @@ public partial class MinecraftView : WpfUserControl
         }
 
         instanceDetected = MinecraftProfileService.TryResolveInstanceRoot(SelectedPath, out _);
+        auditAvailable = false;
         profilePreviewReady = false;
         quarantinePlanReady = false;
         if (QuarantineList is not null)
@@ -202,7 +232,7 @@ public partial class MinecraftView : WpfUserControl
     {
         if (ApplyProfileRequested is not null && ProfileComboBox.SelectedItem is MinecraftProfileDefinition profile)
         {
-            await ApplyProfileRequested.Invoke(SelectedPath, profile.Kind);
+            await ApplyProfileRequested.Invoke(SelectedPath, profile.Kind, SelectedFps);
         }
     }
 
@@ -210,7 +240,7 @@ public partial class MinecraftView : WpfUserControl
     {
         if (PreviewProfileRequested is not null && ProfileComboBox.SelectedItem is MinecraftProfileDefinition profile)
         {
-            await PreviewProfileRequested.Invoke(SelectedPath, profile.Kind);
+            await PreviewProfileRequested.Invoke(SelectedPath, profile.Kind, SelectedFps);
         }
     }
 
@@ -258,6 +288,103 @@ public partial class MinecraftView : WpfUserControl
     private void OpenReportsButton_OnClick(object sender, RoutedEventArgs e)
     {
         OpenReportsRequested?.Invoke();
+    }
+
+    private async void ExportChecklistButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (ExportChecklistRequested is not null)
+        {
+            await ExportChecklistRequested.Invoke(SelectedPath, SelectedFps);
+        }
+    }
+
+    private async void SaveHomologationButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (SaveHomologationRequested is null || !TryReadOperationalObservation(out var observation))
+        {
+            return;
+        }
+
+        await SaveHomologationRequested.Invoke(SelectedPath, observation);
+    }
+
+    private int SelectedFps => FpsComboBox.SelectedItem is int fps ? fps : 45;
+
+    private bool TryReadOperationalObservation(out MinecraftOperationalObservation observation)
+    {
+        observation = default!;
+        if (!TryReadDecimal(MenuSecondsTextBox.Text, "Tempo ate o menu", out var menuSeconds) ||
+            !TryReadDecimal(JoinSecondsTextBox.Text, "Tempo de entrada", out var joinSeconds) ||
+            !TryReadDouble(AverageFpsTextBox.Text, "FPS medio", out var averageFps) ||
+            !TryReadDouble(MinimumFpsTextBox.Text, "FPS minimo", out var minimumFps))
+        {
+            return false;
+        }
+
+        observation = new MinecraftOperationalObservation(
+            GameOpenedCheckBox.IsChecked == true,
+            MenuReachedCheckBox.IsChecked == true,
+            menuSeconds,
+            WorldEnteredCheckBox.IsChecked == true,
+            ServerEnteredCheckBox.IsChecked == true,
+            joinSeconds,
+            Playable720pCheckBox.IsChecked == true,
+            averageFps,
+            minimumFps,
+            SevereDropsCheckBox.IsChecked == true,
+            CrashedCheckBox.IsChecked == true,
+            OutOfMemoryCheckBox.IsChecked == true,
+            OperationalNotesTextBox.Text.Trim());
+        return true;
+    }
+
+    private static bool TryReadDecimal(string value, string label, out decimal? result)
+    {
+        result = null;
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return true;
+        }
+
+        var normalized = value.Trim().Replace(',', '.');
+        if (decimal.TryParse(normalized, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed) &&
+            parsed >= 0)
+        {
+            result = parsed;
+            return true;
+        }
+
+        ShowInvalidNumber(label);
+        return false;
+    }
+
+    private static bool TryReadDouble(string value, string label, out double? result)
+    {
+        result = null;
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return true;
+        }
+
+        var normalized = value.Trim().Replace(',', '.');
+        if (double.TryParse(normalized, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed) &&
+            parsed >= 0)
+        {
+            result = parsed;
+            return true;
+        }
+
+        ShowInvalidNumber(label);
+        return false;
+    }
+
+    private static void ShowInvalidNumber(string label)
+    {
+        System.Windows.MessageBox.Show(
+            $"{label} deve ser um numero positivo ou ficar vazio quando nao foi medido.",
+            "Homologacao operacional",
+            MessageBoxButton.OK,
+            MessageBoxImage.Information);
     }
 
     private bool DirectoryPathAvailable()

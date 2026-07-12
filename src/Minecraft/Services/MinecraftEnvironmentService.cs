@@ -59,6 +59,11 @@ internal sealed partial class MinecraftEnvironmentService
 
     public static string BuildJavaArguments(decimal totalMemoryGb, decimal availableMemoryGb)
     {
+        return RecommendJavaMemory(totalMemoryGb, availableMemoryGb).Arguments;
+    }
+
+    public static JavaMemoryRecommendation RecommendJavaMemory(decimal totalMemoryGb, decimal availableMemoryGb)
+    {
         var preferredMb = totalMemoryGb switch
         {
             <= 4.5m when availableMemoryGb >= 3.25m => 2560,
@@ -71,9 +76,35 @@ internal sealed partial class MinecraftEnvironmentService
         var minimumMb = totalMemoryGb >= 3.5m ? 2048 : 1536;
         var availableLimitMb = Math.Max(minimumMb, (int)Math.Floor((availableMemoryGb - 0.75m) * 1024m / 256m) * 256);
         var totalLimitMb = Math.Max(minimumMb, (int)Math.Floor((totalMemoryGb - 1.25m) * 1024m / 256m) * 256);
-        var maximumMb = Math.Clamp(Math.Min(preferredMb, Math.Min(availableLimitMb, totalLimitMb)), minimumMb, 4096);
+        // On the 4 GB target, use only the three documented test tiers. The
+        // lower tier is already the conservative Cobblemon baseline.
+        var maximumMb = totalMemoryGb <= 4.5m
+            ? preferredMb
+            : Math.Clamp(Math.Min(preferredMb, Math.Min(availableLimitMb, totalLimitMb)), minimumMb, 4096);
+        var tier = totalMemoryGb <= 4.5m
+            ? maximumMb <= 2048
+                ? JavaMemoryTier.Safe2048
+                : maximumMb <= 2304
+                    ? JavaMemoryTier.Balanced2304
+                    : JavaMemoryTier.Aggressive2560
+            : JavaMemoryTier.Standard;
+        var reason = tier switch
+        {
+            JavaMemoryTier.Safe2048 =>
+                $"Modo seguro: {availableMemoryGb:0.00} GB livres; 2048 MB preservam a maior reserva possivel para o Windows.",
+            JavaMemoryTier.Balanced2304 =>
+                $"Modo balanceado: {availableMemoryGb:0.00} GB livres permitem 2304 MB mantendo reserva para o Windows.",
+            JavaMemoryTier.Aggressive2560 =>
+                $"Modo agressivo controlado: {availableMemoryGb:0.00} GB livres permitem testar 2560 MB; retorne a 2304/2048 MB se houver paginacao.",
+            _ =>
+                $"Heap calculado pela RAM total ({totalMemoryGb:0.00} GB) e livre ({availableMemoryGb:0.00} GB)."
+        };
 
-        return $"-Xms512M -Xmx{maximumMb}M";
+        return new JavaMemoryRecommendation(
+            maximumMb,
+            $"-Xms512M -Xmx{maximumMb}M",
+            tier,
+            reason);
     }
 
     private static (decimal TotalGb, decimal AvailableGb) ReadMemory()

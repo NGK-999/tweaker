@@ -11,7 +11,7 @@ Pasta: `release-v2/`
 
 O cliente nao precisa instalar .NET. Target: **Windows 10/11 64-bit**.
 
-Versao atual: **2.2.0**.
+Versao atual: **2.3.0**.
 
 ## Como gerar o portatil
 
@@ -73,6 +73,7 @@ Start-Process "release-v2\ApexTweaker.exe" -Verb RunAs
 - Logs: `C:\ProgramData\ApexTweaker\Logs\latest_runtime.log`
 - O modulo Cobblemon modifica somente arquivos de uma instancia explicitamente
   selecionada, sempre com dry-run, confirmacao e backup. Ele nao injeta hooks no jogo.
-- Downloads publicos (quando disponiveis):
+- O repositorio esta privado em 2026-07-12. Os links abaixo retornam `404` sem
+  login em uma conta autorizada:
   - Instalador: [ApexTweaker-Setup.exe](https://github.com/NGK-999/tweaker/releases/latest/download/ApexTweaker-Setup.exe)
   - Portatil: [ApexTweaker.exe](https://github.com/NGK-999/tweaker/releases/latest/download/ApexTweaker.exe)
