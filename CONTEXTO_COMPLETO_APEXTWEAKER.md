@@ -8,7 +8,7 @@ Regra: fatos marcados como **confirmados** foram verificados no repositorio loca
 
 - Nome: ApexTweaker.
 - Autor/empresa: Igor Silva.
-- Versao atual declarada: `2.1.0`.
+- Versao atual declarada: `2.2.0`.
 - Plataforma: Windows 10/11, com foco atual em Windows 11.
 - Framework atual: `.NET 10`, destino `net10.0-windows`.
 - Objetivo tecnico: otimizar estabilidade de frametime e 1% low, reduzir stutters e oferecer telemetria, backup e rollback.
@@ -435,14 +435,15 @@ Uma otimizacao so pode ser anunciada como aplicada quando:
 Continue o ApexTweaker em C:\Apextweaker usando CONTEXTO_COMPLETO_APEXTWEAKER.md como handoff. Nao trate pedidos historicos como implementados sem verificar o codigo. Primeiro corrija os tres bloqueadores WPF confirmados: (1) PageTransitionAnimator nao pode adicionar views cacheadas vivas a um Grid temporario; use transicao sequencial ou snapshot, (2) MainWindow_OnClosing nao pode chamar Close de forma reentrante; desinscreva Closing antes do fechamento final, (3) remova todo mojibake dos arquivos .cs/.xaml e salve UTF-8. Depois execute build Release, publique em uma pasta nova, confirme o hash e teste exatamente o novo executavel. Nao substitua release-v2 enquanto ApexTweaker.exe estiver em execucao.
 ```
 
-## 16. Minecraft/Cobblemon 2.1.0
+## 16. Minecraft/Cobblemon 2.2.0
 
 - A shell WPF possui a pagina `MinecraftView`, exibida como **Cobblemon**.
 - O modulo em `src/Minecraft` audita JARs, inclusive dependencias aninhadas, sem escrever na pasta de mods.
-- Relatorios sao gerados em JSON, Markdown e TXT, com plano separado de sugestoes de quarentena.
-- Os perfis alteram apenas `options.txt` e um TXT de argumentos JVM depois de backup proprio.
+- Relatorios sao gerados em JSON, Markdown e TXT, incluindo antes/depois, quarentena e Plano de Sobrevivencia 4 GB.
+- O dry-run lista cada chave sem escrever; o apply altera `options.txt`, configs validadas e memoria Prism/MultiMC.
 - Backups Minecraft ficam em `C:\ProgramData\ApexTweaker\MinecraftBackups`.
-- O rollback rejeita caminhos fora da instancia e nunca manipula JARs.
+- Quarentena e rollback de JARs usam backup separado, SHA-256 e confirmacao explicita.
+- O rollback rejeita caminhos fora da instancia ou da pasta de mods esperada.
 - A pasta auditada em julho de 2026 tinha 88 mods, duplicidade de `mega_showdown` e colisao entre Sodium 0.6.13 e Indium separado.
-- `--minecraft-self-test` valida scanner, relatorios, perfil, rollback e carregamento XAML.
+- `--minecraft-self-test` valida scanner, dry-run, configs, Prism, quarentena, benchmark, rollback e XAML.
 - Detalhes operacionais: `docs/COBBLEMON_LOW_END.md`.

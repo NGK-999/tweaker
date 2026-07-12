@@ -11,7 +11,7 @@ Pasta: `release-v2/`
 
 O cliente nao precisa instalar .NET. Target: **Windows 10/11 64-bit**.
 
-Versao atual: **2.1.0**.
+Versao atual: **2.2.0**.
 
 ## Como gerar o portatil
 
@@ -71,7 +71,8 @@ Start-Process "release-v2\ApexTweaker.exe" -Verb RunAs
 - **SmartScreen** pode alertar enquanto o arquivo nao estiver assinado digitalmente. Para distribuicao comercial, use certificado de code signing.
 - Backups do app: `C:\ProgramData\ApexTweaker\Backups`
 - Logs: `C:\ProgramData\ApexTweaker\Logs\latest_runtime.log`
-- O app **nao modifica arquivos de jogos** e evita hooks agressivos contra anti-cheat.
+- O modulo Cobblemon modifica somente arquivos de uma instancia explicitamente
+  selecionada, sempre com dry-run, confirmacao e backup. Ele nao injeta hooks no jogo.
 - Downloads publicos (quando disponiveis):
   - Instalador: [ApexTweaker-Setup.exe](https://github.com/NGK-999/tweaker/releases/latest/download/ApexTweaker-Setup.exe)
   - Portatil: [ApexTweaker.exe](https://github.com/NGK-999/tweaker/releases/latest/download/ApexTweaker.exe)

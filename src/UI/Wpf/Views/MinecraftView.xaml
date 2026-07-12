@@ -91,6 +91,7 @@
                         <TextBox x:Name="PathTextBox"
                                  Grid.Column="0"
                                  Style="{StaticResource MinecraftTextBox}"
+                                 TextChanged="PathTextBox_OnTextChanged"
                                  ToolTip="Selecione a pasta mods ou a raiz da instancia" />
                         <Button x:Name="BrowseButton"
                                 Grid.Column="1"
@@ -191,10 +192,15 @@
                                   Foreground="{StaticResource TextPrimaryBrush}"
                                   BorderBrush="{StaticResource CardBorderBrush}"
                                   DisplayMemberPath="DisplayName" />
-                        <Button x:Name="ApplyProfileButton"
+                        <Button x:Name="PreviewProfileButton"
                                 Margin="0,10,0,0"
+                                Style="{StaticResource MacSecondaryButton}"
+                                Content="Previsualizar (dry-run)"
+                                Click="PreviewProfileButton_OnClick" />
+                        <Button x:Name="ApplyProfileButton"
+                                Margin="0,8,0,0"
                                 Style="{StaticResource MacPrimaryButton}"
-                                Content="Aplicar com backup"
+                                Content="Aplicar plano com backup"
                                 Click="ApplyProfileButton_OnClick" />
                         <Button x:Name="RollbackButton"
                                 Margin="0,8,0,0"
@@ -205,7 +211,92 @@
                                    Foreground="{StaticResource TextTertiaryBrush}"
                                    FontSize="11"
                                    TextWrapping="Wrap"
-                                   Text="Argumentos JVM sao recomendados e salvos em TXT, mas nao sao injetados no launcher sem sua acao." />
+                                   Text="Prism/MultiMC recebem memoria por instancia. Outros launchers recebem instrucoes manuais claras." />
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <Grid Margin="0,14,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="1.12*" />
+                    <ColumnDefinition Width="0.88*" />
+                </Grid.ColumnDefinitions>
+
+                <Border Grid.Column="0"
+                        Margin="0,0,7,0"
+                        Style="{StaticResource MacCardStyle}">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource MacSectionLabel}" Text="QUARENTENA REVERSIVEL" />
+                        <TextBlock Margin="0,7,0,0"
+                                   Style="{StaticResource MacBodyText}"
+                                   Text="Selecione somente os JARs confirmados. A auditoria apenas monta o dry-run; nenhum item vem marcado automaticamente." />
+                        <ListBox x:Name="QuarantineList"
+                                 Height="178"
+                                 Margin="0,10,0,0"
+                                 Padding="4"
+                                 Background="{StaticResource CardElevatedBrush}"
+                                 BorderBrush="{StaticResource CardBorderBrush}"
+                                 BorderThickness="1"
+                                 Foreground="{StaticResource TextPrimaryBrush}"
+                                 SelectionMode="Extended"
+                                 SelectionChanged="QuarantineList_OnSelectionChanged">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel Margin="5,4">
+                                        <TextBlock FontSize="12"
+                                                   FontWeight="SemiBold"
+                                                   Text="{Binding FileName}" />
+                                        <TextBlock Margin="0,2,0,0"
+                                                   Foreground="{StaticResource TextTertiaryBrush}"
+                                                   FontSize="10"
+                                                   TextWrapping="Wrap">
+                                            <Run Text="Risco " />
+                                            <Run Text="{Binding Risk}" />
+                                            <Run Text=" | " />
+                                            <Run Text="{Binding Reason}" />
+                                        </TextBlock>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                        <Grid Margin="0,10,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Button x:Name="ApplyQuarantineButton"
+                                    Grid.Column="0"
+                                    Margin="0,0,5,0"
+                                    Style="{StaticResource MacPrimaryButton}"
+                                    Content="Mover selecionados"
+                                    Click="ApplyQuarantineButton_OnClick" />
+                            <Button x:Name="RollbackQuarantineButton"
+                                    Grid.Column="1"
+                                    Margin="5,0,0,0"
+                                    Style="{StaticResource MacSecondaryButton}"
+                                    Content="Desfazer quarentena"
+                                    Click="RollbackQuarantineButton_OnClick" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <Border Grid.Column="1"
+                        Margin="7,0,0,0"
+                        Style="{StaticResource MacCardStyle}">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource MacSectionLabel}" Text="PLANO DE SOBREVIVENCIA 4 GB" />
+                        <TextBlock x:Name="SurvivalVerdictText"
+                                   Margin="0,8,0,0"
+                                   Foreground="#67D89B"
+                                   FontSize="14"
+                                   FontWeight="SemiBold"
+                                   Text="Execute a auditoria para gerar um veredito realista."
+                                   TextWrapping="Wrap" />
+                        <TextBlock x:Name="SurvivalDetailsText"
+                                   Margin="0,10,0,0"
+                                   Style="{StaticResource MacBodyText}"
+                                   Text="O plano combina JVM, mods, graficos, riscos e recomendacoes manuais."
+                                   TextWrapping="Wrap" />
                     </StackPanel>
                 </Border>
             </Grid>
@@ -223,7 +314,7 @@
                         <TextBlock x:Name="OperationText"
                                    Margin="0,7,0,0"
                                    Style="{StaticResource MacBodyText}"
-                                   Text="Abra o Minecraft para medir 60 segundos de RAM, CPU e pressao de memoria. FPS exige ferramenta externa." />
+                                   Text="Abra o Minecraft para medir RAM, CPU, configs, latest.log e crash reports. Sem processo, o resultado sera NAO_TESTADO." />
                         <TextBox x:Name="JavaArgumentsTextBox"
                                  Margin="0,10,0,0"
                                  Style="{StaticResource MinecraftTextBox}"

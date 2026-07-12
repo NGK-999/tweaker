@@ -347,11 +347,13 @@ internal sealed partial class MinecraftEnvironmentService
             }
 
             var architecture = JavaArchitectureRegex().Match(output).Groups[1].Value;
+            var is64Bit = architecture == "64" ||
+                          output.Contains("64-Bit", StringComparison.OrdinalIgnoreCase);
             return new JavaRuntimeInfo(
                 true,
                 ResolveExecutablePath(executable),
                 version,
-                architecture == "64" || Environment.Is64BitProcess,
+                is64Bit,
                 "Java detectado por execucao somente leitura.");
         }
         catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception or IOException)

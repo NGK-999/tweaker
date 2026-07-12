@@ -54,9 +54,38 @@ internal enum MinecraftProfileKind
 [JsonConverter(typeof(JsonStringEnumConverter))]
 internal enum BenchmarkStatus
 {
+    NotTested,
     Approved,
     Unstable,
     Failed
+}
+
+[JsonConverter(typeof(JsonStringEnumConverter))]
+internal enum MinecraftLauncherKind
+{
+    Custom,
+    Official,
+    PrismLauncher,
+    MultiMC,
+    ModrinthApp,
+    CurseForge
+}
+
+[JsonConverter(typeof(JsonStringEnumConverter))]
+internal enum MinecraftProfileChangeKind
+{
+    Options,
+    JsonConfig,
+    LauncherMemory,
+    GeneratedInstruction
+}
+
+[JsonConverter(typeof(JsonStringEnumConverter))]
+internal enum QuarantineRisk
+{
+    Low,
+    Medium,
+    High
 }
 
 internal sealed class MinecraftModDescriptor
@@ -206,6 +235,12 @@ internal sealed class MinecraftBackupManifest
 
     public required string InstanceRoot { get; init; }
 
+    public string ManagedRoot { get; init; } = string.Empty;
+
+    public string GameDirectory { get; init; } = string.Empty;
+
+    public MinecraftLauncherKind Launcher { get; init; } = MinecraftLauncherKind.Custom;
+
     public required MinecraftProfileKind Profile { get; init; }
 
     public required List<MinecraftBackupFileEntry> Files { get; init; }
@@ -220,6 +255,8 @@ internal sealed record MinecraftProfileApplyResult(
     string BackupDirectory,
     string JavaArguments,
     IReadOnlyList<string> ChangedFiles,
+    IReadOnlyList<MinecraftProfileSettingChange> Changes,
+    string ReportPath,
     IReadOnlyList<string> Messages);
 
 internal sealed record MinecraftRollbackResult(
@@ -238,12 +275,122 @@ internal sealed record MinecraftBenchmarkSample(
 internal sealed record MinecraftBenchmarkResult(
     DateTimeOffset StartedAtUtc,
     TimeSpan Duration,
-    string ProcessName,
-    int ProcessId,
+    string? InstanceRoot,
+    MinecraftEnvironmentSnapshot EnvironmentBefore,
+    MinecraftEnvironmentSnapshot EnvironmentAfter,
+    string? ProcessName,
+    int? ProcessId,
     BenchmarkStatus Status,
     long PeakWorkingSetBytes,
     long PeakPrivateMemoryBytes,
     decimal MinimumAvailableMemoryGb,
     bool FpsMeasured,
     IReadOnlyList<MinecraftBenchmarkSample> Samples,
+    IReadOnlyList<string> ActiveMods,
+    IReadOnlyDictionary<string, string> ConfigHashesBefore,
+    IReadOnlyDictionary<string, string> ConfigHashesAfter,
+    string? LatestLogPath,
+    string? LatestLogTail,
+    string? CrashReportPath,
+    string? CrashReportTail,
+    bool OutOfMemoryEvidence,
+    bool CrashEvidence,
     IReadOnlyList<string> Notes);
+
+internal sealed record MinecraftInstanceDescriptor(
+    string SelectedPath,
+    string ManagedRoot,
+    string GameDirectory,
+    string ModsDirectory,
+    string ConfigDirectory,
+    string OptionsPath,
+    MinecraftLauncherKind Launcher,
+    string? LauncherConfigPath,
+    string DisplayName);
+
+internal sealed record MinecraftProfileSettingChange(
+    MinecraftProfileChangeKind Kind,
+    string FilePath,
+    string Setting,
+    string? Before,
+    string After,
+    bool WillWrite,
+    string Reason);
+
+internal sealed record MinecraftProfilePlan(
+    DateTimeOffset CreatedAtUtc,
+    MinecraftInstanceDescriptor Instance,
+    MinecraftProfileKind Profile,
+    string JavaArguments,
+    IReadOnlyList<MinecraftProfileSettingChange> Changes,
+    IReadOnlyList<string> Messages)
+{
+    public bool HasChanges => Changes.Any(change => change.WillWrite);
+}
+
+internal sealed record MinecraftQuarantineCandidate(
+    string FileName,
+    string FullPath,
+    string ModId,
+    string Version,
+    string Sha256,
+    string Reason,
+    QuarantineRisk Risk,
+    bool RecommendedForExtreme,
+    bool RequiresServerConfirmation);
+
+internal sealed record MinecraftQuarantinePlan(
+    string PlanId,
+    DateTimeOffset CreatedAtUtc,
+    string ModsDirectory,
+    string QuarantineDirectory,
+    IReadOnlyList<MinecraftQuarantineCandidate> Candidates,
+    IReadOnlyList<string> SafetyNotes);
+
+internal sealed record MinecraftQuarantineFileEntry(
+    string SourcePath,
+    string QuarantinePath,
+    string BackupPath,
+    string Sha256,
+    string Reason);
+
+internal sealed class MinecraftQuarantineManifest
+{
+    public required string OperationId { get; init; }
+
+    public required DateTimeOffset CreatedAtUtc { get; init; }
+
+    public required string ModsDirectory { get; init; }
+
+    public required string QuarantineDirectory { get; init; }
+
+    public required List<MinecraftQuarantineFileEntry> Files { get; init; }
+
+    public DateTimeOffset? RolledBackAtUtc { get; set; }
+}
+
+internal sealed record MinecraftQuarantineApplyResult(
+    string OperationId,
+    string ModsDirectory,
+    string QuarantineDirectory,
+    string BackupDirectory,
+    IReadOnlyList<string> MovedFiles,
+    string ManifestPath,
+    IReadOnlyList<string> Messages);
+
+internal sealed record MinecraftQuarantineRollbackResult(
+    string OperationId,
+    string ModsDirectory,
+    IReadOnlyList<string> RestoredFiles,
+    IReadOnlyList<string> Messages);
+
+internal sealed record MinecraftSurvivalPlan(
+    DateTimeOffset CreatedAtUtc,
+    string Verdict,
+    string JavaArguments,
+    IReadOnlyList<string> RequiredMods,
+    IReadOnlyList<string> RecommendedMods,
+    IReadOnlyList<string> QuarantineCandidates,
+    IReadOnlyList<string> GraphicsSettings,
+    IReadOnlyList<string> Risks,
+    IReadOnlyList<string> ManualActions);

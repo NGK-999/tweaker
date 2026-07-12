@@ -2,7 +2,7 @@
 
 ApexTweaker e um utilitario Windows (.NET 10) focado em performance, telemetria de frametime, backup e rollback reversivel. A shell ativa e **WPF**; codigo WinForms legado ainda compila no mesmo assembly, mas nao e iniciado por `Program.cs`.
 
-Versao atual: **2.1.0**.
+Versao atual: **2.2.0**.
 
 ## Pastas principais
 
@@ -59,12 +59,15 @@ Comandos estruturados em `ExtremeMutationCommands.cs` e `MemoryCompressionTweakC
 
 Modulo isolado para Minecraft/Cobblemon:
 
-- `Models/MinecraftAuditModels.cs` - contratos de auditoria, perfil, backup e benchmark.
+- `Models/MinecraftAuditModels.cs` - contratos de auditoria, perfil, quarentena e benchmark.
 - `Services/ModJarScanner.cs` - metadados Fabric/Forge/NeoForge e JARs aninhados.
 - `Services/MinecraftAuditService.cs` - classificacao, dependencias e conflitos.
 - `Services/MinecraftEnvironmentService.cs` - hardware, Java, pagefile e launchers.
-- `Services/MinecraftProfileService.cs` - `options.txt`, backup e rollback.
-- `Services/MinecraftBenchmarkService.cs` - amostras do processo Java.
+- `Services/MinecraftInstanceService.cs` - deteccao de launchers e raiz real da instancia.
+- `Services/MinecraftProfileService.cs` - dry-run, configs, memoria, backup e rollback.
+- `Services/MinecraftQuarantineService.cs` - movimentacao reversivel de JARs com SHA-256.
+- `Services/MinecraftSurvivalPlanService.cs` - veredito e plano manual para 4 GB.
+- `Services/MinecraftBenchmarkService.cs` - ambiente, processo, configs, logs e crashes.
 - `Services/MinecraftReportService.cs` - JSON, Markdown e TXT.
 - `MinecraftCommandLine.cs` - automacao headless.
 - `MinecraftSelfTest.cs` - teste integrado sem pacotes externos.
@@ -131,6 +134,7 @@ Orquestrado por `MutationExecutor` com ledger em `BackupService`. Nenhuma mutaca
 |---------|----------|
 | `C:\ProgramData\ApexTweaker\Backups` | Backups granulares, ledger de mutacoes, sessoes de telemetria |
 | `C:\ProgramData\ApexTweaker\MinecraftBackups` | Backups de perfis de instancia Minecraft |
+| `C:\ProgramData\ApexTweaker\MinecraftQuarantineBackups` | Backups e manifestos de JARs em quarentena |
 | `C:\ProgramData\ApexTweaker\MinecraftReports` | Auditorias e benchmarks Minecraft |
 | `C:\ProgramData\ApexTweaker\Logs\latest_runtime.log` | Log da sessao em execucao |
 

@@ -2,7 +2,7 @@
 
 O objetivo do app e otimizar o Windows para jogos, principalmente VALORANT, mantendo alteracoes rastreaveis e reversiveis.
 
-Versao: **2.1.0** · Shell ativa: **WPF** (`MainWindow`).
+Versao: **2.2.0** · Shell ativa: **WPF** (`MainWindow`).
 
 ## Mapa da interface WPF
 
@@ -48,11 +48,15 @@ Sessoes salvas em `C:\ProgramData\ApexTweaker\Backups` (`Sessao_Baseline.json`, 
 |------|---------|
 | Auditar pasta | `MinecraftAuditService` + `ModJarScanner` |
 | Gerar relatorios | `MinecraftReportService` |
+| Previsualizar perfil | `MinecraftProfileService.PlanProfile()` |
 | Aplicar perfil | `MinecraftProfileService.ApplyProfile()` |
 | Restaurar perfil | `MinecraftProfileService.RollbackLatest()` |
+| Mover selecionados | `MinecraftQuarantineService.Apply()` |
+| Desfazer quarentena | `MinecraftQuarantineService.RollbackLatest()` |
 | Benchmark 60 s | `MinecraftBenchmarkService.CaptureAsync()` |
 
-Essa aba nunca move JARs automaticamente. Consulte `docs/COBBLEMON_LOW_END.md`.
+Essa aba nunca preseleciona nem exclui JARs. Movimentacao exige selecao e
+confirmacao explicitas. Consulte `docs/COBBLEMON_LOW_END.md`.
 
 ### Utilidades
 

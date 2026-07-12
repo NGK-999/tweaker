@@ -100,7 +100,7 @@
                             <TextBlock Margin="0,4,0,0"
                                        Foreground="{StaticResource TextTertiaryBrush}"
                                        FontSize="12"
-                                       Text="v2.1.0" />
+                                       Text="v2.2.0" />
                         </StackPanel>
 
                         <StackPanel Grid.Row="1"

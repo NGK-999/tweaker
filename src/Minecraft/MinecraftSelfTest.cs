@@ -1,5 +1,6 @@
 using System.IO;
 using System.IO.Compression;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using ApexTweaker.Minecraft.Models;
@@ -40,27 +41,169 @@ internal static class MinecraftSelfTest
                 "O plano de quarentena nao foi gerado.");
             messages.Add("PASS: relatorios JSON, Markdown e TXT.");
 
-            var instanceRoot = Path.Combine(root, "instance");
+            var quarantineService = new MinecraftQuarantineService(Path.Combine(root, "quarantine-backups"));
+            var quarantinePlan = quarantineService.BuildPlan(audit);
+            var olderDuplicate = quarantinePlan.Candidates.Single(candidate => candidate.FileName == "sample-1.0.jar");
+            Assert(File.Exists(olderDuplicate.FullPath), "O dry-run de quarentena alterou a origem.");
+            var quarantineReport = new MinecraftReportService().WriteQuarantinePlan(quarantinePlan, reportDirectory);
+            Assert(File.Exists(quarantineReport), "O relatorio dry-run da quarentena nao foi gerado.");
+
+            var quarantined = quarantineService.Apply(quarantinePlan, [olderDuplicate.FileName]);
+            Assert(!File.Exists(olderDuplicate.FullPath), "O JAR selecionado permaneceu na origem depois do apply.");
+            Assert(File.Exists(Path.Combine(quarantined.QuarantineDirectory, olderDuplicate.FileName)),
+                "O JAR nao chegou a quarentena.");
+            Assert(File.Exists(Path.Combine(quarantined.BackupDirectory, olderDuplicate.FileName)),
+                "O backup do JAR nao foi criado.");
+            _ = quarantineService.RollbackLatest(modsDirectory);
+            Assert(File.Exists(olderDuplicate.FullPath), "Rollback da quarentena nao restaurou o JAR.");
+            Assert(!File.Exists(Path.Combine(quarantined.QuarantineDirectory, olderDuplicate.FileName)),
+                "Rollback da quarentena deixou uma copia movida ativa.");
+            messages.Add("PASS: quarentena exige selecao, cria backup SHA-256 e restaura o JAR.");
+
+            var managedRoot = Path.Combine(root, "prism-instance");
+            var instanceRoot = Path.Combine(managedRoot, ".minecraft");
             Directory.CreateDirectory(Path.Combine(instanceRoot, "mods"));
+            CreateFabricJar(
+                Path.Combine(instanceRoot, "mods", "cobblemon-test.jar"),
+                "cobblemon",
+                "test",
+                new Dictionary<string, string>());
+            Directory.CreateDirectory(Path.Combine(instanceRoot, "config"));
             var optionsPath = Path.Combine(instanceRoot, "options.txt");
             const string originalOptions = "renderDistance:12\nsimulationDistance:12\nmaxFps:120\ncustomOption:keep\n";
             File.WriteAllText(optionsPath, originalOptions, new UTF8Encoding(false));
 
-            var profileService = new MinecraftProfileService(Path.Combine(root, "backups"));
-            var applied = profileService.ApplyProfile(instanceRoot, MinecraftProfileKind.Extreme4Gb);
+            var sodiumPath = Path.Combine(instanceRoot, "config", "sodium-options.json");
+            const string originalSodium = "{\"performance\":{\"useEntityCulling\":false,\"useFogOcclusion\":false,\"useBlockFaceCulling\":false,\"animateOnlyVisibleTextures\":false,\"unknown\":17},\"advanced\":{\"enableMemoryTracing\":true}}";
+            File.WriteAllText(sodiumPath, originalSodium, new UTF8Encoding(false));
+            var immediatelyFastPath = Path.Combine(instanceRoot, "config", "immediatelyfast.json");
+            const string originalImmediatelyFast = "{\"font_atlas_resizing\":false,\"map_atlas_generation\":false,\"hud_batching\":false,\"fast_text_lookup\":false,\"fast_buffer_upload\":false,\"experimental_screen_batching\":false}";
+            File.WriteAllText(immediatelyFastPath, originalImmediatelyFast, new UTF8Encoding(false));
+            var entityCullingPath = Path.Combine(instanceRoot, "config", "entityculling.json");
+            const string originalEntityCulling = "{\"debugMode\":true,\"skipEntityCulling\":true,\"skipBlockEntityCulling\":true,\"tickCulling\":false,\"unknown\":\"keep\"}";
+            File.WriteAllText(entityCullingPath, originalEntityCulling, new UTF8Encoding(false));
+            var instanceConfigPath = Path.Combine(managedRoot, "instance.cfg");
+            const string originalInstanceConfig = "name=Test Instance\nOverrideMemory=false\nMinMemAlloc=256\nMaxMemAlloc=4096\niconKey=cobblemon\n";
+            File.WriteAllText(instanceConfigPath, originalInstanceConfig, new UTF8Encoding(false));
+
+            var profileService = new MinecraftProfileService(
+                Path.Combine(root, "backups"),
+                reportDirectory);
+            var dryRun = profileService.PlanProfile(managedRoot, MinecraftProfileKind.Extreme4Gb);
+            Assert(dryRun.Instance.Launcher == MinecraftLauncherKind.PrismLauncher,
+                "A instancia Prism nao foi reconhecida.");
+            Assert(dryRun.Changes.Any(change => change.Setting == "performance.useEntityCulling" && change.WillWrite),
+                "O dry-run nao planejou a config existente do Sodium.");
+            Assert(dryRun.Changes.Any(change => change.Setting == "MaxMemAlloc" && change.WillWrite),
+                "O dry-run nao planejou a memoria do Prism.");
+            Assert(File.ReadAllText(optionsPath).Replace("\r\n", "\n") == originalOptions,
+                "O dry-run alterou options.txt.");
+            Assert(File.ReadAllText(sodiumPath) == originalSodium, "O dry-run alterou Sodium.");
+            Assert(File.ReadAllText(instanceConfigPath).Replace("\r\n", "\n") == originalInstanceConfig,
+                "O dry-run alterou instance.cfg.");
+            messages.Add("PASS: dry-run planeja options, JSONs e Prism sem escrever.");
+
+            var applied = profileService.ApplyProfile(managedRoot, MinecraftProfileKind.Extreme4Gb);
             var changedOptions = File.ReadAllText(optionsPath);
             Assert(changedOptions.Contains("renderDistance:4", StringComparison.Ordinal), "Render distance nao foi aplicada.");
             Assert(changedOptions.Contains("simulationDistance:4", StringComparison.Ordinal), "Simulation distance nao foi aplicada.");
             Assert(changedOptions.Contains("customOption:keep", StringComparison.Ordinal), "Opcao desconhecida foi perdida.");
             Assert(Directory.Exists(applied.BackupDirectory), "Backup nao foi criado.");
-            messages.Add("PASS: EXTREME_4GB preserva opcoes desconhecidas e cria backup.");
+            using (var sodium = JsonDocument.Parse(File.ReadAllText(sodiumPath)))
+            {
+                var performance = sodium.RootElement.GetProperty("performance");
+                Assert(performance.GetProperty("useEntityCulling").GetBoolean(), "Entity culling do Sodium nao foi ativado.");
+                Assert(performance.GetProperty("unknown").GetInt32() == 17, "Chave desconhecida do Sodium foi perdida.");
+            }
 
-            _ = profileService.RollbackLatest(instanceRoot);
+            using (var immediatelyFast = JsonDocument.Parse(File.ReadAllText(immediatelyFastPath)))
+            {
+                Assert(immediatelyFast.RootElement.GetProperty("hud_batching").GetBoolean(),
+                    "HUD batching do ImmediatelyFast nao foi ativado.");
+                Assert(!immediatelyFast.RootElement.GetProperty("experimental_screen_batching").GetBoolean(),
+                    "Opcao experimental do ImmediatelyFast foi alterada.");
+            }
+
+            Assert(File.ReadAllText(instanceConfigPath).Contains("OverrideMemory=true", StringComparison.Ordinal),
+                "Override de memoria do Prism nao foi ativado.");
+            Assert(File.Exists(applied.ReportPath), "Relatorio antes/depois do apply nao foi gerado.");
+            messages.Add("PASS: EXTREME_4GB altera configs reais, preserva desconhecidas e cria backup.");
+
+            _ = profileService.RollbackLatest(managedRoot);
             var rolledBack = File.ReadAllText(optionsPath).Replace("\r\n", "\n");
             Assert(rolledBack == originalOptions, "Rollback nao restaurou o options.txt original.");
+            Assert(File.ReadAllText(sodiumPath) == originalSodium, "Rollback nao restaurou Sodium byte a byte.");
+            Assert(File.ReadAllText(immediatelyFastPath) == originalImmediatelyFast,
+                "Rollback nao restaurou ImmediatelyFast byte a byte.");
+            Assert(File.ReadAllText(entityCullingPath) == originalEntityCulling,
+                "Rollback nao restaurou EntityCulling byte a byte.");
+            Assert(File.ReadAllText(instanceConfigPath).Replace("\r\n", "\n") == originalInstanceConfig,
+                "Rollback nao restaurou instance.cfg.");
             Assert(!File.Exists(Path.Combine(instanceRoot, "apextweaker-java-args.txt")),
                 "Rollback nao removeu o arquivo criado pelo proprio ApexTweaker.");
-            messages.Add("PASS: rollback restaura bytes logicos e remove somente o arquivo gerado.");
+            messages.Add("PASS: rollback restaura options, JSONs e launcher e remove somente o arquivo gerado.");
+
+            var legacyDirectory = Path.Combine(profileService.BackupRoot, "legacy-v21");
+            Directory.CreateDirectory(legacyDirectory);
+            var legacyBackupPath = Path.Combine(legacyDirectory, "options.txt.bak");
+            File.Copy(optionsPath, legacyBackupPath);
+            var legacyHash = ComputeSha256(optionsPath);
+            File.Delete(optionsPath);
+            var legacyManifest = new
+            {
+                backupId = "legacy-v21",
+                createdAtUtc = DateTimeOffset.UtcNow.AddMinutes(1),
+                instanceRoot,
+                profile = "Extreme4Gb",
+                files = new[]
+                {
+                    new
+                    {
+                        targetPath = optionsPath,
+                        backupPath = legacyBackupPath,
+                        existedBefore = true,
+                        sha256Before = legacyHash,
+                        sha256After = (string?)null
+                    }
+                },
+                rolledBackAtUtc = (DateTimeOffset?)null
+            };
+            File.WriteAllText(
+                Path.Combine(legacyDirectory, "manifest.json"),
+                JsonSerializer.Serialize(legacyManifest),
+                new UTF8Encoding(false));
+            _ = profileService.RollbackLatest(managedRoot);
+            Assert(File.ReadAllText(optionsPath).Replace("\r\n", "\n") == originalOptions,
+                "Rollback nao aceitou o manifesto legado da v2.1.0.");
+            messages.Add("PASS: rollback v2.1.0 restaura ate um options.txt removido.");
+
+            Directory.CreateDirectory(Path.Combine(instanceRoot, "logs"));
+            Directory.CreateDirectory(Path.Combine(instanceRoot, "crash-reports"));
+            File.WriteAllText(
+                Path.Combine(instanceRoot, "logs", "latest.log"),
+                "[main/ERROR] java.lang.OutOfMemoryError: Java heap space\n",
+                new UTF8Encoding(false));
+            File.WriteAllText(
+                Path.Combine(instanceRoot, "crash-reports", "crash-test.txt"),
+                "---- Minecraft Crash Report ----\nSynthetic self-test evidence\n",
+                new UTF8Encoding(false));
+            var benchmark = new MinecraftBenchmarkService(() => null)
+                .CaptureAsync(TimeSpan.FromSeconds(5), selectedPath: managedRoot)
+                .GetAwaiter()
+                .GetResult();
+            Assert(benchmark.Status == BenchmarkStatus.NotTested, "Ausencia de processo deveria resultar em NAO_TESTADO.");
+            Assert(benchmark.OutOfMemoryEvidence && benchmark.CrashEvidence,
+                "O benchmark nao leu as evidencias de log/crash.");
+            Assert(benchmark.ActiveMods.Count > 0, "O benchmark nao registrou a lista de mods.");
+            var benchmarkPath = new MinecraftReportService().WriteBenchmark(benchmark, reportDirectory);
+            Assert(File.Exists(benchmarkPath), "Relatorio de benchmark nao foi gerado.");
+            messages.Add("PASS: benchmark NAO_TESTADO registra ambiente, configs, logs e crash reports.");
+
+            var survival = new MinecraftSurvivalPlanService().Build(audit, quarantinePlan);
+            var survivalPath = new MinecraftReportService().WriteSurvivalPlan(survival, reportDirectory);
+            Assert(File.Exists(survivalPath) && survival.GraphicsSettings.Count > 0,
+                "Plano de Sobrevivencia 4 GB nao foi gerado.");
+            messages.Add("PASS: Plano de Sobrevivencia 4 GB gera veredito e acoes manuais.");
 
             var view = new MinecraftView();
             view.SetSelectedPath(modsDirectory);
@@ -102,5 +245,11 @@ internal static class MinecraftSelfTest
         {
             throw new InvalidOperationException(message);
         }
+    }
+
+    private static string ComputeSha256(string path)
+    {
+        using var stream = File.OpenRead(path);
+        return Convert.ToHexString(SHA256.HashData(stream));
     }
 }

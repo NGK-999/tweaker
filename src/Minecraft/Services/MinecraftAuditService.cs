@@ -22,7 +22,12 @@ internal sealed class MinecraftAuditService
         string targetMinecraftVersion = "1.21.1",
         MinecraftLoader targetLoader = MinecraftLoader.Fabric)
     {
-        var normalizedDirectory = Path.GetFullPath(modsDirectory);
+        var selectedDirectory = Path.GetFullPath(modsDirectory);
+        var instanceService = new MinecraftInstanceService();
+        var selectedIsInstance = instanceService.TryResolve(selectedDirectory, out var selectedInstance);
+        var normalizedDirectory = selectedIsInstance
+            ? selectedInstance.ModsDirectory
+            : selectedDirectory;
         var mods = scanner.ScanDirectory(normalizedDirectory).ToList();
         var environment = environmentService.Capture();
         var issues = new List<MinecraftAuditIssue>();
@@ -166,9 +171,11 @@ internal sealed class MinecraftAuditService
         manualActions.Add("Compare esta lista com o manifesto exato do servidor antes de retirar qualquer mod SERVER_REQUIRED_POSSIVEL.");
         manualActions.Add("Mantenha o pagefile ativo e gerenciado pelo Windows, preferencialmente em SSD.");
 
-        var instanceRoot = MinecraftProfileService.TryResolveInstanceRoot(normalizedDirectory, out var resolvedRoot)
-            ? resolvedRoot
-            : null;
+        var instanceRoot = selectedIsInstance
+            ? selectedInstance.GameDirectory
+            : MinecraftProfileService.TryResolveInstanceRoot(normalizedDirectory, out var resolvedRoot)
+                ? resolvedRoot
+                : null;
 
         var summary = new MinecraftAuditSummary(
             TotalMods: mods.Count,

@@ -4,7 +4,7 @@ Utilitario Windows em .NET 10 + WPF para diagnostico de hardware, telemetria,
 otimizacoes reversiveis e preparacao segura de Minecraft/Cobblemon em hardware
 limitado.
 
-Versao: **2.1.0** | Autor: **Igor Silva**
+Versao: **2.2.0** | Autor: **Igor Silva**
 
 ## Cobblemon Low-End Lab
 
@@ -15,13 +15,13 @@ A aba **Cobblemon** adiciona um fluxo separado das mutacoes de Windows:
 - calcula SHA-256 e encontra duplicidades sem modificar os arquivos;
 - classifica mods com postura conservadora para requisitos de servidor;
 - gera relatorios JSON, Markdown e TXT;
-- cria uma pasta de sugestoes de quarentena com hashes, sem mover JARs;
+- gera dry-run de quarentena e move somente JARs explicitamente selecionados;
 - oferece os perfis `SAFE`, `LOW_END`, `EXTREME_4GB`,
   `COBBLEMON_SERVER_CLIENT` e `BENCHMARK`;
-- cria backup antes de alterar `options.txt`;
-- permite rollback do ultimo perfil;
-- mede RAM, CPU e pressao de memoria do processo Java por ate 10 minutos;
-- nunca exclui ou move mods automaticamente.
+- cria backup antes de alterar `options.txt`, configs suportadas e memoria Prism/MultiMC;
+- permite rollback separado do perfil e da quarentena;
+- mede RAM, CPU, configs, logs e crashes do processo Minecraft por ate 10 minutos;
+- nunca exclui mods e nunca preseleciona candidatos de quarentena.
 
 Documentacao completa: [docs/COBBLEMON_LOW_END.md](docs/COBBLEMON_LOW_END.md).
 
@@ -32,7 +32,7 @@ Documentacao completa: [docs/COBBLEMON_LOW_END.md](docs/COBBLEMON_LOW_END.md).
 | **Dashboard** | Auto-Tuning, restore point e resumo de hardware |
 | **Modulos** | Tweaks individuais de energia, CPU, GPU e rede |
 | **Telemetria** | Teste A/B, frametime, metricas e console |
-| **Cobblemon** | Auditoria de mods, perfis, benchmark e rollback Minecraft |
+| **Cobblemon** | Dry-run, perfil real, quarentena, benchmark e rollback Minecraft |
 | **Utilidades** | Rollback mestre, desinstalacao e suporte |
 
 ## Linha de comando
@@ -78,12 +78,14 @@ Requisito: Visual Studio Build Tools com suporte a C++ para compilar
 ## Dados e seguranca
 
 - Backups de Windows: `C:\ProgramData\ApexTweaker\Backups`
-- Backups Minecraft: `C:\ProgramData\ApexTweaker\MinecraftBackups`
+- Backups de perfis Minecraft: `C:\ProgramData\ApexTweaker\MinecraftBackups`
+- Backups de quarentena: `C:\ProgramData\ApexTweaker\MinecraftQuarantineBackups`
 - Relatorios Minecraft: `C:\ProgramData\ApexTweaker\MinecraftReports`
 - Logs: `C:\ProgramData\ApexTweaker\Logs\latest_runtime.log`
-- O perfil Minecraft altera somente `options.txt` e cria
-  `apextweaker-java-args.txt` depois de um backup verificavel.
-- Argumentos Java sao recomendados, nao injetados automaticamente no launcher.
+- O perfil altera `options.txt` e apenas chaves existentes validadas de Sodium,
+  ImmediatelyFast e EntityCulling.
+- Prism/MultiMC recebem memoria por instancia; outros launchers recebem uma
+  instrucao JVM manual.
 - Defender, Windows Update, pagefile e mods de servidor nao sao desativados ou
   removidos por esse fluxo.
 
