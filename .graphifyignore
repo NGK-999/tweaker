@@ -1,0 +1,12 @@
+﻿node_modules/
+dist/
+build/
+bin/
+obj/
+coverage/
+.env
+.env.local
+*.log
+.DS_Store
+.vs/
+release-*/
