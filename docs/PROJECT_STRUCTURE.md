@@ -2,7 +2,7 @@
 
 ApexTweaker e um utilitario Windows (.NET 10) focado em performance, telemetria de frametime, backup e rollback reversivel. A shell ativa e **WPF**; codigo WinForms legado ainda compila no mesmo assembly, mas nao e iniciado por `Program.cs`.
 
-Versao atual: **3.0.0**.
+Versao atual: **3.0.1**.
 
 ## Pastas principais
 
@@ -11,6 +11,8 @@ Versao atual: **3.0.0**.
 - Entrada da aplicacao.
 - `Program.cs`: disclaimer WPF, loading, `MainWindow`.
 - `AppInfo.cs`: nome, versao e creditos.
+- `ApplicationPaths.cs`: separa dados de usuario em LocalAppData dos backups
+  administrativos do Windows em ProgramData.
 
 ### `src/UI/Wpf`
 
@@ -53,6 +55,7 @@ Regras e acoes do backend:
 | `ValorantProcessOptimizer.cs` | Afinidade/prioridade em processos do jogo |
 | `WindowsPowerModeService.cs` | Planos de energia |
 | `TelemetryPipeServer.cs` | Servidor IPC de telemetria |
+| `ApplicationPrivilegeService.cs` | classifica operacoes e solicita elevacao sob demanda |
 
 Comandos estruturados em `ExtremeMutationCommands.cs` e `MemoryCompressionTweakCommand.cs`.
 
@@ -155,11 +158,11 @@ Orquestrado por `MutationExecutor` com ledger em `BackupService`. Nenhuma mutaca
 | Caminho | Conteudo |
 |---------|----------|
 | `C:\ProgramData\ApexTweaker\Backups` | Backups granulares, ledger de mutacoes, sessoes de telemetria |
-| `C:\ProgramData\ApexTweaker\MinecraftBackups` | Backups de perfis de instancia Minecraft |
-| `C:\ProgramData\ApexTweaker\MinecraftQuarantineBackups` | Backups e manifestos de JARs em quarentena |
-| `C:\ProgramData\ApexTweaker\MinecraftReports` | Auditorias e benchmarks Minecraft |
-| `C:\ProgramData\ApexTweaker\MinecraftExperiments` | Estado e relatorios dos experimentos cientificos |
-| `C:\ProgramData\ApexTweaker\Logs\latest_runtime.log` | Log da sessao em execucao |
+| `%LOCALAPPDATA%\ApexTweaker\MinecraftBackups` | Backups de perfis de instancia Minecraft |
+| `%LOCALAPPDATA%\ApexTweaker\MinecraftQuarantineBackups` | Backups e manifestos de JARs em quarentena |
+| `%LOCALAPPDATA%\ApexTweaker\MinecraftReports` | Auditorias e benchmarks Minecraft |
+| `%LOCALAPPDATA%\ApexTweaker\MinecraftExperiments` | Estado e relatorios dos experimentos cientificos |
+| `%LOCALAPPDATA%\ApexTweaker\Telemetry` | Sessoes de telemetria sem administrador |
 
 ## Pastas geradas pelo .NET
 

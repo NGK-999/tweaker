@@ -62,6 +62,15 @@ internal sealed partial class MinecraftEnvironmentService
         return RecommendJavaMemory(totalMemoryGb, availableMemoryGb).Arguments;
     }
 
+    public static JavaMemoryRecommendation RecommendFirstTest4GbMemory()
+    {
+        return new JavaMemoryRecommendation(
+            2048,
+            "-Xms512M -Xmx2048M",
+            JavaMemoryTier.Safe2048,
+            "Primeiro teste seguro de 4 GB: reserva memoria para Windows e iGPU antes de testar heaps maiores.");
+    }
+
     public static JavaMemoryRecommendation RecommendJavaMemory(decimal totalMemoryGb, decimal availableMemoryGb)
     {
         var preferredMb = totalMemoryGb switch

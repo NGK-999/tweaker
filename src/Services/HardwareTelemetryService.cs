@@ -32,19 +32,13 @@ internal sealed class HardwareTelemetryService : IDisposable
     private static readonly TimeSpan ForegroundPollingInterval = TimeSpan.FromMilliseconds(250);
     private static readonly TimeSpan HistoryInterval = TimeSpan.FromSeconds(1);
     private static readonly string SessionFilePath = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
-        "ApexTweaker",
-        "Backups",
+        ApplicationPaths.TelemetrySessions,
         "Sessao_Atual.json");
     private static readonly string BaselineSessionFilePath = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
-        "ApexTweaker",
-        "Backups",
+        ApplicationPaths.TelemetrySessions,
         "Sessao_Baseline.json");
     private static readonly string OptimizedSessionFilePath = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
-        "ApexTweaker",
-        "Backups",
+        ApplicationPaths.TelemetrySessions,
         "Sessao_Optimized.json");
 
     private const double SevereFrametimeMs = 33.3;

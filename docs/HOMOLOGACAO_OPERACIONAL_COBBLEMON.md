@@ -1,6 +1,6 @@
 # Homologacao operacional Cobblemon em 4 GB
 
-Versao do fluxo: **ApexTweaker 3.0.0**
+Versao do fluxo: **ApexTweaker 3.0.1**
 Alvo: **Minecraft 1.21.1 + Fabric + Cobblemon em Windows, i3 de quarta geracao e 4 GB de RAM**
 
 ## Estado comprovado em 2026-07-12
@@ -46,24 +46,23 @@ decisao separada e deve ser confirmada pelo proprietario.
 3. Confira o SHA-256 antes de extrair:
 
 ```powershell
-Get-FileHash "$env:USERPROFILE\Downloads\ApexTweaker-Portable-v2.3.0.zip" -Algorithm SHA256
+Get-FileHash "$env:USERPROFILE\Downloads\ApexTweaker-Portable-v3.0.1.zip" -Algorithm SHA256
 ```
 
 4. Compare o hash inteiro com o digest exibido na release autenticada.
-5. Crie `C:\ApexTweaker\v2.3.0-portable`.
+5. Crie `C:\ApexTweaker\v3.0.1-portable`.
 6. Extraia todo o ZIP nessa pasta. Nao execute diretamente de dentro do ZIP.
 7. Confirme que `ApexTweaker.exe` e `ApexTweaker.Native.dll` estao juntos.
 8. Feche Minecraft e o launcher antes de auditar ou aplicar configuracoes.
-9. Execute `ApexTweaker.exe`. O UAC e esperado porque o aplicativo completo
-   tambem possui modulos de Windows e usa um manifesto global de administrador.
-10. Nunca execute Prism Launcher, Modrinth App, Java ou Minecraft como
-    administrador. O modulo Cobblemon nao precisa elevar o jogo.
+9. Execute `ApexTweaker.exe` em modo normal. O fluxo Cobblemon nao abre UAC.
+10. Aceite UAC somente se voce escolher uma mutacao protegida do Windows. Nunca
+    execute Prism Launcher, Modrinth App, Java ou Minecraft como administrador.
 11. Abra a aba **Cobblemon**.
 12. Selecione `C:\Users\igor.silva\Downloads\mods\mods`.
 13. Clique **Auditar**. Esta etapa e somente leitura.
 14. Confirme no resumo: 88 mods, um ID duplicado, zero dependencias ausentes e
     dois conflitos possiveis.
-15. Abra `C:\ProgramData\ApexTweaker\MinecraftReports` pelo botao de relatorios.
+15. Abra `%LOCALAPPDATA%\ApexTweaker\MinecraftReports` pelo botao de relatorios.
 16. Leia primeiro `cobblemon-audit-*.md` e depois
     `minecraft-quarantine-dry-run-*.md`.
 17. No JSON, use `sha256`, `environment`, `dependencies`, `sideAssessment`,
@@ -126,7 +125,7 @@ do Modrinth App deve ser ajustada manualmente no proprio app; o ApexTweaker gera
 6. Clique **Aplicar plano com backup**.
 7. Leia a confirmacao e aceite somente depois de conferir os arquivos.
 8. Localize o backup em
-   `C:\ProgramData\ApexTweaker\MinecraftBackups`.
+   `%LOCALAPPDATA%\ApexTweaker\MinecraftBackups`.
 9. Abra o jogo e confira as opcoes visuais antes do benchmark.
 
 Valores aplicados em `options.txt`:

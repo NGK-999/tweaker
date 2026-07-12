@@ -8,11 +8,11 @@ Pasta: `release-v2/`
 |---------|-----------|
 | `ApexTweaker.exe` | Executavel principal, self-contained, single-file |
 | `ApexTweaker.Native.dll` | DLL nativa C++ (topologia/afinidade de CPU) |
-| `ApexTweaker-Portable-v3.0.0.zip` | Pacote portatil com os dois arquivos acima |
+| `ApexTweaker-Portable-v3.0.1.zip` | Pacote portatil com os dois arquivos acima |
 
 O cliente nao precisa instalar .NET. Target: **Windows 10/11 64-bit**.
 
-Versao atual: **3.0.0**.
+Versao atual: **3.0.1**.
 
 ## Como gerar o portatil
 
@@ -44,7 +44,10 @@ Reconstrua o instalador apos atualizar `release-v2`, para que o setup embuta o b
 
 ## Como o cliente deve executar
 
-O app solicita **Administrador** pelo manifesto (`app.manifest`). Mutacoes de Registro, BCD, energia e ETW de kernel exigem privilegio elevado.
+O app usa `asInvoker` no manifesto e inicia sem UAC. Auditoria, configs,
+backup/rollback Minecraft, relatorios e benchmark funcionam como usuario normal.
+Mutacoes de Registro, BCD, energia, rollback de sistema e ETW de kernel pedem
+elevacao sob demanda e somente depois de confirmacao.
 
 Execucao minima:
 
@@ -52,7 +55,7 @@ Execucao minima:
 release-v2\ApexTweaker.exe
 ```
 
-Ou, com elevacao explicita:
+Somente para testar uma mutacao Windows com elevacao explicita:
 
 ```powershell
 Start-Process "release-v2\ApexTweaker.exe" -Verb RunAs
@@ -64,16 +67,17 @@ Start-Process "release-v2\ApexTweaker.exe" -Verb RunAs
 2. `scripts\Build-Release.ps1` (ou `dotnet publish ... -o release-v2`)
 3. Confirmar data/tamanho de `ApexTweaker.exe`.
 4. Executar `--minecraft-self-test` no EXE publicado.
-5. Conferir versoes, SHA-256 e conteudo do ZIP.
-6. Testar navegacao, Auto-Tuning, telemetria e fechamento.
-7. Rebuild do instalador.
-8. Criar release no GitHub com os quatro artefatos.
+5. Executar `scripts\Test-Release.ps1` para validar `asInvoker` sem bypass.
+6. Conferir versoes, SHA-256 e conteudo do ZIP.
+7. Testar navegacao, Auto-Tuning, telemetria e fechamento.
+8. Rebuild do instalador.
+9. Criar release no GitHub com os quatro artefatos.
 
 ## Observacoes
 
 - **SmartScreen** pode alertar enquanto o arquivo nao estiver assinado digitalmente. Para distribuicao comercial, use certificado de code signing.
 - Backups do app: `C:\ProgramData\ApexTweaker\Backups`
-- Logs: `C:\ProgramData\ApexTweaker\Logs\latest_runtime.log`
+- Dados Minecraft/telemetria: `%LOCALAPPDATA%\ApexTweaker`
 - O modulo Cobblemon modifica somente arquivos de uma instancia explicitamente
   selecionada, sempre com dry-run, confirmacao e backup. Ele nao injeta hooks no jogo.
 - O repositorio esta privado em 2026-07-12. Os links abaixo retornam `404` sem

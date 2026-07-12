@@ -6,8 +6,10 @@ namespace ApexTweaker.Minecraft.Models;
 internal enum ScientificEvidenceType
 {
     MeasuredFact,
+    UserProvided,
     Inference,
-    ManualRecommendation
+    ManualRecommendation,
+    Unavailable
 }
 
 [JsonConverter(typeof(JsonStringEnumConverter))]

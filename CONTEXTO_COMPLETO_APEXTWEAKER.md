@@ -8,18 +8,18 @@ Regra: fatos marcados como **confirmados** foram verificados no repositorio loca
 
 - Nome: ApexTweaker.
 - Autor/empresa: Igor Silva.
-- Versao atual declarada: `2.3.0`.
+- Versao atual declarada: `3.0.1`.
 - Plataforma: Windows 10/11, com foco atual em Windows 11.
 - Framework atual: `.NET 10`, destino `net10.0-windows`.
 - Objetivo tecnico: otimizar estabilidade de frametime e 1% low, reduzir stutters e oferecer telemetria, backup e rollback.
 - Prioridade declarada: estabilidade e reversibilidade antes de ganho de FPS maximo.
-- O aplicativo exige privilegios administrativos por manifesto para mutacoes de sistema.
+- O manifesto usa `asInvoker`: auditoria, perfis, backups, relatorios e benchmark Minecraft funcionam sem administrador. A elevacao e solicitada somente para mutacoes, rollback, limpeza protegida do Windows e ETW de kernel.
 
 ## 2. Caminhos e repositorio
 
 ### Caminho canonico atual
 
-- Codigo real: `C:\Apextweaker`.
+- Codigo real: `C:\projetos\Apextweaker`.
 - Workspace antigo/auxiliar: `C:\VSCODE`.
 - Este documento foi criado em `C:\VSCODE\CONTEXTO_COMPLETO_APEXTWEAKER.md`.
 
@@ -27,17 +27,16 @@ Regra: fatos marcados como **confirmados** foram verificados no repositorio loca
 
 - Repositorio: `https://github.com/NGK-999/tweaker.git`.
 - Branch: `main`.
-- Estado local confirmado em 2026-06-29: limpo e alinhado a `origin/main`.
-- Commit local mais recente confirmado: `1a0ca1a`.
-- Mensagem: `feat: ApexTweaker v2.0.1 - initial commit with WPF UI, transactional pipeline, native C++ topology, and telemetry system`.
-- O repositorio em `C:\Apextweaker` possui ownership diferente do usuario sandbox; comandos Git automatizados precisam usar `-c safe.directory=C:/Apextweaker`.
+- Estado local confirmado em 2026-07-12: patch `3.0.1` em preparacao e alinhado a `origin/main` antes da publicacao.
+- Base publicada antes deste patch: `6c8c018` (`v3.0.0`).
+- O repositorio atual nao exige excecao local de `safe.directory`.
 
 ## 3. Build e distribuicao
 
 ### Projeto principal
 
-- Solucao: `C:\Apextweaker\ApexTweaker.sln`.
-- Projeto: `C:\Apextweaker\ApexTweaker.csproj`.
+- Solucao: `C:\projetos\Apextweaker\ApexTweaker.sln`.
+- Projeto: `C:\projetos\Apextweaker\ApexTweaker.csproj`.
 - Assembly: `ApexTweaker`.
 - UI habilitada no mesmo projeto: WinForms e WPF (`UseWindowsForms=true`, `UseWPF=true`).
 - Publicacao: single-file comprimido, ReadyToRun, bibliotecas nativas extraidas.
@@ -54,13 +53,13 @@ Regra: fatos marcados como **confirmados** foram verificados no repositorio loca
 
 ### Artefatos locais confirmados
 
-- Portatil antigo/oficial atual: `C:\Apextweaker\release-v2\ApexTweaker.exe`.
+- Portatil publicado localmente em `C:\projetos\Apextweaker\release-v2\ApexTweaker.exe`.
   - Data: 2026-06-24 15:00.
   - Tamanho: 106.571.584 bytes.
-- Staging mais novo: `C:\Apextweaker\release-v2-staging\ApexTweaker.exe`.
+- Staging historico: `C:\projetos\Apextweaker\release-v2-staging\ApexTweaker.exe`.
   - Data: 2026-06-25 06:25.
   - Tamanho: 106.574.616 bytes.
-- Instalador local: `C:\Apextweaker\release-installer\ApexTweaker-Setup.exe`.
+- Instalador local: `C:\projetos\Apextweaker\release-installer\ApexTweaker-Setup.exe`.
   - Data: 2026-06-24 10:49.
   - Tamanho: 75.050.916 bytes.
 - A publicacao para `release-v2` falhou anteriormente porque uma instancia elevada de `ApexTweaker.exe` manteve o arquivo bloqueado.
@@ -69,8 +68,8 @@ Regra: fatos marcados como **confirmados** foram verificados no repositorio loca
 ### Comandos de validacao
 
 ```powershell
-dotnet build C:\Apextweaker\ApexTweaker.sln -c Release
-dotnet publish C:\Apextweaker\ApexTweaker.csproj -c Release -r win-x64 --self-contained true -o C:\Apextweaker\release-v2
+dotnet build C:\projetos\Apextweaker\ApexTweaker.sln -c Release
+dotnet publish C:\projetos\Apextweaker\ApexTweaker.csproj -c Release -r win-x64 --self-contained true -o C:\projetos\Apextweaker\release-v2
 ```
 
 Antes de substituir `release-v2`, fechar toda instancia do ApexTweaker e comparar hash/data dos executaveis.
@@ -432,18 +431,18 @@ Uma otimizacao so pode ser anunciada como aplicada quando:
 ## 15. Prompt curto para retomar o trabalho
 
 ```text
-Continue o ApexTweaker em C:\Apextweaker usando CONTEXTO_COMPLETO_APEXTWEAKER.md como handoff. Nao trate pedidos historicos como implementados sem verificar o codigo. Primeiro corrija os tres bloqueadores WPF confirmados: (1) PageTransitionAnimator nao pode adicionar views cacheadas vivas a um Grid temporario; use transicao sequencial ou snapshot, (2) MainWindow_OnClosing nao pode chamar Close de forma reentrante; desinscreva Closing antes do fechamento final, (3) remova todo mojibake dos arquivos .cs/.xaml e salve UTF-8. Depois execute build Release, publique em uma pasta nova, confirme o hash e teste exatamente o novo executavel. Nao substitua release-v2 enquanto ApexTweaker.exe estiver em execucao.
+Continue o ApexTweaker em C:\projetos\Apextweaker usando CONTEXTO_COMPLETO_APEXTWEAKER.md como handoff. Nao trate pedidos historicos como implementados sem verificar o codigo. Preserve o motor cientifico da v3, mantenha privilegio minimo, execute build/self-test/Test-Release e teste exatamente o executavel publicado. Nao substitua release-v2 enquanto ApexTweaker.exe estiver em execucao.
 ```
 
-## 16. Minecraft/Cobblemon 2.3.0
+## 16. Minecraft/Cobblemon 3.0.1
 
 - A shell WPF possui a pagina `MinecraftView`, exibida como **Cobblemon**.
 - O modulo em `src/Minecraft` audita JARs, inclusive dependencias aninhadas, sem escrever na pasta de mods.
 - Relatorios sao gerados em JSON, Markdown e TXT, incluindo antes/depois, quarentena, checklist e resultado operacional.
 - O dry-run lista cada chave sem escrever; o apply altera `options.txt`, configs validadas e memoria Prism/MultiMC.
-- Backups Minecraft ficam em `C:\ProgramData\ApexTweaker\MinecraftBackups`.
+- Dados Minecraft novos ficam em `%LOCALAPPDATA%\ApexTweaker`; backups legados em `%ProgramData%` continuam legiveis para rollback seguro.
 - Quarentena e rollback de JARs usam backup separado, SHA-256 e confirmacao explicita; risco de servidor exige confirmacao do manifesto.
 - O rollback rejeita caminhos fora da instancia ou da pasta de mods esperada.
 - A pasta auditada em julho de 2026 tinha 88 mods, duplicidade de `mega_showdown` e colisao entre Sodium 0.6.13 e Indium separado.
-- `--minecraft-self-test` valida scanner, dry-run, FPS, heap, configs, Prism, quarentena, benchmark, homologacao, rollback e XAML.
+- `--minecraft-self-test` valida scanner, dry-run, fontes de metricas, ausencia de FPS inventado, heap, configs, Prism, quarentena, decisoes cientificas, rollback, privilegio minimo e XAML.
 - Detalhes operacionais: `docs/COBBLEMON_LOW_END.md` e `docs/HOMOLOGACAO_OPERACIONAL_COBBLEMON.md`.

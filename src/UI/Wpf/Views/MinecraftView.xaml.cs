@@ -56,7 +56,7 @@ public partial class MinecraftView : WpfUserControl
         ProfileComboBox.SelectedItem = MinecraftProfileService.AvailableProfiles
             .First(profile => profile.Kind == MinecraftProfileKind.Extreme4Gb);
         FpsComboBox.ItemsSource = new[] { 30, 45, 60 };
-        FpsComboBox.SelectedItem = 45;
+        FpsComboBox.SelectedItem = 30;
         ProfileComboBox.SelectionChanged += (_, _) =>
         {
             profilePreviewReady = false;
@@ -412,7 +412,7 @@ public partial class MinecraftView : WpfUserControl
         await ScientificAdvanceRequested.Invoke(SelectedPath, observation);
     }
 
-    private int SelectedFps => FpsComboBox.SelectedItem is int fps ? fps : 45;
+    private int SelectedFps => FpsComboBox.SelectedItem is int fps ? fps : 30;
 
     private bool TryReadOperationalObservation(out MinecraftOperationalObservation observation)
     {

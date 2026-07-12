@@ -62,7 +62,7 @@ internal sealed class MinecraftScientificMetricsService
         AddManualEvidence(observation, evidence);
         AddAutomaticEvidence(benchmark, averageCpu, peakCpu, pageFileDelta, evidence);
         evidence.Add(new ScientificEvidence(
-            ScientificEvidenceType.ManualRecommendation,
+            ScientificEvidenceType.Unavailable,
             "GPU_COUNTER_UNAVAILABLE",
             "Uso percentual de GPU nao e declarado como medido sem um contador de GPU confiavel para o processo; a identidade da GPU permanece no diagnostico.",
             "ApexTweaker evidence policy"));
@@ -187,18 +187,34 @@ internal sealed class MinecraftScientificMetricsService
         MinecraftOperationalObservation observation,
         ICollection<ScientificEvidence> evidence)
     {
-        evidence.Add(new ScientificEvidence(
-            ScientificEvidenceType.MeasuredFact,
-            "MANUAL_OUTCOME",
-            $"Jogo={observation.GameOpened}; menu={observation.MenuReached}; mundo={observation.WorldEntered}; servidor={observation.ServerEntered}.",
-            "Observacao guiada do usuario"));
+        var hasManualOutcome = observation.GameOpened || observation.MenuReached || observation.WorldEntered ||
+                               observation.ServerEntered || observation.PlayableAt720p || observation.SevereDrops ||
+                               observation.Crashed || observation.OutOfMemory ||
+                               observation.MenuLoadSeconds is not null || observation.JoinLoadSeconds is not null;
+        if (hasManualOutcome)
+        {
+            evidence.Add(new ScientificEvidence(
+                ScientificEvidenceType.UserProvided,
+                "USER_OUTCOME",
+                $"Jogo={observation.GameOpened}; menu={observation.MenuReached}; mundo={observation.WorldEntered}; servidor={observation.ServerEntered}.",
+                "Observacao guiada do usuario"));
+        }
+
         if (observation.AverageFps is not null || observation.MinimumFps is not null)
         {
             evidence.Add(new ScientificEvidence(
-                ScientificEvidenceType.MeasuredFact,
-                "MANUAL_FPS",
+                ScientificEvidenceType.UserProvided,
+                "USER_FPS",
                 $"FPS medio={Format(observation.AverageFps)}; minimo={Format(observation.MinimumFps)}.",
                 "F3, Spark, PresentMon ou ferramenta informada pelo usuario"));
+        }
+        else
+        {
+            evidence.Add(new ScientificEvidence(
+                ScientificEvidenceType.Unavailable,
+                "FPS_UNAVAILABLE",
+                "FPS nao foi capturado automaticamente nem informado pelo usuario.",
+                "ApexTweaker evidence policy"));
         }
     }
 
@@ -212,8 +228,13 @@ internal sealed class MinecraftScientificMetricsService
         if (benchmark is null)
         {
             evidence.Add(new ScientificEvidence(
-                ScientificEvidenceType.ManualRecommendation,
+                ScientificEvidenceType.Unavailable,
                 "BENCHMARK_MISSING",
+                "CPU, RAM, pagefile e I/O do processo Java nao foram coletados nesta rodada.",
+                "ApexTweaker scientific protocol"));
+            evidence.Add(new ScientificEvidence(
+                ScientificEvidenceType.ManualRecommendation,
+                "RUN_BENCHMARK",
                 "Execute o benchmark automatico na mesma cena antes de comparar.",
                 "ApexTweaker scientific protocol"));
             return;

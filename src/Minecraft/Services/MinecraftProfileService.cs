@@ -33,8 +33,8 @@ internal sealed partial class MinecraftProfileService
                 MinecraftProfileKind.LowEnd, "LOW_END", 6, 4, "0.60", 2, 0, 1, 60, false, 2560,
                 "Equilibrio para hardware antigo com 6 a 8 GB."),
             [MinecraftProfileKind.Extreme4Gb] = CreateProfile(
-                MinecraftProfileKind.Extreme4Gb, "EXTREME_4GB", 4, 4, "0.50", 2, 0, 0, 45, false, 2560,
-                "Prioriza inicializacao, RAM e estabilidade em 720p."),
+                MinecraftProfileKind.Extreme4Gb, "EXTREME_4GB", 4, 4, "0.50", 2, 0, 0, 30, false, 2048,
+                "Primeiro teste seguro: 720p, 30 FPS e heap de 2048 MB."),
             [MinecraftProfileKind.GpuLimited] = CreateProfile(
                 MinecraftProfileKind.GpuLimited, "GPU_LIMITED", 4, 4, "0.45", 2, 0, 0, 30, false, 2560,
                 "Reduz pixels, efeitos, distancia e carga de entidades para GPU integrada."),
@@ -85,16 +85,22 @@ internal sealed partial class MinecraftProfileService
         };
 
     private readonly string backupRoot;
+    private readonly IReadOnlyList<string> readBackupRoots;
     private readonly string? reportRoot;
     private readonly MinecraftEnvironmentService environmentService = new();
     private readonly MinecraftInstanceService instanceService = new();
 
-    public MinecraftProfileService(string? backupRoot = null, string? reportRoot = null)
+    public MinecraftProfileService(
+        string? backupRoot = null,
+        string? reportRoot = null,
+        string? legacyBackupRoot = null)
     {
-        this.backupRoot = backupRoot ?? Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
-            "ApexTweaker",
-            "MinecraftBackups");
+        this.backupRoot = backupRoot ?? ApplicationPaths.MinecraftBackups;
+        readBackupRoots = backupRoot is null
+            ? [this.backupRoot, ApplicationPaths.LegacyMinecraftBackups]
+            : legacyBackupRoot is null
+                ? [this.backupRoot]
+                : [this.backupRoot, Path.GetFullPath(legacyBackupRoot)];
         this.reportRoot = reportRoot;
     }
 
@@ -122,7 +128,21 @@ internal sealed partial class MinecraftProfileService
         MinecraftProfileKind profileKind,
         int? maximumFps = null)
     {
-        var operation = BuildOperation(selectedPath, profileKind, maximumFps);
+        return ApplyOperation(BuildOperation(selectedPath, profileKind, maximumFps));
+    }
+
+    internal MinecraftProfileApplyResult ApplyVerifiedProfile(MinecraftProfilePlan expectedPlan)
+    {
+        var operation = BuildOperation(
+            expectedPlan.Instance.GameDirectory,
+            expectedPlan.Profile,
+            expectedPlan.MaximumFps);
+        EnsurePlansEquivalent(expectedPlan, operation.Plan);
+        return ApplyOperation(operation);
+    }
+
+    private MinecraftProfileApplyResult ApplyOperation(ProfileOperation operation)
+    {
         var plan = operation.Plan;
         var changedMutations = operation.Mutations.Where(mutation => mutation.Changed).ToArray();
         if (changedMutations.Length == 0)
@@ -130,7 +150,7 @@ internal sealed partial class MinecraftProfileService
             var noChangeReport = new MinecraftReportService().WriteProfilePlan(plan, applied: false, outputDirectory: reportRoot);
             return new MinecraftProfileApplyResult(
                 plan.Instance.GameDirectory,
-                profileKind,
+                plan.Profile,
                 string.Empty,
                 string.Empty,
                 plan.JavaArguments,
@@ -154,7 +174,7 @@ internal sealed partial class MinecraftProfileService
             ManagedRoot = plan.Instance.ManagedRoot,
             GameDirectory = plan.Instance.GameDirectory,
             Launcher = plan.Instance.Launcher,
-            Profile = profileKind,
+            Profile = plan.Profile,
             Files = entries
         };
 
@@ -186,7 +206,7 @@ internal sealed partial class MinecraftProfileService
 
             return new MinecraftProfileApplyResult(
                 plan.Instance.GameDirectory,
-                profileKind,
+                plan.Profile,
                 backupId,
                 backupDirectory,
                 plan.JavaArguments,
@@ -194,7 +214,7 @@ internal sealed partial class MinecraftProfileService
                 plan.Changes,
                 reportPath,
                 [
-                    $"Perfil {Profiles[profileKind].DisplayName} aplicado com verificacao antes/depois.",
+                    $"Perfil {Profiles[plan.Profile].DisplayName} aplicado com verificacao antes/depois.",
                     $"Limite de FPS: {plan.MaximumFps}. Heap: {plan.MaximumHeapMb} MB.",
                     launcherMessage,
                     "Nenhum JAR foi excluido, movido ou modificado.",
@@ -208,6 +228,68 @@ internal sealed partial class MinecraftProfileService
             WriteManifest(manifestPath, manifest);
             throw;
         }
+    }
+
+    private static void EnsurePlansEquivalent(
+        MinecraftProfilePlan expected,
+        MinecraftProfilePlan current)
+    {
+        var expectedChanges = expected.Changes
+            .Where(change => change.WillWrite)
+            .Select(NormalizeChange)
+            .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        var currentChanges = current.Changes
+            .Where(change => change.WillWrite)
+            .Select(NormalizeChange)
+            .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        var equivalent = expected.Profile == current.Profile &&
+                         expected.MaximumHeapMb == current.MaximumHeapMb &&
+                         expected.MaximumFps == current.MaximumFps &&
+                         string.Equals(expected.JavaArguments, current.JavaArguments, StringComparison.Ordinal) &&
+                         expectedChanges.SequenceEqual(currentChanges, StringComparer.OrdinalIgnoreCase);
+        if (!equivalent)
+        {
+            var details = new List<string>();
+            if (expected.Profile != current.Profile)
+            {
+                details.Add($"perfil {expected.Profile}->{current.Profile}");
+            }
+
+            if (expected.MaximumHeapMb != current.MaximumHeapMb)
+            {
+                details.Add($"heap {expected.MaximumHeapMb}->{current.MaximumHeapMb}");
+            }
+
+            if (expected.MaximumFps != current.MaximumFps)
+            {
+                details.Add($"FPS {expected.MaximumFps}->{current.MaximumFps}");
+            }
+
+            if (!expectedChanges.SequenceEqual(currentChanges, StringComparer.OrdinalIgnoreCase))
+            {
+                var removed = expectedChanges.Except(currentChanges, StringComparer.OrdinalIgnoreCase);
+                var added = currentChanges.Except(expectedChanges, StringComparer.OrdinalIgnoreCase);
+                details.Add($"mudancas removidas=[{string.Join("; ", removed)}]");
+                details.Add($"mudancas adicionadas=[{string.Join("; ", added)}]");
+            }
+
+            throw new InvalidOperationException(
+                $"O plano mudou depois do baseline ({string.Join(", ", details)}). " +
+                "Registre um novo baseline antes de aplicar o candidato.");
+        }
+    }
+
+    private static string NormalizeChange(MinecraftProfileSettingChange change)
+    {
+        return string.Join(
+            "|",
+            Path.GetFullPath(change.FilePath),
+            change.Kind,
+            change.Setting,
+            change.Before ?? "<AUSENTE>",
+            change.After);
     }
 
     public MinecraftRollbackResult RollbackLatest(string selectedPath)
@@ -230,19 +312,30 @@ internal sealed partial class MinecraftProfileService
             throw new ArgumentException("Identificador de backup invalido.", nameof(backupId));
         }
 
-        var root = Path.GetFullPath(backupRoot);
-        var backupDirectory = Path.GetFullPath(Path.Combine(root, backupId));
-        if (!string.Equals(Path.GetDirectoryName(backupDirectory), root, StringComparison.OrdinalIgnoreCase))
+        string? backupDirectory = null;
+        foreach (var candidateRoot in readBackupRoots)
         {
-            throw new InvalidDataException("O backup solicitado esta fora da raiz gerenciada.");
+            var root = Path.GetFullPath(candidateRoot);
+            var candidate = Path.GetFullPath(Path.Combine(root, backupId));
+            if (!string.Equals(Path.GetDirectoryName(candidate), root, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidDataException("O backup solicitado esta fora da raiz gerenciada.");
+            }
+
+            var candidateManifest = Path.Combine(candidate, ManifestFileName);
+            if (File.Exists(candidateManifest) && IsSelfContainedManifest(candidateManifest))
+            {
+                backupDirectory = candidate;
+                break;
+            }
+        }
+
+        if (backupDirectory is null)
+        {
+            throw new FileNotFoundException("Backup solicitado nao foi encontrado nas raizes atual ou legada.", backupId);
         }
 
         var manifestPath = Path.Combine(backupDirectory, ManifestFileName);
-        if (!File.Exists(manifestPath))
-        {
-            throw new FileNotFoundException("Manifesto do backup solicitado nao foi encontrado.", manifestPath);
-        }
-
         return RollbackManifest(selectedPath, manifestPath, backupId);
     }
 
@@ -391,7 +484,7 @@ internal sealed partial class MinecraftProfileService
             $"# ApexTweaker {profile.DisplayName}\r\n" +
             $"# Launcher detectado: {instance.Launcher}\r\n" +
             $"# FPS: {fpsLimit} | Heap: {profileHeapMb} MB\r\n" +
-            $"# Motivo: {javaMemoryReason}\r\n" +
+            "# A justificativa de memoria esta registrada no relatorio do perfil.\r\n" +
             "# Use esta linha quando o launcher nao possuir integracao automatica.\r\n" +
             $"{javaArguments}\r\n";
         var javaMutation = BuildWholeFileMutation(
@@ -739,55 +832,78 @@ internal sealed partial class MinecraftProfileService
 
     private string? FindLatestPendingManifest(string selectedPath)
     {
-        if (!Directory.Exists(backupRoot))
-        {
-            return null;
-        }
-
         var candidates = new List<(string Path, DateTimeOffset CreatedAt)>();
         var selected = Path.GetFullPath(selectedPath);
-        foreach (var manifestPath in Directory.EnumerateFiles(backupRoot, ManifestFileName, SearchOption.AllDirectories))
+        foreach (var root in readBackupRoots.Where(Directory.Exists))
         {
-            try
+            foreach (var manifestPath in Directory.EnumerateFiles(root, ManifestFileName, SearchOption.AllDirectories))
             {
-                var manifest = JsonSerializer.Deserialize<MinecraftBackupManifest>(File.ReadAllText(manifestPath), JsonOptions);
-                var manifestGameDirectory = manifest is null || string.IsNullOrWhiteSpace(manifest.GameDirectory)
-                    ? manifest?.InstanceRoot
-                    : manifest.GameDirectory;
-                var manifestManagedRoot = manifest is null || string.IsNullOrWhiteSpace(manifest.ManagedRoot)
-                    ? manifestGameDirectory
-                    : manifest.ManagedRoot;
-                var acceptedSelections = string.IsNullOrWhiteSpace(manifestGameDirectory)
-                    ? Array.Empty<string>()
-                    : new[]
-                    {
-                        Path.GetFullPath(manifestGameDirectory),
-                        Path.GetFullPath(Path.Combine(manifestGameDirectory, "mods")),
-                        Path.GetFullPath(manifestManagedRoot!)
-                    };
-                var selectedContainsGameDirectory = !string.IsNullOrWhiteSpace(manifestGameDirectory) &&
-                    (string.Equals(
-                         Path.GetFullPath(Path.Combine(selected, ".minecraft")),
-                         Path.GetFullPath(manifestGameDirectory),
-                         StringComparison.OrdinalIgnoreCase) ||
-                     string.Equals(
-                         Path.GetFullPath(Path.Combine(selected, "minecraft")),
-                         Path.GetFullPath(manifestGameDirectory),
-                         StringComparison.OrdinalIgnoreCase));
-                if (manifest is not null &&
-                    manifest.RolledBackAtUtc is null &&
-                    (acceptedSelections.Contains(selected, StringComparer.OrdinalIgnoreCase) || selectedContainsGameDirectory))
+                try
                 {
-                    candidates.Add((manifestPath, manifest.CreatedAtUtc));
+                    var manifest = JsonSerializer.Deserialize<MinecraftBackupManifest>(File.ReadAllText(manifestPath), JsonOptions);
+                    var manifestGameDirectory = manifest is null || string.IsNullOrWhiteSpace(manifest.GameDirectory)
+                        ? manifest?.InstanceRoot
+                        : manifest.GameDirectory;
+                    var manifestManagedRoot = manifest is null || string.IsNullOrWhiteSpace(manifest.ManagedRoot)
+                        ? manifestGameDirectory
+                        : manifest.ManagedRoot;
+                    var acceptedSelections = string.IsNullOrWhiteSpace(manifestGameDirectory)
+                        ? Array.Empty<string>()
+                        : new[]
+                        {
+                            Path.GetFullPath(manifestGameDirectory),
+                            Path.GetFullPath(Path.Combine(manifestGameDirectory, "mods")),
+                            Path.GetFullPath(manifestManagedRoot!)
+                        };
+                    var selectedContainsGameDirectory = !string.IsNullOrWhiteSpace(manifestGameDirectory) &&
+                        (string.Equals(
+                             Path.GetFullPath(Path.Combine(selected, ".minecraft")),
+                             Path.GetFullPath(manifestGameDirectory),
+                             StringComparison.OrdinalIgnoreCase) ||
+                         string.Equals(
+                             Path.GetFullPath(Path.Combine(selected, "minecraft")),
+                             Path.GetFullPath(manifestGameDirectory),
+                             StringComparison.OrdinalIgnoreCase));
+                    if (manifest is not null &&
+                        HasSelfContainedBackupPaths(manifest, manifestPath) &&
+                        manifest.RolledBackAtUtc is null &&
+                        (acceptedSelections.Contains(selected, StringComparer.OrdinalIgnoreCase) || selectedContainsGameDirectory))
+                    {
+                        candidates.Add((manifestPath, manifest.CreatedAtUtc));
+                    }
                 }
-            }
-            catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
-            {
-                // An unrelated malformed backup does not block valid rollback candidates.
+                catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
+                {
+                    // An unrelated malformed backup does not block valid rollback candidates.
+                }
             }
         }
 
         return candidates.OrderByDescending(item => item.CreatedAt).Select(item => item.Path).FirstOrDefault();
+    }
+
+    private static bool IsSelfContainedManifest(string manifestPath)
+    {
+        try
+        {
+            var manifest = JsonSerializer.Deserialize<MinecraftBackupManifest>(File.ReadAllText(manifestPath), JsonOptions);
+            return manifest is not null && HasSelfContainedBackupPaths(manifest, manifestPath);
+        }
+        catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
+    }
+
+    private static bool HasSelfContainedBackupPaths(
+        MinecraftBackupManifest manifest,
+        string manifestPath)
+    {
+        var operationDirectory = Path.GetFullPath(Path.GetDirectoryName(manifestPath)!);
+        return manifest.Files.All(entry => string.Equals(
+            Path.GetDirectoryName(Path.GetFullPath(entry.BackupPath)),
+            operationDirectory,
+            StringComparison.OrdinalIgnoreCase));
     }
 
     private static List<MinecraftBackupFileEntry> CaptureFiles(

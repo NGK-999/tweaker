@@ -100,7 +100,12 @@
                             <TextBlock Margin="0,4,0,0"
                                        Foreground="{StaticResource TextTertiaryBrush}"
                                        FontSize="12"
-                                       Text="v3.0.0" />
+                                       Text="v3.0.1" />
+                            <TextBlock x:Name="PrivilegeModeText"
+                                       Margin="0,4,0,0"
+                                       Foreground="{StaticResource AccentBrush}"
+                                       FontSize="11"
+                                       Text="Modo normal" />
                         </StackPanel>
 
                         <StackPanel Grid.Row="1"

@@ -115,12 +115,21 @@ internal sealed class MinecraftScientificExperimentService
         MinecraftScientificExperiment updated;
         if (kind == ScientificMeasurementKind.Baseline)
         {
+            var baselinePlan = autoOptimizeService.BuildPlan(
+                experiment.InstanceRoot,
+                experiment.OptimizationPlan.MaximumFps);
             updated = experiment with
             {
                 UpdatedAtUtc = now,
                 Phase = ScientificExperimentPhase.BaselineRecorded,
+                OptimizationPlan = baselinePlan,
+                Hypothesis = experiment.Hypothesis.Kind == ScientificHypothesisKind.Custom
+                    ? experiment.Hypothesis
+                    : BuildHypothesis(baselinePlan),
                 Baseline = measurement,
-                AuditTrail = Append(experiment.AuditTrail, Audit(now, $"Baseline registrado: {metrics.Outcome}."))
+                AuditTrail = Append(
+                    experiment.AuditTrail,
+                    Audit(now, $"Baseline registrado e plano congelado: {metrics.Outcome}."))
             };
         }
         else
@@ -161,29 +170,13 @@ internal sealed class MinecraftScientificExperimentService
         var beforeApply = evidenceService.Capture(experiment.InstanceRoot);
         EnsureModSetUnchanged(experiment.Baseline, beforeApply, "pre-apply");
         EnsureConfigSetUnchanged(experiment.Baseline, beforeApply, "pre-apply");
-        var currentPlan = profileService.PlanProfile(
-            experiment.InstanceRoot,
-            experiment.OptimizationPlan.SelectedProfile,
-            experiment.OptimizationPlan.MaximumFps);
-        var result = profileService.ApplyProfile(
-            experiment.InstanceRoot,
-            experiment.OptimizationPlan.SelectedProfile,
-            experiment.OptimizationPlan.MaximumFps);
+        var frozenPlan = experiment.OptimizationPlan.ProfilePlan;
+        var result = profileService.ApplyVerifiedProfile(frozenPlan);
         var now = DateTimeOffset.UtcNow;
-        var updatedPlan = experiment.OptimizationPlan with
-        {
-            ProfilePlan = currentPlan,
-            JavaMemory = new JavaMemoryRecommendation(
-                currentPlan.MaximumHeapMb,
-                currentPlan.JavaArguments,
-                ToTier(currentPlan.MaximumHeapMb),
-                currentPlan.JavaMemoryReason)
-        };
         var updated = experiment with
         {
             UpdatedAtUtc = now,
             Phase = ScientificExperimentPhase.CandidateApplied,
-            OptimizationPlan = updatedPlan,
             AppliedProfileBackupId = string.IsNullOrWhiteSpace(result.BackupId) ? null : result.BackupId,
             AuditTrail = Append(
                 experiment.AuditTrail,
@@ -497,17 +490,6 @@ internal sealed class MinecraftScientificExperimentService
             })
             .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
             .ToArray();
-    }
-
-    private static JavaMemoryTier ToTier(int maximumHeapMb)
-    {
-        return maximumHeapMb switch
-        {
-            <= 2048 => JavaMemoryTier.Safe2048,
-            <= 2304 => JavaMemoryTier.Balanced2304,
-            <= 2560 => JavaMemoryTier.Aggressive2560,
-            _ => JavaMemoryTier.Standard
-        };
     }
 
     private static string Audit(DateTimeOffset timestamp, string message) => $"{timestamp:O} | {message}";

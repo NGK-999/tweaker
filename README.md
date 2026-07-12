@@ -4,7 +4,7 @@ Utilitario Windows em .NET 10 + WPF para diagnostico de hardware, telemetria,
 otimizacoes reversiveis e preparacao segura de Minecraft/Cobblemon em hardware
 limitado.
 
-Versao: **3.0.0** | Autor: **Igor Silva**
+Versao: **3.0.1** | Autor: **Igor Silva**
 
 ## Minecraft Scientific Optimization Engine
 
@@ -87,10 +87,10 @@ Artefatos oficiais:
 - [ApexTweaker.exe](https://github.com/NGK-999/tweaker/releases/latest/download/ApexTweaker.exe)
 - [ApexTweaker.Native.dll](https://github.com/NGK-999/tweaker/releases/latest/download/ApexTweaker.Native.dll)
 - [ApexTweaker-Setup.exe](https://github.com/NGK-999/tweaker/releases/latest/download/ApexTweaker-Setup.exe)
-- [ApexTweaker-Portable-v3.0.0.zip](https://github.com/NGK-999/tweaker/releases/download/v3.0.0/ApexTweaker-Portable-v3.0.0.zip)
+- [ApexTweaker-Portable-v3.0.1.zip](https://github.com/NGK-999/tweaker/releases/download/v3.0.1/ApexTweaker-Portable-v3.0.1.zip)
 
-O executavel publicado e self-contained, pede Administrador pelo manifesto e
-nao exige .NET instalado.
+O executavel publicado e self-contained, inicia em modo normal e nao exige .NET
+instalado. Apenas mutacoes protegidas do Windows solicitam UAC sob demanda.
 
 ## Build local
 
@@ -105,19 +105,25 @@ Requisito: Visual Studio Build Tools com suporte a C++ para compilar
 ## Dados e seguranca
 
 - Backups de Windows: `C:\ProgramData\ApexTweaker\Backups`
-- Backups de perfis Minecraft: `C:\ProgramData\ApexTweaker\MinecraftBackups`
-- Backups de quarentena: `C:\ProgramData\ApexTweaker\MinecraftQuarantineBackups`
-- Relatorios Minecraft: `C:\ProgramData\ApexTweaker\MinecraftReports`
-- Experimentos cientificos: `C:\ProgramData\ApexTweaker\MinecraftExperiments`
-- Logs: `C:\ProgramData\ApexTweaker\Logs\latest_runtime.log`
+- Backups de perfis Minecraft: `%LOCALAPPDATA%\ApexTweaker\MinecraftBackups`
+- Backups de quarentena: `%LOCALAPPDATA%\ApexTweaker\MinecraftQuarantineBackups`
+- Relatorios Minecraft: `%LOCALAPPDATA%\ApexTweaker\MinecraftReports`
+- Experimentos cientificos: `%LOCALAPPDATA%\ApexTweaker\MinecraftExperiments`
+- Telemetria de usuario: `%LOCALAPPDATA%\ApexTweaker\Telemetry`
 - O perfil altera `options.txt` e apenas chaves existentes validadas de Sodium,
   ImmediatelyFast e EntityCulling, alem de desativar Iris por chave reconhecida.
 - Prism/MultiMC recebem memoria por instancia; outros launchers recebem uma
   instrucao JVM manual.
 - Defender, Windows Update, pagefile e mods de servidor nao sao desativados ou
   removidos por esse fluxo.
+- Relatorios e experimentos legados da v3.0.0 sao copiados para LocalAppData
+  sem sobrescrever; manifestos de backup permanecem em ProgramData e sao lidos
+  diretamente como fallback para preservar caminhos e hashes.
 
 O repositorio GitHub esta privado; links de release retornam `404` sem uma conta
 autorizada. Mais detalhes de build e distribuicao:
 [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md) e
 [docs/PROJECT_STRUCTURE.md](docs/PROJECT_STRUCTURE.md).
+
+Primeiro teste no PC de 4 GB:
+[docs/FIRST_REAL_TEST_4GB.md](docs/FIRST_REAL_TEST_4GB.md).

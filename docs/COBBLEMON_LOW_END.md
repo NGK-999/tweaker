@@ -1,4 +1,4 @@
-# Cobblemon Low-End Lab v3.0.0
+# Cobblemon Low-End Lab v3.0.1
 
 ## Objetivo
 
@@ -75,16 +75,21 @@ principal, o motor apenas registra o contrato. Consulte
 
 ## Memoria Java
 
-O heap e escolhido de acordo com a RAM livre e limitado pelo perfil:
+O primeiro teste do `EXTREME_4GB` usa obrigatoriamente:
 
 ```text
 -Xms512M -Xmx2048M
+```
+
+Somente rodadas posteriores, justificadas por logs e pagefile, podem comparar:
+
+```text
 -Xms512M -Xmx2304M
 -Xms512M -Xmx2560M
 ```
 
-O `EXTREME_4GB` escolhe 2048, 2304 ou 2560 MB conforme a memoria livre e nunca
-passa de `-Xmx2560M`. Prism/MultiMC recebem `OverrideMemory`, `MinMemAlloc` e `MaxMemAlloc` em `instance.cfg`. Outros
+O `EXTREME_4GB` fica limitado a `-Xmx2048M`. Prism/MultiMC recebem
+`OverrideMemory`, `MinMemAlloc` e `MaxMemAlloc` em `instance.cfg`. Outros
 launchers recebem `apextweaker-java-args.txt` com instrucao manual.
 
 Nao use `-Xmx4G` em uma maquina com 4 GB. Mantenha o pagefile ativo e gerenciado
@@ -95,7 +100,7 @@ pelo Windows, de preferencia em SSD.
 Backups ficam em:
 
 ```text
-C:\ProgramData\ApexTweaker\MinecraftBackups
+%LOCALAPPDATA%\ApexTweaker\MinecraftBackups
 ```
 
 O manifesto guarda launcher, instancia, arquivos permitidos e SHA-256 antes e

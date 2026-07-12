@@ -21,10 +21,7 @@ internal sealed class MinecraftScientificExperimentStore
 
     public MinecraftScientificExperimentStore(string? root = null)
     {
-        Root = Path.GetFullPath(root ?? Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
-            "ApexTweaker",
-            "MinecraftExperiments"));
+        Root = Path.GetFullPath(root ?? ApplicationPaths.MinecraftExperiments);
     }
 
     public string Root { get; }

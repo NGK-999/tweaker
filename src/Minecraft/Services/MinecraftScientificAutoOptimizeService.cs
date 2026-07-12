@@ -204,6 +204,12 @@ internal sealed class MinecraftScientificAutoOptimizeService
         MinecraftBottleneckKind bottleneck,
         decimal totalMemoryGb)
     {
+        if (totalMemoryGb <= 4.5m &&
+            bottleneck is not MinecraftBottleneckKind.ModConflict and not MinecraftBottleneckKind.ServerModMismatch)
+        {
+            return MinecraftProfileKind.Extreme4Gb;
+        }
+
         return bottleneck switch
         {
             MinecraftBottleneckKind.ModConflict or MinecraftBottleneckKind.ServerModMismatch =>
@@ -214,7 +220,7 @@ internal sealed class MinecraftScientificAutoOptimizeService
             MinecraftBottleneckKind.CpuLimited => MinecraftProfileKind.CpuLimited,
             MinecraftBottleneckKind.GpuLimited or MinecraftBottleneckKind.ConfigTooHeavy =>
                 MinecraftProfileKind.GpuLimited,
-            _ => totalMemoryGb <= 4.5m ? MinecraftProfileKind.RamLimited : MinecraftProfileKind.LowEnd
+            _ => MinecraftProfileKind.LowEnd
         };
     }
 

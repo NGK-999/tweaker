@@ -17,10 +17,7 @@ internal sealed class MinecraftReportService
         Converters = { new JsonStringEnumConverter() }
     };
 
-    public string DefaultReportRoot { get; } = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
-        "ApexTweaker",
-        "MinecraftReports");
+    public string DefaultReportRoot { get; } = ApplicationPaths.MinecraftReports;
 
     public MinecraftReportPaths WriteAudit(MinecraftAuditResult result, string? outputDirectory = null)
     {
@@ -59,15 +56,30 @@ internal sealed class MinecraftReportService
             .AppendLine($"- Instancia: `{result.InstanceRoot ?? "NAO INFORMADA"}`")
             .AppendLine($"- Processo: `{result.ProcessName ?? "NAO DETECTADO"}` / `{result.ProcessId?.ToString() ?? "-"}`")
             .AppendLine($"- Duracao: `{result.Duration.TotalSeconds:0.0} s`")
+            .AppendLine()
+            .AppendLine("## Metricas coletadas automaticamente")
+            .AppendLine()
             .AppendLine($"- Pico RAM Java: `{FormatBytes(result.PeakWorkingSetBytes)}`")
             .AppendLine($"- Menor RAM livre: `{result.MinimumAvailableMemoryGb:0.00} GB`")
             .AppendLine($"- Disco Java leitura/escrita: `{FormatBytes(result.Samples.Count == 0 ? 0 : result.Samples.Max(sample => sample.DiskReadBytes))}` / `{FormatBytes(result.Samples.Count == 0 ? 0 : result.Samples.Max(sample => sample.DiskWriteBytes))}`")
             .AppendLine($"- Mods ativos: `{result.ActiveMods.Count}`")
-            .AppendLine($"- FPS automatico: `{(result.FpsMeasured ? "SIM" : "NAO")}`")
             .AppendLine($"- Evidencia OOM: `{(result.OutOfMemoryEvidence ? "SIM" : "NAO")}`")
             .AppendLine($"- Evidencia crash: `{(result.CrashEvidence ? "SIM" : "NAO")}`")
             .AppendLine($"- Latest log: `{result.LatestLogPath ?? "NAO ENCONTRADO"}`")
             .AppendLine($"- Crash report: `{result.CrashReportPath ?? "NAO ENCONTRADO"}`")
+            .AppendLine()
+            .AppendLine("## Metricas informadas pelo usuario")
+            .AppendLine()
+            .AppendLine("- Nenhuma neste relatorio automatico. FPS, tempos percebidos e entrada no servidor ficam na medicao guiada do experimento.")
+            .AppendLine()
+            .AppendLine("## Metricas estimadas ou inferidas")
+            .AppendLine()
+            .AppendLine("- Nenhuma metrica estimada e apresentada como coleta automatica. Inferencias de gargalo aparecem separadas no relatorio cientifico.")
+            .AppendLine()
+            .AppendLine("## Metricas nao disponiveis")
+            .AppendLine()
+            .AppendLine($"- FPS automatico: `{(result.FpsMeasured ? "DISPONIVEL" : "NAO DISPONIVEL")}`")
+            .AppendLine("- GPU percentual por processo: `NAO DISPONIVEL`")
             .AppendLine()
             .AppendLine("## Observacoes")
             .AppendLine();
@@ -88,6 +100,9 @@ internal sealed class MinecraftReportService
             $"DISK_READ_BYTES={(result.Samples.Count == 0 ? 0 : result.Samples.Max(sample => sample.DiskReadBytes))}\r\n" +
             $"DISK_WRITE_BYTES={(result.Samples.Count == 0 ? 0 : result.Samples.Max(sample => sample.DiskWriteBytes))}\r\n" +
             $"FPS_MEASURED={result.FpsMeasured}\r\n" +
+            $"FPS_SOURCE={(result.FpsMeasured ? "AUTOMATIC" : "UNAVAILABLE")}\r\n" +
+            "GPU_PROCESS_SOURCE=UNAVAILABLE\r\n" +
+            "USER_METRICS=SCIENTIFIC_GUIDED_REPORT_ONLY\r\n" +
             $"OOM={result.OutOfMemoryEvidence}\r\n" +
             $"CRASH={result.CrashEvidence}\r\n",
             Utf8WithoutBom());

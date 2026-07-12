@@ -40,7 +40,7 @@
             <TextBlock Grid.Row="1"
                        Margin="0,16,0,16"
                        Style="{StaticResource MacBodyText}"
-                       Text="O ApexTweaker altera energia, registro, BCD e prioridades do sistema. O pipeline transacional e o rollback foram preservados, mas aplique os pacotes apenas se entender os riscos operacionais da m&#x00E1;quina." />
+                       Text="O modo normal audita e otimiza instancias Minecraft sem administrador. Acoes de energia, registro, BCD e rollback do Windows solicitam UAC separadamente e so devem ser aplicadas se voce entender os riscos operacionais." />
 
             <StackPanel Grid.Row="2">
                 <CheckBox x:Name="AcceptCheckBox"

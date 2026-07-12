@@ -76,6 +76,9 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        PrivilegeModeText.Text = ApplicationPrivilegeService.IsAdministrator
+            ? "Modo administrador"
+            : "Modo normal (sem UAC)";
 
         etwFrameTracker = new EtwFrameTracker(hardwareTelemetryService);
 
@@ -326,6 +329,9 @@ public partial class MainWindow : Window
         WriteLine($"CPU n\u00FAcleos: {hardware.PhysicalCoreCount} f\u00EDsicos / {hardware.LogicalCoreCount} l\u00F3gicos");
         WriteLine($"RAM instalada: {hardware.TotalMemoryGb:0.#} GB");
         WriteLine($"CPU arquitetura heterog\u00EAnea: {(profile.IsHeterogeneousArchitecture ? "sim" : "n\u00E3o")}");
+        WriteLine(ApplicationPrivilegeService.IsAdministrator
+            ? "[PRIVILEGIO] Modo administrador: mutacoes Windows estao disponiveis."
+            : "[PRIVILEGIO] Modo normal: Minecraft, auditoria, benchmark e relatorios nao exigem UAC.");
 
         if (alreadyOptimized)
         {
@@ -334,7 +340,9 @@ public partial class MainWindow : Window
         }
         else
         {
-            SetStatus("Pronto: use o Auto-Tuning ou navegue por m\u00F3dulos espec\u00EDficos.");
+            SetStatus(ApplicationPrivilegeService.IsAdministrator
+                ? "Modo administrador: Auto-Tuning e mutacoes Windows disponiveis."
+                : "Modo normal: use Cobblemon sem UAC; mutacoes Windows pedirao elevacao.");
         }
     }
     private async Task ShowPageAsync(string pageKey, WpfButton navigationButton, bool animate = true)
@@ -456,6 +464,11 @@ public partial class MainWindow : Window
 
     private async Task RunAutoOptimizeAsync()
     {
+        if (!EnsureAdministratorForWindowsOperation("Auto-Tuning do Windows"))
+        {
+            return;
+        }
+
         if (!TryBeginTweaking("Auto-Tuning"))
         {
             return;
@@ -563,6 +576,11 @@ public partial class MainWindow : Window
         string? completionStatus = null,
         bool createAutomaticBackup = true)
     {
+        if (!EnsureAdministratorForWindowsOperation(section))
+        {
+            return;
+        }
+
         if (!TryBeginTweaking(section))
         {
             return;
@@ -1451,6 +1469,11 @@ public partial class MainWindow : Window
     private async Task RevertTweaksAsync()
     {
         const string section = "Master rollback";
+        if (!EnsureAdministratorForWindowsOperation(section, ApplicationOperation.WindowsRollback))
+        {
+            return;
+        }
+
         if (!TryBeginTweaking(section))
         {
             return;
@@ -1496,6 +1519,13 @@ public partial class MainWindow : Window
 
     private async Task UninstallAndExitAsync()
     {
+        if (!EnsureAdministratorForWindowsOperation(
+                "Restaurar tweaks e limpar dados de sistema",
+                ApplicationOperation.WindowsCleanup))
+        {
+            return;
+        }
+
         if (System.Windows.MessageBox.Show(
                 "Isso ir\u00E1 restaurar o \u00FAltimo estado pendente e limpar os dados locais do ApexTweaker. Deseja prosseguir?",
                 "Desinstalar e sair",
@@ -1530,13 +1560,12 @@ public partial class MainWindow : Window
 
                 try
                 {
-                    var appDataRoot = Path.Combine(
-                        Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
-                        "ApexTweaker");
-
-                    if (Directory.Exists(appDataRoot))
+                    foreach (var appDataRoot in new[] { ApplicationPaths.SystemDataRoot, ApplicationPaths.UserDataRoot })
                     {
-                        Directory.Delete(appDataRoot, recursive: true);
+                        if (Directory.Exists(appDataRoot))
+                        {
+                            Directory.Delete(appDataRoot, recursive: true);
+                        }
                     }
                 }
                 catch
@@ -1606,6 +1635,49 @@ public partial class MainWindow : Window
         {
             WriteLine($"Falha ao abrir o suporte da Riot: {ex.Message}");
         }
+    }
+
+    private bool EnsureAdministratorForWindowsOperation(
+        string operation,
+        ApplicationOperation requiredOperation = ApplicationOperation.WindowsMutation)
+    {
+        if (!ApplicationPrivilegeService.RequiresAdministrator(requiredOperation) ||
+            ApplicationPrivilegeService.IsAdministrator)
+        {
+            return true;
+        }
+
+        var confirmation = System.Windows.MessageBox.Show(
+            $"{operation} altera estado protegido do Windows e exige administrador.\n\n" +
+            "O ApexTweaker sera reaberto em modo administrador somente para essa classe de operacao. " +
+            "Auditoria, perfis, backups e benchmark Minecraft funcionam no modo normal.\n\n" +
+            "Reabrir agora?",
+            "Elevacao necessaria",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Information);
+        if (confirmation != MessageBoxResult.Yes)
+        {
+            SetStatus($"{operation}: cancelado sem elevacao.");
+            return false;
+        }
+
+        try
+        {
+            ApplicationPrivilegeService.RestartElevated();
+            WriteLine($"[PRIVILEGIO] Reabrindo para: {operation}.");
+            Close();
+        }
+        catch (OperationCanceledException)
+        {
+            SetStatus($"{operation}: UAC cancelado; nenhuma operacao foi iniciada.");
+        }
+        catch (Exception ex)
+        {
+            WriteLine($"Falha ao solicitar elevacao: {ex.Message}");
+            SetStatus($"{operation}: elevacao nao iniciada.");
+        }
+
+        return false;
     }
 
     private void WriteSection(string title)

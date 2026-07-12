@@ -11,6 +11,8 @@ internal static class Program
     [STAThread]
     private static void Main(string[] args)
     {
+        _ = ApplicationPaths.MigrateLegacyMinecraftData();
+
         if (MinecraftCommandLine.TryRun(args, out var exitCode))
         {
             Environment.ExitCode = exitCode;

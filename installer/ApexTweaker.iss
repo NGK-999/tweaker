@@ -3,7 +3,7 @@
 #endif
 
 #define MyAppName "ApexTweaker"
-#define MyAppVersion "3.0.0"
+#define MyAppVersion "3.0.1"
 #define MyAppPublisher "Igor Silva"
 #define MyAppExeName "ApexTweaker.exe"
 #define MyAppURL "https://github.com/NGK-999/tweaker"
@@ -50,7 +50,7 @@ Name: "{group}\Desinstalar ApexTweaker"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\ApexTweaker"; Filename: "{app}\ApexTweaker.exe"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\ApexTweaker.exe"; WorkingDir: "{app}"; Description: "Executar ApexTweaker"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\ApexTweaker.exe"; WorkingDir: "{app}"; Description: "Executar ApexTweaker"; Flags: nowait postinstall skipifsilent runasoriginaluser
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{app}"

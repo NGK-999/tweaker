@@ -1,6 +1,6 @@
 # Minecraft Scientific Optimization Engine
 
-Versao: **ApexTweaker 3.0.0**
+Versao: **ApexTweaker 3.0.1**
 
 ## Objetivo e limite
 
@@ -41,9 +41,11 @@ Cada evidencia tem uma origem explicita:
 
 | Tipo | Exemplo |
 |---|---|
-| `MEASURED_FACT` | amostra do processo Java, hash, log ou observacao registrada |
-| `INFERENCE` | GPU limitada inferida de FPS baixo, CPU/RAM sem saturacao e iGPU Intel |
-| `MANUAL_RECOMMENDATION` | medir FPS externamente ou testar um mod fora |
+| `FATO_AUTOMATICO` | amostra do processo Java, hash ou padrao explicito de log |
+| `INFORMADO_PELO_USUARIO` | FPS via F3, tempo percebido e entrada no servidor |
+| `INFERENCIA` | GPU limitada inferida de FPS baixo, CPU/RAM sem saturacao e iGPU Intel |
+| `RECOMENDACAO_MANUAL` | medir FPS externamente ou testar um mod fora |
+| `NAO_DISPONIVEL` | FPS/GPU nao capturados ou benchmark ausente |
 
 GPU percentual nao e preenchida sem um contador confiavel por processo. A
 identidade da GPU pode apoiar uma inferencia, mas nunca aparece como telemetria
@@ -67,6 +69,8 @@ Regras:
 - conflitos estruturais de mods bloqueiam apply;
 - o conjunto de hashes dos mods deve permanecer identico;
 - configs nao podem mudar entre a captura baseline e o apply;
+- o plano e recalculado e congelado no momento do baseline;
+- apply rejeita qualquer diferenca entre o plano congelado e o atual;
 - baseline e candidato precisam apontar para a mesma instancia;
 - mudanca fora do plano rebaixa a rodada para `RETEST` e confianca baixa;
 - qualquer decisao diferente de `KEEP` exige confirmacao e usa o backup exato;
@@ -77,12 +81,19 @@ Regras:
 O estado padrao fica em:
 
 ```text
-C:\ProgramData\ApexTweaker\MinecraftExperiments\exp-...
+%LOCALAPPDATA%\ApexTweaker\MinecraftExperiments\exp-...
 ```
 
 Cada pasta contem `experiment.json` e os relatorios `.json`, `.md` e `.txt`.
 A CLI aceita `--experiment-root <path>` para testes ou um armazenamento gravavel
 sem elevacao. Nesse caso, backups e relatorios auxiliares ficam sob a mesma raiz.
+
+## Privilegio minimo
+
+Auditoria, perfis, quarentena confirmada, rollback Minecraft, benchmark e
+relatorios funcionam em modo normal. O manifesto usa `asInvoker`. Somente
+mutacoes protegidas e rollback do Windows solicitam UAC sob demanda. Prism,
+Java e Minecraft nunca devem ser executados como administrador.
 
 ## Resultados da medicao
 
@@ -184,15 +195,20 @@ suficiente, e o relatorio identifica a inferencia.
 | `COBBLEMON_SERVER_CLIENT` | perfil operacional anterior para cliente do servidor |
 | `BENCHMARK` | ambiente controlado para rodada comparativa |
 
-Em maquina com aproximadamente 4 GB, o heap sempre fica entre:
+O primeiro teste em maquina com aproximadamente 4 GB usa:
 
 ```text
 -Xms512M -Xmx2048M
+```
+
+Heaps maiores ficam reservados para hipoteses posteriores:
+
+```text
 -Xms512M -Xmx2304M
 -Xms512M -Xmx2560M
 ```
 
-A escolha usa RAM livre real e o limite do perfil. `-Xmx4G` nunca e emitido.
+A escolha inicial nao depende de um pico momentaneo de RAM livre. `-Xmx4G` nunca e emitido.
 Prism/MultiMC recebem memoria em `instance.cfg`; launchers sem contrato gravavel
 recebem um arquivo de instrucao manual.
 

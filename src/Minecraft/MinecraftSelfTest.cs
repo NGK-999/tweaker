@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.Json;
 using ApexTweaker.Minecraft.Models;
 using ApexTweaker.Minecraft.Services;
+using ApexTweaker.Services;
 using ApexTweaker.UI.Wpf.Views;
 
 namespace ApexTweaker.Minecraft;
@@ -18,6 +19,26 @@ internal static class MinecraftSelfTest
 
         try
         {
+            Assert(!ApplicationPrivilegeService.RequiresAdministrator(ApplicationOperation.HardwareDiagnostics) &&
+                   !ApplicationPrivilegeService.RequiresAdministrator(ApplicationOperation.MinecraftFiles) &&
+                   !ApplicationPrivilegeService.RequiresAdministrator(ApplicationOperation.MinecraftBenchmark) &&
+                   !ApplicationPrivilegeService.RequiresAdministrator(ApplicationOperation.UserTelemetry),
+                "Operacoes de usuario foram marcadas como administrativas.");
+            Assert(ApplicationPrivilegeService.RequiresAdministrator(ApplicationOperation.WindowsMutation) &&
+                   ApplicationPrivilegeService.RequiresAdministrator(ApplicationOperation.WindowsRollback) &&
+                   ApplicationPrivilegeService.RequiresAdministrator(ApplicationOperation.WindowsCleanup) &&
+                   ApplicationPrivilegeService.RequiresAdministrator(ApplicationOperation.KernelEtw),
+                "Operacoes protegidas do Windows nao exigiram administrador.");
+            var localData = Path.GetFullPath(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData));
+            Assert(Path.GetFullPath(ApplicationPaths.UserDataRoot).StartsWith(localData, StringComparison.OrdinalIgnoreCase),
+                "A raiz de dados do usuario nao esta em LocalAppData.");
+            Assert(new MinecraftProfileService().BackupRoot == ApplicationPaths.MinecraftBackups &&
+                   new MinecraftQuarantineService().BackupRoot == ApplicationPaths.MinecraftQuarantineBackups &&
+                   new MinecraftReportService().DefaultReportRoot == ApplicationPaths.MinecraftReports &&
+                   new MinecraftScientificExperimentStore().Root == ApplicationPaths.MinecraftExperiments,
+                "Um servico Minecraft ainda depende de ProgramData por padrao.");
+            messages.Add("PASS: Minecraft usa privilegio minimo e dados em LocalAppData.");
+
             var modsDirectory = Path.Combine(root, "audit", "mods");
             Directory.CreateDirectory(modsDirectory);
             CreateFabricJar(Path.Combine(modsDirectory, "sample-1.0.jar"), "sample", "1.0.0", new Dictionary<string, string>());
@@ -43,7 +64,8 @@ internal static class MinecraftSelfTest
                 "O plano de quarentena nao foi gerado.");
             messages.Add("PASS: relatorios JSON, Markdown e TXT.");
 
-            var quarantineService = new MinecraftQuarantineService(Path.Combine(root, "quarantine-backups"));
+            var legacyQuarantineRoot = Path.Combine(root, "legacy-quarantine-backups");
+            var quarantineService = new MinecraftQuarantineService(legacyQuarantineRoot);
             var quarantinePlan = quarantineService.BuildPlan(audit);
             var olderDuplicate = quarantinePlan.Candidates.Single(candidate => candidate.FileName == "sample-1.0.jar");
             Assert(File.Exists(olderDuplicate.FullPath), "O dry-run de quarentena alterou a origem.");
@@ -71,7 +93,17 @@ internal static class MinecraftSelfTest
                 "O JAR nao chegou a quarentena.");
             Assert(File.Exists(Path.Combine(quarantined.BackupDirectory, olderDuplicate.FileName)),
                 "O backup do JAR nao foi criado.");
-            _ = quarantineService.RollbackLatest(modsDirectory);
+            var copiedQuarantineManifestDirectory = Path.Combine(
+                root,
+                "current-quarantine-backups",
+                Path.GetFileName(quarantined.BackupDirectory));
+            Directory.CreateDirectory(copiedQuarantineManifestDirectory);
+            File.Copy(
+                quarantined.ManifestPath,
+                Path.Combine(copiedQuarantineManifestDirectory, "manifest.json"));
+            _ = new MinecraftQuarantineService(
+                Path.Combine(root, "current-quarantine-backups"),
+                legacyQuarantineRoot).RollbackLatest(modsDirectory);
             Assert(File.Exists(olderDuplicate.FullPath), "Rollback da quarentena nao restaurou o JAR.");
             Assert(!File.Exists(Path.Combine(quarantined.QuarantineDirectory, olderDuplicate.FileName)),
                 "Rollback da quarentena deixou uma copia movida ativa.");
@@ -131,8 +163,13 @@ internal static class MinecraftSelfTest
             messages.Add("PASS: memoria de 4 GB escolhe somente Xmx2048M, Xmx2304M ou Xmx2560M pela RAM livre.");
 
             var dryRun = profileService.PlanProfile(managedRoot, MinecraftProfileKind.Extreme4Gb, 30);
+            var firstSafePlan = profileService.PlanProfile(managedRoot, MinecraftProfileKind.Extreme4Gb);
             Assert(dryRun.Instance.Launcher == MinecraftLauncherKind.PrismLauncher,
                 "A instancia Prism nao foi reconhecida.");
+            Assert(firstSafePlan.MaximumFps == 30 &&
+                   firstSafePlan.MaximumHeapMb == 2048 &&
+                   firstSafePlan.JavaArguments == "-Xms512M -Xmx2048M",
+                "EXTREME_4GB nao iniciou no preset seguro de 30 FPS/2048 MB.");
             Assert(dryRun.MaximumFps == 30, "O dry-run nao preservou o limite de 30 FPS selecionado.");
             Assert(dryRun.Changes.Any(change => change.Setting == "performance.useEntityCulling" && change.WillWrite),
                 "O dry-run nao planejou a config existente do Sodium.");
@@ -204,7 +241,8 @@ internal static class MinecraftSelfTest
                 "Rollback nao removeu o arquivo criado pelo proprio ApexTweaker.");
             messages.Add("PASS: rollback restaura options, JSONs e launcher e remove somente o arquivo gerado.");
 
-            var legacyDirectory = Path.Combine(profileService.BackupRoot, "legacy-v21");
+            var legacyProfileRoot = Path.Combine(root, "legacy-profile-backups");
+            var legacyDirectory = Path.Combine(legacyProfileRoot, "legacy-v21");
             Directory.CreateDirectory(legacyDirectory);
             var legacyBackupPath = Path.Combine(legacyDirectory, "options.txt.bak");
             File.Copy(optionsPath, legacyBackupPath);
@@ -233,10 +271,18 @@ internal static class MinecraftSelfTest
                 Path.Combine(legacyDirectory, "manifest.json"),
                 JsonSerializer.Serialize(legacyManifest),
                 new UTF8Encoding(false));
-            _ = profileService.RollbackLatest(managedRoot);
+            var copiedProfileManifestDirectory = Path.Combine(root, "current-profile-backups", "legacy-v21");
+            Directory.CreateDirectory(copiedProfileManifestDirectory);
+            File.Copy(
+                Path.Combine(legacyDirectory, "manifest.json"),
+                Path.Combine(copiedProfileManifestDirectory, "manifest.json"));
+            _ = new MinecraftProfileService(
+                Path.Combine(root, "current-profile-backups"),
+                reportDirectory,
+                legacyProfileRoot).RollbackLatest(managedRoot);
             Assert(File.ReadAllText(optionsPath).Replace("\r\n", "\n") == originalOptions,
                 "Rollback nao aceitou o manifesto legado da v2.1.0.");
-            messages.Add("PASS: rollback v2.1.0 restaura ate um options.txt removido.");
+            messages.Add("PASS: rollback legado restaura perfil e quarentena sem copiar manifestos.");
 
             var instanceAudit = new MinecraftAuditService().Audit(managedRoot);
             var ramAudit = instanceAudit with
@@ -252,6 +298,12 @@ internal static class MinecraftSelfTest
             var ramDiagnosis = new MinecraftBottleneckDiagnosticService().Diagnose(ramAudit);
             Assert(ramDiagnosis.Primary == MinecraftBottleneckKind.RamLimited,
                 "O diagnostico nao classificou o hardware sintetico de 4 GB como RAM_LIMITED.");
+            var firstTestScientificPlan = new MinecraftScientificAutoOptimizeService(profileService)
+                .BuildPlan(managedRoot, ramAudit, 30);
+            Assert(firstTestScientificPlan.SelectedProfile == MinecraftProfileKind.Extreme4Gb &&
+                   firstTestScientificPlan.ProfilePlan.MaximumHeapMb == 2048 &&
+                   firstTestScientificPlan.MaximumFps == 30,
+                "O motor cientifico nao escolheu EXTREME_4GB/2048M/30 FPS para o primeiro teste de 4 GB.");
             var contractAssessments = new MinecraftModConfigContractCatalog().Assess(instanceAudit, Path.Combine(instanceRoot, "config"));
             Assert(contractAssessments.Single(contract => contract.ModId == "sodium").Status == ModConfigAutomationStatus.Supported,
                 "O contrato do Sodium instalado nao foi marcado como suportado.");
@@ -334,6 +386,12 @@ internal static class MinecraftSelfTest
                    File.Exists(finalized.Reports.MarkdownPath) &&
                    File.Exists(finalized.Reports.TextPath),
                 "Relatorios cientificos JSON/Markdown/TXT nao foram gerados.");
+            var scientificMarkdown = File.ReadAllText(finalized.Reports.MarkdownPath);
+            Assert(scientificMarkdown.Contains("FATO_AUTOMATICO", StringComparison.Ordinal) &&
+                   scientificMarkdown.Contains("INFORMADO_PELO_USUARIO", StringComparison.Ordinal) &&
+                   scientificMarkdown.Contains("NAO_DISPONIVEL", StringComparison.Ordinal) &&
+                   scientificMarkdown.Contains("Estado operacional da alteracao", StringComparison.Ordinal),
+                "Relatorio cientifico nao separou fato, usuario, indisponivel e estado da alteracao.");
             var store = new MinecraftScientificExperimentStore(scientificRoot);
             Assert(store.Load(started.Experiment.ExperimentId).Phase == ScientificExperimentPhase.Kept,
                 "Store nao persistiu o estado final do experimento.");
@@ -418,6 +476,43 @@ internal static class MinecraftSelfTest
             Assert(File.ReadAllText(optionsPath).Replace("\r\n", "\n") == originalOptions,
                 "NEEDS_RETEST nao restaurou options.txt pelo backup gerenciado.");
 
+            var scientificProfileService = new MinecraftProfileService(scientificBackupRoot, scientificReports);
+            var preAppliedPlan = new MinecraftScientificAutoOptimizeService(scientificProfileService)
+                .BuildPlan(managedRoot, 30);
+            var preApplied = scientificProfileService.ApplyProfile(
+                managedRoot,
+                preAppliedPlan.SelectedProfile,
+                30);
+            Assert(!string.IsNullOrWhiteSpace(preApplied.BackupId),
+                "Preparacao do teste INSUFFICIENT_DATA nao criou backup.");
+            var insufficientStarted = scientificService.StartGuided(managedRoot, 30);
+            _ = scientificService.RecordMeasurement(
+                insufficientStarted.Experiment.ExperimentId,
+                ScientificMeasurementKind.Baseline,
+                baselineObservation,
+                baselineBenchmark);
+            var noChangeCandidate = scientificService.ApplyCandidate(
+                insufficientStarted.Experiment.ExperimentId,
+                userConfirmed: true);
+            Assert(noChangeCandidate.Experiment.AppliedProfileBackupId is null,
+                "Candidato sem mudancas criou backup indevido.");
+            _ = scientificService.RecordMeasurement(
+                insufficientStarted.Experiment.ExperimentId,
+                ScientificMeasurementKind.Candidate,
+                baselineObservation,
+                baselineBenchmark);
+            var insufficientCompared = scientificService.Compare(insufficientStarted.Experiment.ExperimentId);
+            Assert(insufficientCompared.Experiment.Comparison?.Decision == ScientificDecision.InsufficientData,
+                "Ausencia de variavel independente nao gerou INSUFFICIENT_DATA.");
+            var insufficientFinalized = scientificService.Finalize(
+                insufficientStarted.Experiment.ExperimentId,
+                rollbackConfirmed: false);
+            Assert(insufficientFinalized.Experiment.Phase == ScientificExperimentPhase.NeedsRetest,
+                "INSUFFICIENT_DATA manteve o candidato automaticamente.");
+            _ = scientificProfileService.RollbackBackup(managedRoot, preApplied.BackupId);
+            Assert(File.ReadAllText(optionsPath).Replace("\r\n", "\n") == originalOptions,
+                "Limpeza do teste INSUFFICIENT_DATA nao restaurou options.txt.");
+
             var metricsService = new MinecraftScientificMetricsService();
             var comparisonService = new MinecraftScientificComparisonService();
             var stableMetrics = metricsService.Build(baselineObservation, baselineBenchmark);
@@ -440,7 +535,7 @@ internal static class MinecraftSelfTest
                     failedMetrics, emptyEvidence, string.Empty));
             Assert(criticalComparison.Decision == ScientificDecision.Revert && criticalComparison.CriticalRegression,
                 "Crash/OOM novo nao gerou decisao REVERT critica.");
-            messages.Add("PASS: motor cientifico bloqueia drift, detecta contaminacao e executa KEEP/REVERT auditaveis.");
+            messages.Add("PASS: motor cientifico cobre KEEP, REVERT, RETEST e INSUFFICIENT_DATA sem contaminacao.");
 
             var operationalService = new MinecraftOperationalHomologationService();
             var checklist = operationalService.BuildChecklist(audit, quarantinePlan, dryRun);
@@ -507,11 +602,18 @@ internal static class MinecraftSelfTest
             Assert(benchmark.ActiveMods.Count > 0, "O benchmark nao registrou a lista de mods.");
             var benchmarkPath = new MinecraftReportService().WriteBenchmark(benchmark, reportDirectory);
             Assert(File.Exists(benchmarkPath), "Relatorio de benchmark nao foi gerado.");
-            messages.Add("PASS: benchmark NAO_TESTADO registra ambiente, configs, logs e crash reports.");
+            var benchmarkMarkdown = File.ReadAllText(Path.ChangeExtension(benchmarkPath, ".md"));
+            Assert(benchmarkMarkdown.Contains("FPS automatico: `NAO DISPONIVEL`", StringComparison.Ordinal) &&
+                   benchmarkMarkdown.Contains("Metricas coletadas automaticamente", StringComparison.Ordinal) &&
+                   benchmarkMarkdown.Contains("Metricas informadas pelo usuario", StringComparison.Ordinal) &&
+                   benchmarkMarkdown.Contains("Metricas estimadas ou inferidas", StringComparison.Ordinal),
+                "Relatorio de benchmark nao separou fontes ou declarou FPS indisponivel.");
+            messages.Add("PASS: benchmark separa fontes e nunca inventa FPS.");
 
             var survival = new MinecraftSurvivalPlanService().Build(audit, quarantinePlan);
             var survivalPath = new MinecraftReportService().WriteSurvivalPlan(survival, reportDirectory);
-            Assert(File.Exists(survivalPath) && survival.GraphicsSettings.Count > 0,
+            Assert(File.Exists(survivalPath) && survival.GraphicsSettings.Count > 0 &&
+                   survival.JavaArguments == "-Xms512M -Xmx2048M",
                 "Plano de Sobrevivencia 4 GB nao foi gerado.");
             messages.Add("PASS: Plano de Sobrevivencia 4 GB gera veredito e acoes manuais.");
 

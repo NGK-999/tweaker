@@ -2,7 +2,7 @@
 
 O objetivo do app e otimizar o Windows para jogos, principalmente VALORANT, mantendo alteracoes rastreaveis e reversiveis.
 
-Versao: **3.0.0** · Shell ativa: **WPF** (`MainWindow`).
+Versao: **3.0.1** · Shell ativa: **WPF** (`MainWindow`).
 
 ## Mapa da interface WPF
 
@@ -40,7 +40,7 @@ Backup automatico e criado antes de qualquer otimizacao iniciada pela UI. Nao ha
 | Metricas DPC, boost, temperatura | `TelemetryMetricsSnapshot` |
 | Console | Log da sessao em tempo real |
 
-Sessoes salvas em `C:\ProgramData\ApexTweaker\Backups` (`Sessao_Baseline.json`, `Sessao_Optimized.json`).
+Sessoes salvas em `%LOCALAPPDATA%\ApexTweaker\Telemetry` (`Sessao_Baseline.json`, `Sessao_Optimized.json`).
 
 ### Cobblemon
 

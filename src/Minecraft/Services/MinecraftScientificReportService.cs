@@ -18,10 +18,7 @@ internal sealed class MinecraftScientificReportService
         Converters = { new JsonStringEnumConverter() }
     };
 
-    public string DefaultReportRoot { get; } = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
-        "ApexTweaker",
-        "MinecraftScientificReports");
+    public string DefaultReportRoot { get; } = ApplicationPaths.MinecraftScientificReports;
 
     public MinecraftScientificReportPaths WritePlan(
         MinecraftScientificOptimizationPlan plan,
@@ -137,6 +134,18 @@ internal sealed class MinecraftScientificReportService
             .AppendLine($"- Backup aplicado: `{experiment.AppliedProfileBackupId ?? "NAO"}`")
             .AppendLine();
         var plan = experiment.OptimizationPlan;
+        var rollbackPerformed = experiment.AuditTrail.Any(item =>
+            item.Contains("Rollback direcionado", StringComparison.OrdinalIgnoreCase));
+        markdown.AppendLine("## Estado operacional da alteracao")
+            .AppendLine()
+            .AppendLine($"- Hipotese: {experiment.Hypothesis.Statement}")
+            .AppendLine($"- Alteracao aplicada: `{YesNo(experiment.AppliedProfileBackupId is not null)}`")
+            .AppendLine($"- Alteracao mantida: `{YesNo(experiment.Phase == ScientificExperimentPhase.Kept)}`")
+            .AppendLine($"- Alteracao revertida: `{YesNo(rollbackPerformed)}`")
+            .AppendLine($"- Limitacao do hardware: `{(plan.Audit.Environment.TotalMemoryGb <= 4.5m ? "4 GB compartilhados por Windows, Java e iGPU" : "validar no hardware alvo de 4 GB")}`")
+            .AppendLine($"- Riscos restantes: `{plan.ManualActions.Count}`")
+            .AppendLine($"- Acoes manuais necessarias: `{plan.Actions.Count(action => !action.SafeToApplyAutomatically)}`")
+            .AppendLine();
         markdown.AppendLine("## Contexto inicial")
             .AppendLine()
             .AppendLine($"- CPU: {plan.Audit.Environment.Processor}")
@@ -226,7 +235,11 @@ internal sealed class MinecraftScientificReportService
             $"BASELINE={experiment.Baseline?.Metrics.Outcome.ToString() ?? "NAO_REGISTRADO"}",
             $"CANDIDATE={experiment.Candidate?.Metrics.Outcome.ToString() ?? "NAO_REGISTRADO"}",
             $"DECISION={experiment.Comparison?.Decision.ToString() ?? "NAO_COMPARADO"}",
-            $"CONFIDENCE={experiment.Comparison?.Confidence.ToString() ?? "NAO_COMPARADO"}"
+            $"CONFIDENCE={experiment.Comparison?.Confidence.ToString() ?? "NAO_COMPARADO"}",
+            $"CHANGE_APPLIED={experiment.AppliedProfileBackupId is not null}",
+            $"CHANGE_KEPT={experiment.Phase == ScientificExperimentPhase.Kept}",
+            $"CHANGE_REVERTED={rollbackPerformed}",
+            $"REMAINING_RISKS={plan.ManualActions.Count}"
         };
         text.AddRange(experiment.AuditTrail.Select(item => $"AUDIT={item}"));
         File.WriteAllLines(paths.TextPath, text, Utf8());
@@ -259,6 +272,17 @@ internal sealed class MinecraftScientificReportService
             .AppendLine($"- Config hashes: `{measurement.InstanceEvidence.ConfigHashes.Count}`")
             .AppendLine($"- Mod hashes: `{measurement.InstanceEvidence.ModHashes.Count}`")
             .AppendLine();
+
+        builder.AppendLine("### Fontes das evidencias").AppendLine()
+            .AppendLine("| Categoria | Codigo | Evidencia | Fonte |")
+            .AppendLine("|---|---|---|---|");
+        foreach (var evidence in metrics.Evidence)
+        {
+            builder.AppendLine(
+                $"| {EvidenceLabel(evidence.Type)} | {Escape(evidence.Code)} | {Escape(evidence.Message)} | {Escape(evidence.Source)} |");
+        }
+
+        builder.AppendLine();
     }
 
     private static void AppendHashDifferences(
@@ -348,6 +372,19 @@ internal sealed class MinecraftScientificReportService
         (value ?? string.Empty).Replace("|", "\\|").Replace("\r", " ").Replace("\n", " ");
 
     private static string YesNo(bool value) => value ? "SIM" : "NAO";
+
+    private static string EvidenceLabel(ScientificEvidenceType type)
+    {
+        return type switch
+        {
+            ScientificEvidenceType.MeasuredFact => "FATO_AUTOMATICO",
+            ScientificEvidenceType.UserProvided => "INFORMADO_PELO_USUARIO",
+            ScientificEvidenceType.Inference => "INFERENCIA",
+            ScientificEvidenceType.ManualRecommendation => "RECOMENDACAO_MANUAL",
+            ScientificEvidenceType.Unavailable => "NAO_DISPONIVEL",
+            _ => type.ToString().ToUpperInvariant()
+        };
+    }
 
     private static string Format(double? value) =>
         value?.ToString("0.00", CultureInfo.InvariantCulture) ?? "NAO_MEDIDO";

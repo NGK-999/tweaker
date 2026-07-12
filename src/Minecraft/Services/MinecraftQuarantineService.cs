@@ -19,13 +19,16 @@ internal sealed class MinecraftQuarantineService
     };
 
     private readonly string backupRoot;
+    private readonly IReadOnlyList<string> readBackupRoots;
 
-    public MinecraftQuarantineService(string? backupRoot = null)
+    public MinecraftQuarantineService(string? backupRoot = null, string? legacyBackupRoot = null)
     {
-        this.backupRoot = backupRoot ?? Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
-            "ApexTweaker",
-            "MinecraftQuarantineBackups");
+        this.backupRoot = backupRoot ?? ApplicationPaths.MinecraftQuarantineBackups;
+        readBackupRoots = backupRoot is null
+            ? [this.backupRoot, ApplicationPaths.LegacyMinecraftQuarantineBackups]
+            : legacyBackupRoot is null
+                ? [this.backupRoot]
+                : [this.backupRoot, Path.GetFullPath(legacyBackupRoot)];
     }
 
     public string BackupRoot => backupRoot;
@@ -266,31 +269,41 @@ internal sealed class MinecraftQuarantineService
 
     private string? FindLatestPendingManifest(string modsDirectory)
     {
-        if (!Directory.Exists(backupRoot))
-        {
-            return null;
-        }
-
         var candidates = new List<(string Path, DateTimeOffset CreatedAt)>();
-        foreach (var path in Directory.EnumerateFiles(backupRoot, ManifestFileName, SearchOption.AllDirectories))
+        foreach (var root in readBackupRoots.Where(Directory.Exists))
         {
-            try
+            foreach (var path in Directory.EnumerateFiles(root, ManifestFileName, SearchOption.AllDirectories))
             {
-                var manifest = JsonSerializer.Deserialize<MinecraftQuarantineManifest>(File.ReadAllText(path), JsonOptions);
-                if (manifest is not null &&
-                    manifest.RolledBackAtUtc is null &&
-                    string.Equals(Path.GetFullPath(manifest.ModsDirectory), modsDirectory, StringComparison.OrdinalIgnoreCase))
+                try
                 {
-                    candidates.Add((path, manifest.CreatedAtUtc));
+                    var manifest = JsonSerializer.Deserialize<MinecraftQuarantineManifest>(File.ReadAllText(path), JsonOptions);
+                    if (manifest is not null &&
+                        HasSelfContainedBackupPaths(manifest, path) &&
+                        manifest.RolledBackAtUtc is null &&
+                        string.Equals(Path.GetFullPath(manifest.ModsDirectory), modsDirectory, StringComparison.OrdinalIgnoreCase))
+                    {
+                        candidates.Add((path, manifest.CreatedAtUtc));
+                    }
                 }
-            }
-            catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
-            {
-                // Ignore unrelated malformed operation records.
+                catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
+                {
+                    // Ignore unrelated malformed operation records.
+                }
             }
         }
 
         return candidates.OrderByDescending(item => item.CreatedAt).Select(item => item.Path).FirstOrDefault();
+    }
+
+    private static bool HasSelfContainedBackupPaths(
+        MinecraftQuarantineManifest manifest,
+        string manifestPath)
+    {
+        var operationDirectory = Path.GetFullPath(Path.GetDirectoryName(manifestPath)!);
+        return manifest.Files.All(entry => string.Equals(
+            Path.GetDirectoryName(Path.GetFullPath(entry.BackupPath)),
+            operationDirectory,
+            StringComparison.OrdinalIgnoreCase));
     }
 
     private static IReadOnlyList<string> RestoreEntries(
