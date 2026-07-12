@@ -3,7 +3,7 @@
 #endif
 
 #define MyAppName "ApexTweaker"
-#define MyAppVersion "3.0.1"
+#define MyAppVersion "3.1.0"
 #define MyAppPublisher "Igor Silva"
 #define MyAppExeName "ApexTweaker.exe"
 #define MyAppURL "https://github.com/NGK-999/tweaker"

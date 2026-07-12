@@ -51,6 +51,7 @@ internal enum MinecraftProfileKind
     Safe,
     LowEnd,
     Extreme4Gb,
+    PotatoCobblemon4Gb,
     GpuLimited,
     RamLimited,
     CpuLimited,
@@ -100,10 +101,25 @@ internal enum QuarantineRisk
 [JsonConverter(typeof(JsonStringEnumConverter))]
 internal enum JavaMemoryTier
 {
+    Survival1792,
     Safe2048,
     Balanced2304,
     Aggressive2560,
     Standard
+}
+
+[JsonConverter(typeof(JsonStringEnumConverter))]
+internal enum MinecraftExperimentVariable
+{
+    Resolution,
+    FpsCap,
+    RenderDistance,
+    SimulationDistance,
+    EntityDistance,
+    VisualQuality,
+    ResourcePacks,
+    WindowMode,
+    JavaHeap
 }
 
 [JsonConverter(typeof(JsonStringEnumConverter))]
@@ -253,7 +269,18 @@ internal sealed record MinecraftProfileDefinition(
     IReadOnlyDictionary<string, string> Options,
     int MinimumHeapMb,
     int PreferredHeapMb,
-    string Description);
+    string Description,
+    bool OnlyExistingOptions = false);
+
+internal sealed record MinecraftExperimentDefinition(
+    string Id,
+    string Category,
+    string DisplayName,
+    MinecraftExperimentVariable Variable,
+    IReadOnlyDictionary<string, string> OptionValues,
+    int? HeapMb,
+    string Description,
+    string ExpectedEffect);
 
 internal sealed record MinecraftBackupFileEntry(
     string TargetPath,
@@ -307,7 +334,8 @@ internal sealed record MinecraftBenchmarkSample(
     decimal AvailableMemoryGb,
     double CpuPercent,
     long DiskReadBytes,
-    long DiskWriteBytes);
+    long DiskWriteBytes,
+    long CommitUsedMb);
 
 internal sealed record MinecraftBenchmarkResult(
     DateTimeOffset StartedAtUtc,
@@ -363,7 +391,8 @@ internal sealed record MinecraftProfilePlan(
     int MaximumFps,
     string JavaMemoryReason,
     IReadOnlyList<MinecraftProfileSettingChange> Changes,
-    IReadOnlyList<string> Messages)
+    IReadOnlyList<string> Messages,
+    MinecraftExperimentDefinition? Experiment = null)
 {
     public bool HasChanges => Changes.Any(change => change.WillWrite);
 }

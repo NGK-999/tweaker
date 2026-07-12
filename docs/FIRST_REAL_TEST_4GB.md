@@ -1,6 +1,6 @@
 # Primeiro teste seguro em 4 GB
 
-Versao: **ApexTweaker 3.0.1**
+Versao: **ApexTweaker 3.1.0**
 
 Este roteiro prepara o primeiro teste real no Intel Core i3 de quarta geracao,
 4 GB de RAM e Intel HD. O objetivo e abrir o jogo, entrar no servidor e obter
@@ -19,8 +19,8 @@ Windows continuam em `C:\ProgramData\ApexTweaker\Backups`.
 
 ## Preparacao
 
-1. Baixe `ApexTweaker-Portable-v3.0.1.zip` da release autenticada.
-2. Confira o SHA-256 publicado e extraia em `C:\ApexTweaker\v3.0.1-portable`.
+1. Baixe `ApexTweaker-Portable-v3.1.0.zip` da release autenticada.
+2. Confira o SHA-256 publicado e extraia em `C:\ApexTweaker\v3.1.0-portable`.
 3. Confirme que `ApexTweaker.exe` e `ApexTweaker.Native.dll` estao juntos.
 4. No Prism Launcher, crie `Cobblemon-1.21.1-EXTREME-4GB`.
 5. Selecione Minecraft `1.21.1`, Fabric e Java `21` x64.
@@ -62,7 +62,7 @@ Use `EXTREME_4GB` com:
 
 - resolucao 1280x720 em janela;
 - render distance 4;
-- simulation distance 4;
+- simulation distance 5;
 - entity distance 0.50;
 - FPS 30;
 - VSync desligado;
@@ -75,6 +75,9 @@ Use `EXTREME_4GB` com:
 
 Nao comece com 2304 ou 2560 MB. Esses valores sao hipoteses posteriores caso os
 logs indiquem heap insuficiente sem pressao excessiva de pagefile.
+
+Se o jogo ainda nao abrir, crie uma nova rodada com `POTATO_COBBLEMON_4GB`.
+Nao misture Potato, heap 1792 MB e remocao de mod na mesma hipotese.
 
 ## Experimento real
 

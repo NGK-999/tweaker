@@ -1,4 +1,4 @@
-# Cobblemon Low-End Lab v3.0.1
+# Cobblemon Low-End Lab v3.1.0
 
 ## Objetivo
 
@@ -45,25 +45,41 @@ O perfil altera `options.txt` para:
 
 - 1280x720 em janela;
 - render distance 4;
-- simulation distance 4;
+- simulation distance 5, minimo validado para o controle vanilla 1.21.1;
 - entity distance 0.5;
 - graficos rapidos;
 - particulas minimas;
 - biome blend 0;
 - mipmap 0;
 - nuvens, sombras de entidades e VSync desligados;
-- limite selecionavel de 30, 45 ou 60 FPS;
+- limite selecionavel de 20, 24, 30, 45 ou 60 FPS;
 - screen effect 0.25 e FOV effect 0.50.
 
-O perfil considera somente chaves existentes nos JSONs abaixo:
+O perfil considera somente chaves existentes do Sodium e Iris:
 
 - `config/sodium-options.json`;
-- `config/immediatelyfast.json`;
-- `config/entityculling.json`.
 - `config/iris.properties`, somente para `enableShaders=false`.
 
 Se o arquivo ou a chave nao existir, nada e inventado. Opcoes experimentais e
-debug do ImmediatelyFast nao sao ativadas.
+debug nao sao ativadas. ImmediatelyFast e EntityCulling permanecem nos defaults
+e devem ser comparados isoladamente por causa de bugs visuais possiveis.
+
+## POTATO_COBBLEMON_4GB
+
+Use somente quando o primeiro teste seguro ainda nao abre ou pagina demais:
+
+- 960x540 em janela;
+- render distance 2;
+- simulation distance 5;
+- entity distance 0.30;
+- 24 FPS;
+- graficos rapidos, AO, nuvens, sombras, bob view e efeitos desligados;
+- particulas minimas, mipmap 0 e biome blend 0;
+- resource packs locais desmarcados sem excluir arquivos;
+- `-Xms512M -Xmx2048M`.
+
+O Potato altera somente opcoes que ja existem no `options.txt`. Abra o jogo uma
+vez antes. Resource packs exigidos pelo servidor devem ser confirmados antes.
 
 Configs de Sodium Extra, More Culling, Dynamic FPS, ModernFix e Noisium sao
 detectadas, mas permanecem sem escrita automatica nesta versao.
@@ -84,6 +100,7 @@ O primeiro teste do `EXTREME_4GB` usa obrigatoriamente:
 Somente rodadas posteriores, justificadas por logs e pagefile, podem comparar:
 
 ```text
+-Xms512M -Xmx1792M
 -Xms512M -Xmx2304M
 -Xms512M -Xmx2560M
 ```
@@ -108,7 +125,7 @@ depois. O rollback rejeita caminhos fora da lista gerenciada e restaura:
 
 - `options.txt`;
 - `apextweaker-java-args.txt`;
-- os tres JSONs suportados, quando alterados;
+- JSON do Sodium, quando alterado;
 - `iris.properties`, quando alterado;
 - `instance.cfg`, quando alterado.
 
@@ -173,6 +190,7 @@ O benchmark aguarda um processo Java do Minecraft e registra:
 
 - ambiente antes/depois;
 - RAM e CPU por segundo;
+- commit usado por segundo, quando a API do Windows o fornece;
 - pico de working set e private memory;
 - menor RAM fisica livre;
 - JARs ativos;
@@ -191,18 +209,12 @@ Estados:
 
 FPS nunca e inventado. Use F3, Spark, PresentMon ou ferramenta equivalente.
 
-## Interface
+## Interface guiada
 
-1. Abra `Cobblemon`.
-2. Selecione a pasta `mods` ou a instancia.
-3. Clique `Auditar`.
-4. Leia o Plano de Sobrevivencia 4 GB.
-5. Em uma instancia completa, clique `Previsualizar (dry-run)`.
-6. Revise o relatorio antes/depois.
-7. Clique `Aplicar plano com backup` e confirme.
-8. Para JARs, selecione candidatos individualmente e confirme a quarentena.
-9. Teste a entrada no servidor.
-10. Use o rollback correspondente se houver falha.
+O wizard possui dez etapas: objetivo, instancia, diagnostico, mods, modo,
+baseline, candidato, pos-teste, resultado e finalizacao. O modo simples mostra
+o caminho essencial. O modo avancado revela diffs, quarentena, hashes,
+observacoes manuais e argumentos JVM.
 
 Para o fluxo cientifico, use o cartao verde no topo da aba:
 

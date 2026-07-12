@@ -2,7 +2,7 @@
 
 ApexTweaker e um utilitario Windows (.NET 10) focado em performance, telemetria de frametime, backup e rollback reversivel. A shell ativa e **WPF**; codigo WinForms legado ainda compila no mesmo assembly, mas nao e iniciado por `Program.cs`.
 
-Versao atual: **3.0.1**.
+Versao atual: **3.1.0**.
 
 ## Pastas principais
 
@@ -23,7 +23,10 @@ Shell WPF ativa (unica UI do app):
 - `Views/ModulesView` — modulos individuais de otimizacao.
 - `Views/TelemetryView` — teste A/B, grafico, metricas e console.
 - `Views/MinecraftView` - diagnostico cientifico, experimentos, auditoria,
-  perfis, benchmark e rollback.
+  wizard simples/avancado, perfis, benchmark e rollback.
+- `ViewModels/MinecraftWizardViewModel.cs` - estado, navegacao, progresso,
+  cancelamento e estados visuais via CommunityToolkit.Mvvm.
+- `Controls/LightweightBenchmarkChart.cs` - grafico WPF sem SkiaSharp.
 - `Views/UtilitiesView` — revert, desinstalar, sobre, suporte Riot.
 - `Windows/StartupDisclaimerWindow` — aviso legal inicial.
 - `Windows/LoadingWindow` — warmup de hardware durante o boot da UI.
@@ -71,6 +74,8 @@ Modulo isolado para Minecraft/Cobblemon:
 - `Services/MinecraftEnvironmentService.cs` - hardware, Java, pagefile e launchers.
 - `Services/MinecraftInstanceService.cs` - deteccao de launchers e raiz real da instancia.
 - `Services/MinecraftProfileService.cs` - dry-run, configs, memoria, backup e rollback.
+- `Services/MinecraftExtremeExperimentCatalog.cs` - Potato e hipoteses
+  fechadas de resolucao, FPS, chunks, entidades, resource packs e heap.
 - `Services/MinecraftQuarantineService.cs` - movimentacao reversivel de JARs com SHA-256.
 - `Services/MinecraftSurvivalPlanService.cs` - veredito e plano manual para 4 GB.
 - `Services/MinecraftBenchmarkService.cs` - ambiente, processo, configs, logs e crashes.

@@ -51,7 +51,11 @@ internal static class MinecraftCommandLine
                 HasFlag(args, "--minecraft-scientific-auto-optimize"))
             {
                 var instance = RequireValue(args, "--instance");
-                var result = CreateScientificService(args).StartGuided(instance, ParseFps(args));
+                var preset = GetValue(args, "--preset");
+                var service = CreateScientificService(args);
+                var result = string.IsNullOrWhiteSpace(preset)
+                    ? service.StartGuided(instance, ParseFps(args))
+                    : service.StartCustom(instance, preset);
                 Console.WriteLine($"Experimento: {result.Experiment.ExperimentId}");
                 Console.WriteLine($"Fase: {result.Experiment.Phase}");
                 Console.WriteLine(result.Reports.MarkdownPath);
@@ -109,6 +113,18 @@ internal static class MinecraftCommandLine
                 return true;
             }
 
+            if (HasFlag(args, "--minecraft-scientific-cancel"))
+            {
+                RequireConfirmation(args);
+                var result = CreateScientificService(args).Cancel(
+                    RequireValue(args, "--experiment"),
+                    rollbackConfirmed: true);
+                Console.WriteLine($"Fase final: {result.Experiment.Phase}");
+                Console.WriteLine(result.Reports.MarkdownPath);
+                WriteStatusFile(args, "SCIENTIFIC_EXPERIMENT_CANCELLED", result.Reports.MarkdownPath);
+                return true;
+            }
+
             if (HasFlag(args, "--minecraft-scientific-show"))
             {
                 var experiment = CreateScientificService(args).Load(RequireValue(args, "--experiment"));
@@ -160,6 +176,21 @@ internal static class MinecraftCommandLine
                 Console.WriteLine($"DRY_RUN: {plan.Changes.Count(change => change.WillWrite)} alteracoes propostas.");
                 Console.WriteLine(path);
                 WriteStatusFile(args, "PROFILE_DRY_RUN_OK", path);
+                return true;
+            }
+
+            if (HasFlag(args, "--minecraft-experiment-dry-run"))
+            {
+                var plan = new MinecraftProfileService().PlanExperiment(
+                    RequireValue(args, "--instance"),
+                    RequireValue(args, "--preset"));
+                var path = new MinecraftReportService().WriteProfilePlan(
+                    plan,
+                    applied: false,
+                    outputDirectory: GetValue(args, "--output"));
+                Console.WriteLine($"DRY_RUN: {plan.Experiment?.DisplayName} | {plan.Changes.Count(change => change.WillWrite)} alteracoes.");
+                Console.WriteLine(path);
+                WriteStatusFile(args, "EXPERIMENT_DRY_RUN_OK", path);
                 return true;
             }
 
@@ -354,6 +385,7 @@ internal static class MinecraftCommandLine
             "SAFE" => MinecraftProfileKind.Safe,
             "LOWEND" => MinecraftProfileKind.LowEnd,
             "EXTREME4GB" => MinecraftProfileKind.Extreme4Gb,
+            "POTATOCOBBLEMON4GB" => MinecraftProfileKind.PotatoCobblemon4Gb,
             "GPULIMITED" => MinecraftProfileKind.GpuLimited,
             "RAMLIMITED" => MinecraftProfileKind.RamLimited,
             "CPULIMITED" => MinecraftProfileKind.CpuLimited,
@@ -373,9 +405,9 @@ internal static class MinecraftCommandLine
         }
 
         if (!int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var fps) ||
-            fps is not (30 or 45 or 60))
+            fps is not (20 or 24 or 30 or 45 or 60))
         {
-            throw new ArgumentException("--fps deve ser 30, 45 ou 60.");
+            throw new ArgumentException("--fps deve ser 20, 24, 30, 45 ou 60.");
         }
 
         return fps;
@@ -520,18 +552,20 @@ internal static class MinecraftCommandLine
     {
         Console.WriteLine("ApexTweaker Minecraft commands:");
         Console.WriteLine("  scientific commands accept [--experiment-root <path>] for a custom writable store");
-        Console.WriteLine("  --minecraft-scientific-plan --instance <path> [--fps 30|45|60] [--output <path>]");
-        Console.WriteLine("  --minecraft-scientific-auto-optimize --instance <path> [--fps 30|45|60]");
-        Console.WriteLine("  --minecraft-scientific-start --instance <path> [--fps 30|45|60]");
+        Console.WriteLine("  --minecraft-scientific-plan --instance <path> [--fps 20|24|30|45|60] [--output <path>]");
+        Console.WriteLine("  --minecraft-scientific-auto-optimize --instance <path> [--fps 20|24|30|45|60]");
+        Console.WriteLine("  --minecraft-scientific-start --instance <path> [--fps ...] [--preset resolution-854x480]");
         Console.WriteLine("  --minecraft-scientific-record --experiment <id> --phase baseline|candidate [observacoes] [--benchmark-seconds 60]");
         Console.WriteLine("  --minecraft-scientific-apply --experiment <id> --yes");
         Console.WriteLine("  --minecraft-scientific-compare --experiment <id>");
         Console.WriteLine("  --minecraft-scientific-finalize --experiment <id> --yes");
+        Console.WriteLine("  --minecraft-scientific-cancel --experiment <id> --yes");
         Console.WriteLine("  --minecraft-scientific-show --experiment <id>");
         Console.WriteLine("  --minecraft-scientific-list");
         Console.WriteLine("  --minecraft-audit --mods <path> [--output <path>] [--target 1.21.1]");
-        Console.WriteLine("  --minecraft-profile-dry-run --instance <path> --profile EXTREME_4GB [--fps 30|45|60] [--output <path>]");
-        Console.WriteLine("  --minecraft-apply-profile --instance <path> --profile EXTREME_4GB [--fps 30|45|60] --yes");
+        Console.WriteLine("  --minecraft-profile-dry-run --instance <path> --profile POTATO_COBBLEMON_4GB [--fps ...] [--output <path>]");
+        Console.WriteLine("  --minecraft-experiment-dry-run --instance <path> --preset heap-1792 [--output <path>]");
+        Console.WriteLine("  --minecraft-apply-profile --instance <path> --profile POTATO_COBBLEMON_4GB [--fps ...] --yes");
         Console.WriteLine("  --minecraft-rollback --instance <path> --yes");
         Console.WriteLine("  --minecraft-quarantine-dry-run --mods <path> [--output <path>]");
         Console.WriteLine("  --minecraft-quarantine-apply --mods <path> --files \"a.jar;b.jar\" --yes [--server-manifest-confirmed]");

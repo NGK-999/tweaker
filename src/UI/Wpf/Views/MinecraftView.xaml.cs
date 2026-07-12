@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using ApexTweaker.Minecraft.Models;
 using ApexTweaker.Minecraft.Services;
+using ApexTweaker.UI.Wpf.ViewModels;
 using WpfUserControl = System.Windows.Controls.UserControl;
 
 namespace ApexTweaker.UI.Wpf.Views;
@@ -18,6 +19,7 @@ public partial class MinecraftView : WpfUserControl
     private bool profilePreviewReady;
     private bool quarantinePlanReady;
     private ScientificExperimentPhase? scientificPhase;
+    private readonly MinecraftWizardViewModel wizard = new();
 
     public event Action? BrowseRequested;
 
@@ -39,24 +41,31 @@ public partial class MinecraftView : WpfUserControl
 
     internal event Func<string, MinecraftOperationalObservation, Task>? SaveHomologationRequested;
 
-    internal event Func<string, int, Task>? ScientificPlanRequested;
+    internal event Func<string, int, string?, Task>? ScientificPlanRequested;
 
-    internal event Func<string, int, Task>? ScientificStartRequested;
+    internal event Func<string, int, string?, Task>? ScientificStartRequested;
 
     internal event Func<string, MinecraftOperationalObservation, Task>? ScientificAdvanceRequested;
 
     public event Action? OpenReportsRequested;
 
+    public event Action? CancelBenchmarkRequested;
+
     public MinecraftView()
     {
         InitializeComponent();
+        DataContext = wizard;
+        wizard.CancelRequested += () => CancelBenchmarkRequested?.Invoke();
         ProfileComboBox.ItemsSource = MinecraftProfileService.AvailableProfiles
             .OrderBy(profile => profile.Kind)
             .ToArray();
         ProfileComboBox.SelectedItem = MinecraftProfileService.AvailableProfiles
             .First(profile => profile.Kind == MinecraftProfileKind.Extreme4Gb);
-        FpsComboBox.ItemsSource = new[] { 30, 45, 60 };
+        FpsComboBox.ItemsSource = new[] { 20, 24, 30, 45, 60 };
         FpsComboBox.SelectedItem = 30;
+        ExperimentComboBox.ItemsSource = MinecraftProfileService.AvailableExperiments;
+        ExperimentComboBox.SelectedItem = MinecraftProfileService.AvailableExperiments
+            .First(experiment => experiment.Id == "resolution-960x540");
         ProfileComboBox.SelectionChanged += (_, _) =>
         {
             profilePreviewReady = false;
@@ -84,6 +93,7 @@ public partial class MinecraftView : WpfUserControl
         InstanceStateText.Text = instanceDetected
             ? "Instancia valida detectada. Perfis e rollback estao disponiveis."
             : "Pasta aceita para auditoria. Perfil bloqueado ate selecionar uma instancia com options.txt e subpasta mods.";
+        wizard.SetInstanceState(instanceDetected, InstanceStateText.Text);
         UpdateActionState();
     }
 
@@ -125,6 +135,8 @@ public partial class MinecraftView : WpfUserControl
         InstanceStateText.Text = result.InstanceRootDetected
             ? $"Instancia valida: {result.InstanceRoot}"
             : "A pasta contem mods, mas nao e uma instancia completa. Auditoria concluida; aplicacao de perfil permanece bloqueada.";
+        wizard.SetInstanceState(result.InstanceRootDetected, InstanceStateText.Text);
+        wizard.SetAudit(result);
         UpdateActionState();
     }
 
@@ -137,6 +149,7 @@ public partial class MinecraftView : WpfUserControl
             $"DRY-RUN: {changed.Length} alteracoes em {changed.Select(change => change.FilePath).Distinct(StringComparer.OrdinalIgnoreCase).Count()} arquivo(s). " +
             $"FPS {plan.MaximumFps}, heap {plan.MaximumHeapMb} MB. Relatorio: {reportPath}";
         OperationalStatusText.Text = plan.JavaMemoryReason;
+        wizard.SetProfilePlan(plan);
         UpdateActionState();
     }
 
@@ -162,6 +175,7 @@ public partial class MinecraftView : WpfUserControl
     public void SetBusy(bool value)
     {
         busy = value;
+        wizard.SetBusyState(value);
         UpdateActionState();
     }
 
@@ -187,6 +201,7 @@ public partial class MinecraftView : WpfUserControl
 
     internal void SetScientificPlan(MinecraftScientificOptimizationPlan plan, string reportPath)
     {
+        wizard.SetProfilePlan(plan.ProfilePlan);
         ScientificStatusText.Text =
             $"Gargalo {plan.Diagnosis.Primary} ({plan.Diagnosis.Confidence}). " +
             $"Candidato {plan.SelectedProfile}, {plan.JavaMemory.Arguments}, {plan.MaximumFps} FPS. " +
@@ -196,6 +211,7 @@ public partial class MinecraftView : WpfUserControl
     internal void SetScientificExperiment(MinecraftScientificExperiment experiment, string reportPath)
     {
         scientificPhase = experiment.Phase;
+        wizard.SetExperiment(experiment);
         ScientificStatusText.Text =
             $"{experiment.ExperimentId} | fase {experiment.Phase} | " +
             $"decisao {experiment.Comparison?.Decision.ToString() ?? "PENDENTE"}. Relatorio: {reportPath}";
@@ -239,6 +255,23 @@ public partial class MinecraftView : WpfUserControl
         UpdateActionState();
     }
 
+    internal void BeginBenchmark()
+    {
+        wizard.BeginBenchmark();
+        UpdateActionState();
+    }
+
+    internal void AddBenchmarkSample(MinecraftBenchmarkSample sample)
+    {
+        wizard.AddBenchmarkSample(sample);
+    }
+
+    internal void CompleteBenchmark(MinecraftBenchmarkResult? result, bool cancelled = false)
+    {
+        wizard.CompleteBenchmark(result, cancelled);
+        UpdateActionState();
+    }
+
     private void UpdateActionState()
     {
         BrowseButton.IsEnabled = !busy;
@@ -253,6 +286,7 @@ public partial class MinecraftView : WpfUserControl
         ApplyQuarantineButton.IsEnabled = !busy && quarantinePlanReady && QuarantineList.SelectedItems.Count > 0;
         RollbackQuarantineButton.IsEnabled = !busy && DirectoryPathAvailable();
         BenchmarkButton.IsEnabled = !busy;
+        CancelBenchmarkButton.IsEnabled = wizard.IsBenchmarkRunning;
         ScientificPlanButton.IsEnabled = !busy && instanceDetected;
         ScientificStartButton.IsEnabled = !busy && instanceDetected;
         ScientificAdvanceButton.IsEnabled = !busy && scientificPhase is
@@ -264,6 +298,7 @@ public partial class MinecraftView : WpfUserControl
         ExportChecklistButton.IsEnabled = !busy && auditAvailable;
         SaveHomologationButton.IsEnabled = !busy && instanceDetected;
         OpenReportsButton.IsEnabled = !busy;
+        ExperimentComboBox.IsEnabled = !busy && instanceDetected && CustomExperimentCheckBox.IsChecked == true;
     }
 
     private void BrowseButton_OnClick(object sender, RoutedEventArgs e)
@@ -288,6 +323,12 @@ public partial class MinecraftView : WpfUserControl
             QuarantineList.ItemsSource = null;
         }
 
+        wizard.SetInstanceState(
+            instanceDetected,
+            instanceDetected
+                ? "Instancia valida detectada."
+                : "Selecione uma instancia com options.txt, config e mods.");
+
         UpdateActionState();
     }
 
@@ -309,6 +350,12 @@ public partial class MinecraftView : WpfUserControl
 
     private async void PreviewProfileButton_OnClick(object sender, RoutedEventArgs e)
     {
+        if (SelectedExperimentId is { } experimentId && ScientificPlanRequested is not null)
+        {
+            await ScientificPlanRequested.Invoke(SelectedPath, SelectedFps, experimentId);
+            return;
+        }
+
         if (PreviewProfileRequested is not null && ProfileComboBox.SelectedItem is MinecraftProfileDefinition profile)
         {
             await PreviewProfileRequested.Invoke(SelectedPath, profile.Kind, SelectedFps);
@@ -383,7 +430,7 @@ public partial class MinecraftView : WpfUserControl
     {
         if (ScientificPlanRequested is not null)
         {
-            await ScientificPlanRequested.Invoke(SelectedPath, SelectedFps);
+            await ScientificPlanRequested.Invoke(SelectedPath, SelectedFps, SelectedExperimentId);
         }
     }
 
@@ -391,8 +438,18 @@ public partial class MinecraftView : WpfUserControl
     {
         if (ScientificStartRequested is not null)
         {
-            await ScientificStartRequested.Invoke(SelectedPath, SelectedFps);
+            await ScientificStartRequested.Invoke(SelectedPath, SelectedFps, SelectedExperimentId);
         }
+    }
+
+    private void CustomExperimentCheckBox_OnChanged(object sender, RoutedEventArgs e)
+    {
+        UpdateActionState();
+    }
+
+    private void CancelBenchmarkButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        CancelBenchmarkRequested?.Invoke();
     }
 
     private async void ScientificAdvanceButton_OnClick(object sender, RoutedEventArgs e)
@@ -413,6 +470,12 @@ public partial class MinecraftView : WpfUserControl
     }
 
     private int SelectedFps => FpsComboBox.SelectedItem is int fps ? fps : 30;
+
+    private string? SelectedExperimentId =>
+        CustomExperimentCheckBox.IsChecked == true &&
+        ExperimentComboBox.SelectedItem is MinecraftExperimentDefinition experiment
+            ? experiment.Id
+            : null;
 
     private bool TryReadOperationalObservation(out MinecraftOperationalObservation observation)
     {

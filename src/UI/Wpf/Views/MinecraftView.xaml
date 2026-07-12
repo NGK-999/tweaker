@@ -1,6 +1,7 @@
 <UserControl x:Class="ApexTweaker.UI.Wpf.Views.MinecraftView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="clr-namespace:ApexTweaker.UI.Wpf.Controls"
              Background="Transparent"
              FontFamily="Segoe UI Variable Display, Segoe UI, Arial">
     <UserControl.Resources>
@@ -9,9 +10,11 @@
                 <ResourceDictionary Source="../Themes/MacTheme.xaml" />
             </ResourceDictionary.MergedDictionaries>
 
-            <Style x:Key="MinecraftTextBox" TargetType="TextBox">
-                <Setter Property="Height" Value="40" />
-                <Setter Property="Padding" Value="12,8" />
+            <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+
+            <Style x:Key="WizardTextBox" TargetType="TextBox">
+                <Setter Property="MinHeight" Value="38" />
+                <Setter Property="Padding" Value="12,7" />
                 <Setter Property="Background" Value="{StaticResource CardElevatedBrush}" />
                 <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
                 <Setter Property="CaretBrush" Value="{StaticResource AccentBrush}" />
@@ -23,478 +26,791 @@
 
             <Style x:Key="MetricCard" TargetType="Border">
                 <Setter Property="Background" Value="{StaticResource CardElevatedBrush}" />
+                <Setter Property="BorderBrush" Value="{StaticResource CardBorderBrush}" />
+                <Setter Property="BorderThickness" Value="1" />
                 <Setter Property="CornerRadius" Value="12" />
                 <Setter Property="Padding" Value="14" />
-                <Setter Property="Margin" Value="0,0,10,0" />
+                <Setter Property="Margin" Value="0,0,8,0" />
+            </Style>
+
+            <Style x:Key="WizardChoice" TargetType="RadioButton">
+                <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+                <Setter Property="FontSize" Value="13" />
+                <Setter Property="Margin" Value="0,0,18,8" />
+            </Style>
+
+            <Style x:Key="TechnicalCheckBox" TargetType="CheckBox">
+                <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+                <Setter Property="Margin" Value="0,0,16,8" />
             </Style>
         </ResourceDictionary>
     </UserControl.Resources>
 
-    <ScrollViewer VerticalScrollBarVisibility="Auto"
-                  HorizontalScrollBarVisibility="Disabled">
-        <StackPanel Margin="0,0,8,8">
-            <Border Style="{StaticResource MacCardStyle}">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
+    <Grid Margin="0,0,6,0">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
 
-                    <StackPanel>
-                        <TextBlock Style="{StaticResource MacSectionLabel}"
-                                   Text="COBBLEMON LOW-END LAB" />
-                        <TextBlock Margin="0,6,0,0"
-                                   Style="{StaticResource MacPageTitle}"
-                                   FontSize="22"
-                                   Text="Audite primeiro. Mude depois." />
-                        <TextBlock Margin="0,10,0,0"
-                                   MaxWidth="680"
-                                   Style="{StaticResource MacBodyText}"
-                                   Text="Leitura de metadados reais dos JARs, dependencias aninhadas, conflitos e perfis reversiveis. Mods nunca sao excluidos automaticamente." />
-                    </StackPanel>
-
-                    <Border Grid.Column="1"
-                            Width="126"
-                            Height="72"
-                            Margin="24,0,0,0"
-                            Background="#14281F"
-                            BorderBrush="#2B8A5A"
-                            BorderThickness="1"
-                            CornerRadius="14">
-                        <StackPanel VerticalAlignment="Center">
-                            <TextBlock HorizontalAlignment="Center"
-                                       Foreground="#67D89B"
-                                       FontSize="12"
-                                       FontWeight="SemiBold"
-                                       Text="MODO SEGURO" />
-                            <TextBlock HorizontalAlignment="Center"
-                                       Margin="0,5,0,0"
-                                       Foreground="{StaticResource TextTertiaryBrush}"
-                                       FontSize="11"
-                                       Text="sem apagar JARs" />
-                        </StackPanel>
-                    </Border>
-                </Grid>
-            </Border>
-
-            <Border Margin="0,14,0,0"
-                    Padding="18"
-                    Background="#10241F"
-                    BorderBrush="#2F9E70"
-                    BorderThickness="1"
-                    CornerRadius="14">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-
-                    <StackPanel>
-                        <TextBlock Foreground="#67D89B"
-                                   FontSize="11"
-                                   FontWeight="Bold"
-                                   Text="MINECRAFT SCIENTIFIC OPTIMIZATION ENGINE" />
-                        <TextBlock Margin="0,7,0,0"
-                                   Foreground="{StaticResource TextPrimaryBrush}"
-                                   FontSize="17"
-                                   FontWeight="SemiBold"
-                                   Text="Medir. Alterar uma variavel. Comparar. Manter ou reverter." />
-                        <TextBlock x:Name="ScientificStatusText"
-                                   Margin="0,8,0,0"
-                                   MaxWidth="700"
-                                   Foreground="{StaticResource TextSecondaryBrush}"
-                                   FontSize="12"
-                                   Text="Nenhum experimento ativo. O diagnostico e sempre dry-run."
-                                   TextWrapping="Wrap" />
-                    </StackPanel>
-
-                    <StackPanel Grid.Column="1" Margin="18,0,0,0">
-                        <Button x:Name="ScientificPlanButton"
-                                Width="174"
-                                Style="{StaticResource MacSecondaryButton}"
-                                Content="Diagnosticar gargalo"
-                                Click="ScientificPlanButton_OnClick" />
-                        <Button x:Name="ScientificStartButton"
-                                Width="174"
-                                Margin="0,8,0,0"
-                                Style="{StaticResource MacPrimaryButton}"
-                                Content="Iniciar experimento"
-                                Click="ScientificStartButton_OnClick" />
-                        <Button x:Name="ScientificAdvanceButton"
-                                Width="174"
-                                Margin="0,8,0,0"
-                                Style="{StaticResource MacSecondaryButton}"
-                                Content="Avancar etapa"
-                                Click="ScientificAdvanceButton_OnClick" />
-                    </StackPanel>
-                </Grid>
-            </Border>
-
-            <Border Margin="0,14,0,0" Style="{StaticResource MacCardStyle}">
-                <StackPanel>
-                    <TextBlock Style="{StaticResource MacSectionLabel}"
-                               Text="PASTA DE MODS OU INSTANCIA" />
-                    <Grid Margin="0,12,0,0">
+        <ScrollViewer Grid.Row="0"
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Margin="0,0,8,12">
+                <Border Style="{StaticResource MacCardStyle}">
+                    <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
 
-                        <TextBox x:Name="PathTextBox"
-                                 Grid.Column="0"
-                                 Style="{StaticResource MinecraftTextBox}"
-                                 TextChanged="PathTextBox_OnTextChanged"
-                                 ToolTip="Selecione a pasta mods ou a raiz da instancia" />
-                        <Button x:Name="BrowseButton"
-                                Grid.Column="1"
-                                Width="108"
-                                Margin="10,0,0,0"
-                                Style="{StaticResource MacSecondaryButton}"
-                                Content="Selecionar"
-                                Click="BrowseButton_OnClick" />
-                        <Button x:Name="AuditButton"
-                                Grid.Column="2"
-                                Width="112"
-                                Margin="10,0,0,0"
-                                Style="{StaticResource MacPrimaryButton}"
-                                Content="Auditar"
-                                Click="AuditButton_OnClick" />
-                    </Grid>
-                    <TextBlock x:Name="InstanceStateText"
-                               Margin="0,10,0,0"
-                               Foreground="{StaticResource TextTertiaryBrush}"
-                               FontSize="12"
-                               Text="A auditoria aceita qualquer pasta com JARs. Perfis exigem options.txt e subpasta mods." />
-                </StackPanel>
-            </Border>
-
-            <Grid Margin="0,14,0,0">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="*" />
-                </Grid.ColumnDefinitions>
-
-                <Border Grid.Column="0" Style="{StaticResource MetricCard}">
-                    <StackPanel>
-                        <TextBlock Style="{StaticResource MacSectionLabel}" Text="MODS" />
-                        <TextBlock x:Name="TotalModsText" Margin="0,6,0,0" Style="{StaticResource MacMetricValue}" Text="--" />
-                    </StackPanel>
-                </Border>
-                <Border Grid.Column="1" Style="{StaticResource MetricCard}">
-                    <StackPanel>
-                        <TextBlock Style="{StaticResource MacSectionLabel}" Text="PERFORMANCE" />
-                        <TextBlock x:Name="PerformanceModsText" Margin="0,6,0,0" Style="{StaticResource MacMetricValue}" Text="--" />
-                    </StackPanel>
-                </Border>
-                <Border Grid.Column="2" Style="{StaticResource MetricCard}">
-                    <StackPanel>
-                        <TextBlock Style="{StaticResource MacSectionLabel}" Text="DUPLICADOS" />
-                        <TextBlock x:Name="DuplicateModsText" Margin="0,6,0,0" Style="{StaticResource MacMetricValue}" Text="--" />
-                    </StackPanel>
-                </Border>
-                <Border Grid.Column="3"
-                        Margin="0"
-                        Style="{StaticResource MetricCard}">
-                    <StackPanel>
-                        <TextBlock Style="{StaticResource MacSectionLabel}" Text="ALERTAS" />
-                        <TextBlock x:Name="IssuesText" Margin="0,6,0,0" Style="{StaticResource MacMetricValue}" Text="--" />
-                    </StackPanel>
-                </Border>
-            </Grid>
-
-            <Grid Margin="0,14,0,0">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="1.12*" />
-                    <ColumnDefinition Width="0.88*" />
-                </Grid.ColumnDefinitions>
-
-                <Border Grid.Column="0"
-                        Margin="0,0,7,0"
-                        Style="{StaticResource MacCardStyle}">
-                    <StackPanel>
-                        <TextBlock Style="{StaticResource MacSectionLabel}" Text="DIAGNOSTICO" />
-                        <TextBlock x:Name="EnvironmentText"
-                                   Margin="0,8,0,0"
-                                   Style="{StaticResource MacBodyText}"
-                                   Text="Execute a auditoria para ler hardware, Java, pagefile e processos pesados." />
-                        <ListBox x:Name="IssueList"
-                                 Height="142"
-                                 Margin="0,12,0,0"
-                                 Padding="0"
-                                 Background="Transparent"
-                                 BorderThickness="0"
-                                 Foreground="{StaticResource TextSecondaryBrush}"
-                                 FontSize="12"
-                                 ScrollViewer.VerticalScrollBarVisibility="Auto" />
-                    </StackPanel>
-                </Border>
-
-                <Border Grid.Column="1"
-                        Margin="7,0,0,0"
-                        Style="{StaticResource MacCardStyle}">
-                    <StackPanel>
-                        <TextBlock Style="{StaticResource MacSectionLabel}" Text="PERFIL REVERSIVEL" />
-                        <ComboBox x:Name="ProfileComboBox"
-                                  Height="40"
-                                  Margin="0,10,0,0"
-                                  Padding="10,5"
-                                  Background="{StaticResource CardElevatedBrush}"
-                                  Foreground="{StaticResource TextPrimaryBrush}"
-                                  BorderBrush="{StaticResource CardBorderBrush}"
-                                  DisplayMemberPath="DisplayName" />
-                        <Grid Margin="0,8,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="96" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock VerticalAlignment="Center"
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource MacSectionLabel}"
+                                       Text="COBBLEMON SURVIVAL LAB" />
+                            <TextBlock Margin="0,7,0,0"
+                                       Style="{StaticResource MacPageTitle}"
+                                       FontSize="24"
+                                       Text="Uma mudanca por vez. Nenhum placebo." />
+                            <TextBlock Margin="0,9,0,0"
+                                       MaxWidth="690"
                                        Style="{StaticResource MacBodyText}"
-                                       Text="Limite de FPS para esta rodada" />
-                            <ComboBox x:Name="FpsComboBox"
-                                      Grid.Column="1"
-                                      Height="36"
-                                      Padding="10,4"
-                                      Background="{StaticResource CardElevatedBrush}"
-                                      Foreground="{StaticResource TextPrimaryBrush}"
-                                      BorderBrush="{StaticResource CardBorderBrush}" />
+                                       Text="Assistente cientifico para PCs de 4 GB. Nada e apagado, toda escrita tem backup e o hardware pode continuar sendo o limite."
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="1"
+                                    Margin="20,0,0,0"
+                                    VerticalAlignment="Center">
+                            <Border Padding="12,7"
+                                    Background="#152C24"
+                                    BorderBrush="#3EAA77"
+                                    BorderThickness="1"
+                                    CornerRadius="16">
+                                <TextBlock Foreground="#67D89B"
+                                           FontSize="11"
+                                           FontWeight="Bold"
+                                           Text="{Binding ModeLabel}" />
+                            </Border>
+                            <Button Margin="0,8,0,0"
+                                    Style="{StaticResource MacSecondaryButton}"
+                                    Command="{Binding ToggleModeCommand}"
+                                    Content="Alternar modo"
+                                    ToolTip="Modo simples guia o teste. Modo avancado exibe diffs, quarentena, hashes e homologacao." />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <Border Margin="0,12,0,0" Style="{StaticResource MacCardStyle}">
+                    <StackPanel>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource MacSectionLabel}" Text="ROTEIRO DO EXPERIMENTO" />
+                                <TextBlock Margin="0,5,0,0"
+                                           Foreground="{StaticResource TextPrimaryBrush}"
+                                           FontSize="15"
+                                           FontWeight="SemiBold"
+                                           Text="{Binding CurrentStep.Title}" />
+                            </StackPanel>
+                            <TextBlock Grid.Column="1"
+                                       VerticalAlignment="Center"
+                                       Foreground="{Binding CurrentStep.StateColor}"
+                                       FontSize="11"
+                                       FontWeight="Bold"
+                                       Text="{Binding CurrentStep.StateLabel}" />
                         </Grid>
-                        <Button x:Name="PreviewProfileButton"
-                                Margin="0,10,0,0"
-                                Style="{StaticResource MacSecondaryButton}"
-                                Content="Previsualizar (dry-run)"
-                                Click="PreviewProfileButton_OnClick" />
-                        <Button x:Name="ApplyProfileButton"
-                                Margin="0,8,0,0"
-                                Style="{StaticResource MacPrimaryButton}"
-                                Content="Aplicar plano com backup"
-                                Click="ApplyProfileButton_OnClick" />
-                        <Button x:Name="RollbackButton"
-                                Margin="0,8,0,0"
-                                Style="{StaticResource MacSecondaryButton}"
-                                Content="Restaurar ultimo perfil"
-                                Click="RollbackButton_OnClick" />
-                        <TextBlock Margin="0,12,0,0"
-                                   Foreground="{StaticResource TextTertiaryBrush}"
-                                   FontSize="11"
-                                   TextWrapping="Wrap"
-                                   Text="Prism/MultiMC recebem memoria por instancia. Outros launchers recebem instrucoes manuais claras." />
+
+                        <ProgressBar Height="4"
+                                     Margin="0,12,0,0"
+                                     Maximum="100"
+                                     Value="{Binding OverallProgress, Mode=OneWay}"
+                                     Foreground="{StaticResource AccentBrush}"
+                                     Background="{StaticResource CardElevatedBrush}" />
+
+                        <ItemsControl Margin="0,12,0,0" ItemsSource="{Binding Steps}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <UniformGrid Rows="2" Columns="5" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Margin="0,0,7,7"
+                                            Padding="9"
+                                            Background="{StaticResource CardElevatedBrush}"
+                                            BorderBrush="{Binding StateColor}"
+                                            BorderThickness="1"
+                                            CornerRadius="9">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="25" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <Border Width="21"
+                                                    Height="21"
+                                                    VerticalAlignment="Top"
+                                                    Background="{Binding StateColor}"
+                                                    CornerRadius="11">
+                                                <TextBlock HorizontalAlignment="Center"
+                                                           VerticalAlignment="Center"
+                                                           Foreground="#09111D"
+                                                           FontSize="10"
+                                                           FontWeight="Bold"
+                                                           Text="{Binding Number}" />
+                                            </Border>
+                                            <StackPanel Grid.Column="1">
+                                                <TextBlock Foreground="{StaticResource TextPrimaryBrush}"
+                                                           FontSize="11"
+                                                           FontWeight="SemiBold"
+                                                           Text="{Binding Title}" />
+                                                <TextBlock Margin="0,3,0,0"
+                                                           Foreground="{StaticResource TextTertiaryBrush}"
+                                                           FontSize="9"
+                                                           Text="{Binding Detail}"
+                                                           TextTrimming="CharacterEllipsis" />
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
                     </StackPanel>
                 </Border>
-            </Grid>
 
-            <Grid Margin="0,14,0,0">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="1.12*" />
-                    <ColumnDefinition Width="0.88*" />
-                </Grid.ColumnDefinitions>
+                <Border Margin="0,12,0,0"
+                        Padding="18"
+                        Background="#101B2B"
+                        BorderBrush="#2D3E58"
+                        BorderThickness="1"
+                        CornerRadius="14">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Width="42"
+                                   Height="42"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Top"
+                                   Foreground="{StaticResource AccentBrush}"
+                                   FontFamily="Segoe MDL2 Assets"
+                                   FontSize="24"
+                                   Text="&#xE9D9;" />
+                        <StackPanel Grid.Column="1" Margin="12,0,0,0">
+                            <TextBlock Foreground="{StaticResource TextPrimaryBrush}"
+                                       FontSize="17"
+                                       FontWeight="SemiBold"
+                                       Text="{Binding CurrentStep.Title}" />
+                            <TextBlock Margin="0,6,0,0"
+                                       Foreground="{StaticResource TextSecondaryBrush}"
+                                       FontSize="12"
+                                       Text="{Binding CurrentStep.Description}"
+                                       TextWrapping="Wrap" />
+                            <TextBlock Margin="0,7,0,0"
+                                       Foreground="{Binding CurrentStep.StateColor}"
+                                       FontSize="11"
+                                       Text="{Binding CurrentStep.Detail}"
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
 
-                <Border Grid.Column="0"
-                        Margin="0,0,7,0"
-                        Style="{StaticResource MacCardStyle}">
-                    <StackPanel>
-                        <TextBlock Style="{StaticResource MacSectionLabel}" Text="QUARENTENA REVERSIVEL" />
-                        <TextBlock Margin="0,7,0,0"
-                                   Style="{StaticResource MacBodyText}"
-                                   Text="Selecione somente os JARs confirmados. A auditoria apenas monta o dry-run; nenhum item vem marcado automaticamente." />
-                        <ListBox x:Name="QuarantineList"
-                                 Height="178"
-                                 Margin="0,10,0,0"
-                                 Padding="4"
-                                 Background="{StaticResource CardElevatedBrush}"
-                                 BorderBrush="{StaticResource CardBorderBrush}"
-                                 BorderThickness="1"
-                                 Foreground="{StaticResource TextPrimaryBrush}"
-                                 SelectionMode="Extended"
-                                 SelectionChanged="QuarantineList_OnSelectionChanged">
-                            <ListBox.ItemTemplate>
-                                <DataTemplate>
-                                    <StackPanel Margin="5,4">
-                                        <TextBlock FontSize="12"
-                                                   FontWeight="SemiBold"
-                                                   Text="{Binding FileName}" />
-                                        <TextBlock Margin="0,2,0,0"
-                                                   Foreground="{StaticResource TextTertiaryBrush}"
-                                                   FontSize="10"
-                                                   TextWrapping="Wrap">
-                                            <Run Text="Risco " />
-                                            <Run Text="{Binding Risk}" />
-                                            <Run Text=" | " />
-                                            <Run Text="{Binding Reason}" />
-                                        </TextBlock>
-                                    </StackPanel>
-                                </DataTemplate>
-                            </ListBox.ItemTemplate>
-                        </ListBox>
-                        <Grid Margin="0,10,0,0">
+                <TabControl Margin="0,12,0,0"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            SelectedIndex="{Binding CurrentStepIndex, Mode=TwoWay}">
+                    <TabControl.Template>
+                        <ControlTemplate TargetType="TabControl">
+                            <ContentPresenter ContentSource="SelectedContent" />
+                        </ControlTemplate>
+                    </TabControl.Template>
+
+                    <TabItem>
+                        <Border Style="{StaticResource MacCardStyle}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="1.1*" />
+                                    <ColumnDefinition Width="0.9*" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Margin="0,0,18,0">
+                                    <TextBlock Style="{StaticResource MacSectionLabel}" Text="REALIDADE DO HARDWARE" />
+                                    <TextBlock Margin="0,8,0,0"
+                                               Foreground="{StaticResource TextPrimaryBrush}"
+                                               FontSize="19"
+                                               FontWeight="SemiBold"
+                                               Text="4 GB e Intel HD sao um caso limite." />
+                                    <TextBlock Margin="0,10,0,0"
+                                               Style="{StaticResource MacBodyText}"
+                                               Text="O objetivo e abrir o jogo, entrar no servidor e reduzir travamentos. 30 FPS nao e promessa. O melhor upgrade continua sendo 8 GB em dual-channel e SSD."
+                                               TextWrapping="Wrap" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1">
+                                    <TextBlock Style="{StaticResource MacSectionLabel}" Text="GARANTIAS" />
+                                    <TextBlock Margin="0,8,0,0" Foreground="#67D89B" Text="• Mods nunca sao excluidos." />
+                                    <TextBlock Margin="0,7,0,0" Foreground="#67D89B" Text="• Escritas usam backup e SHA-256." />
+                                    <TextBlock Margin="0,7,0,0" Foreground="#67D89B" Text="• FPS ausente continua ausente." />
+                                    <TextBlock Margin="0,7,0,0" Foreground="#67D89B" Text="• Somente KEEP permanece aplicado." />
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                    </TabItem>
+
+                    <TabItem>
+                        <Border Style="{StaticResource MacCardStyle}">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource MacSectionLabel}" Text="SELECAO DA INSTANCIA" />
+                                <Grid Margin="0,10,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox x:Name="PathTextBox"
+                                             Style="{StaticResource WizardTextBox}"
+                                             TextChanged="PathTextBox_OnTextChanged"
+                                             ToolTip="Selecione a raiz da instancia, .minecraft ou a pasta mods" />
+                                    <Button x:Name="BrowseButton"
+                                            Grid.Column="1"
+                                            Width="118"
+                                            Margin="10,0,0,0"
+                                            Style="{StaticResource MacPrimaryButton}"
+                                            Content="Selecionar"
+                                            Click="BrowseButton_OnClick" />
+                                </Grid>
+                                <TextBlock x:Name="InstanceStateText"
+                                           Margin="0,10,0,0"
+                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           FontSize="12"
+                                           Text="Selecione uma instancia com options.txt e pasta mods."
+                                           TextWrapping="Wrap" />
+                                <Border Margin="0,12,0,0"
+                                        Padding="12"
+                                        Background="{StaticResource CardElevatedBrush}"
+                                        CornerRadius="10">
+                                    <TextBlock Foreground="{StaticResource TextTertiaryBrush}"
+                                               Text="O detector reconhece Prism, MultiMC, Modrinth, CurseForge e pastas customizadas. Abra o jogo uma vez antes para gerar options.txt e configs."
+                                               TextWrapping="Wrap" />
+                                </Border>
+                            </StackPanel>
+                        </Border>
+                    </TabItem>
+
+                    <TabItem>
+                        <Border Style="{StaticResource MacCardStyle}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="1.2*" />
+                                    <ColumnDefinition Width="0.8*" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Margin="0,0,16,0">
+                                    <TextBlock Style="{StaticResource MacSectionLabel}" Text="DIAGNOSTICO AUTOMATICO" />
+                                    <TextBlock x:Name="EnvironmentText"
+                                               Margin="0,8,0,0"
+                                               Style="{StaticResource MacBodyText}"
+                                               Text="Execute a auditoria para ler CPU, RAM, Java, GPU, pagefile, disco e processos."
+                                               TextWrapping="Wrap" />
+                                    <Button x:Name="AuditButton"
+                                            Width="150"
+                                            Margin="0,14,0,0"
+                                            HorizontalAlignment="Left"
+                                            Style="{StaticResource MacPrimaryButton}"
+                                            Content="Auditar agora"
+                                            Click="AuditButton_OnClick" />
+                                </StackPanel>
+                                <ListBox x:Name="IssueList"
+                                         Grid.Column="1"
+                                         Height="180"
+                                         Padding="8"
+                                         Background="{StaticResource CardElevatedBrush}"
+                                         BorderBrush="{StaticResource CardBorderBrush}"
+                                         Foreground="{StaticResource TextSecondaryBrush}"
+                                         FontSize="11"
+                                         ScrollViewer.VerticalScrollBarVisibility="Auto" />
+                            </Grid>
+                        </Border>
+                    </TabItem>
+
+                    <TabItem>
+                        <StackPanel>
+                            <UniformGrid Columns="4">
+                                <Border Style="{StaticResource MetricCard}">
+                                    <StackPanel><TextBlock Style="{StaticResource MacSectionLabel}" Text="MODS" /><TextBlock x:Name="TotalModsText" Margin="0,6,0,0" Style="{StaticResource MacMetricValue}" Text="--" /></StackPanel>
+                                </Border>
+                                <Border Style="{StaticResource MetricCard}">
+                                    <StackPanel><TextBlock Style="{StaticResource MacSectionLabel}" Text="PERFORMANCE" /><TextBlock x:Name="PerformanceModsText" Margin="0,6,0,0" Style="{StaticResource MacMetricValue}" Text="--" /></StackPanel>
+                                </Border>
+                                <Border Style="{StaticResource MetricCard}">
+                                    <StackPanel><TextBlock Style="{StaticResource MacSectionLabel}" Text="DUPLICADOS" /><TextBlock x:Name="DuplicateModsText" Margin="0,6,0,0" Style="{StaticResource MacMetricValue}" Text="--" /></StackPanel>
+                                </Border>
+                                <Border Margin="0" Style="{StaticResource MetricCard}">
+                                    <StackPanel><TextBlock Style="{StaticResource MacSectionLabel}" Text="ALERTAS" /><TextBlock x:Name="IssuesText" Margin="0,6,0,0" Style="{StaticResource MacMetricValue}" Text="--" /></StackPanel>
+                                </Border>
+                            </UniformGrid>
+                            <Border Margin="0,10,0,0" Style="{StaticResource MacCardStyle}">
+                                <StackPanel>
+                                    <TextBlock Style="{StaticResource MacSectionLabel}" Text="MODPACK SURVIVAL" />
+                                    <TextBlock Margin="0,7,0,0"
+                                               Foreground="{StaticResource TextSecondaryBrush}"
+                                               Text="Mantenha Cobblemon, dependencias do servidor, Fabric API/Kotlin, Sodium, Lithium, FerriteCore e EntityCulling. Teste visuais pesados somente em copia."
+                                               TextWrapping="Wrap" />
+                                    <TextBlock Margin="0,7,0,0"
+                                               Foreground="#F5B942"
+                                               Text="Nenhum JAR sera movido sem selecao e duas confirmacoes quando houver risco de servidor."
+                                               TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </TabItem>
+
+                    <TabItem>
+                        <Border Style="{StaticResource MacCardStyle}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Margin="0,0,14,0">
+                                    <TextBlock Style="{StaticResource MacSectionLabel}" Text="PERFIL COMPLETO" />
+                                    <ComboBox x:Name="ProfileComboBox"
+                                              Height="40"
+                                              Margin="0,9,0,0"
+                                              Padding="10,5"
+                                              Background="{StaticResource CardElevatedBrush}"
+                                              Foreground="{StaticResource TextPrimaryBrush}"
+                                              DisplayMemberPath="DisplayName" />
+                                    <TextBlock Margin="0,11,0,4" Style="{StaticResource MacSectionLabel}" Text="FPS DA RODADA" />
+                                    <ComboBox x:Name="FpsComboBox"
+                                              Height="38"
+                                              Padding="10,5"
+                                              Background="{StaticResource CardElevatedBrush}"
+                                              Foreground="{StaticResource TextPrimaryBrush}" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Margin="14,0,0,0">
+                                    <CheckBox x:Name="CustomExperimentCheckBox"
+                                              Foreground="{StaticResource TextPrimaryBrush}"
+                                              FontWeight="SemiBold"
+                                              Content="Usar hipotese isolada"
+                                              Checked="CustomExperimentCheckBox_OnChanged"
+                                              Unchecked="CustomExperimentCheckBox_OnChanged" />
+                                    <ComboBox x:Name="ExperimentComboBox"
+                                              Height="40"
+                                              Margin="0,9,0,0"
+                                              Padding="10,5"
+                                              Background="{StaticResource CardElevatedBrush}"
+                                              Foreground="{StaticResource TextPrimaryBrush}"
+                                              DisplayMemberPath="DisplayName" />
+                                    <WrapPanel Margin="0,12,0,0">
+                                        <Button x:Name="PreviewProfileButton"
+                                                Width="132"
+                                                Margin="0,0,8,0"
+                                                Style="{StaticResource MacSecondaryButton}"
+                                                Content="Ver diff"
+                                                Click="PreviewProfileButton_OnClick" />
+                                        <Button x:Name="ScientificPlanButton"
+                                                Width="150"
+                                                Style="{StaticResource MacPrimaryButton}"
+                                                Content="Diagnosticar"
+                                                Click="ScientificPlanButton_OnClick" />
+                                    </WrapPanel>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                    </TabItem>
+
+                    <TabItem>
+                        <Border Style="{StaticResource MacCardStyle}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Style="{StaticResource MacSectionLabel}" Text="BASELINE LIMPO" />
+                                    <TextBlock Margin="0,7,0,0"
+                                               Foreground="{StaticResource TextPrimaryBrush}"
+                                               FontSize="18"
+                                               FontWeight="SemiBold"
+                                               Text="Meca antes de aplicar qualquer candidato." />
+                                    <TextBlock Margin="0,8,0,0"
+                                               Foreground="{StaticResource TextSecondaryBrush}"
+                                               Text="Abra o servidor, use a mesma rota e execute o benchmark. Informe FPS apenas se voce realmente observou por F3, PresentMon ou ferramenta equivalente."
+                                               TextWrapping="Wrap" />
+                                </StackPanel>
+                                <Button x:Name="ScientificStartButton"
+                                        Grid.Column="1"
+                                        Width="175"
+                                        Margin="18,0,0,0"
+                                        Style="{StaticResource MacPrimaryButton}"
+                                        Content="Iniciar experimento"
+                                        Click="ScientificStartButton_OnClick" />
+                            </Grid>
+                        </Border>
+                    </TabItem>
+
+                    <TabItem>
+                        <Border Style="{StaticResource MacCardStyle}">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource MacSectionLabel}" Text="APLICACAO DO CANDIDATO" />
+                                <TextBlock Margin="0,7,0,0"
+                                           Foreground="{StaticResource TextPrimaryBrush}"
+                                           FontSize="18"
+                                           FontWeight="SemiBold"
+                                           Text="Revise arquivos, antes/depois e hipotese." />
+                                <TextBlock x:Name="ScientificStatusText"
+                                           Margin="0,9,0,0"
+                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           Text="Nenhum experimento ativo. O diagnostico e sempre dry-run."
+                                           TextWrapping="Wrap" />
+                                <TextBlock x:Name="OperationText"
+                                           Margin="0,10,0,0"
+                                           Foreground="#F5B942"
+                                           Text="Nenhuma alteracao planejada."
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+                    </TabItem>
+
+                    <TabItem>
+                        <Border Style="{StaticResource MacCardStyle}">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource MacSectionLabel}" Text="BENCHMARK POS-ALTERACAO" />
+                                <TextBlock Margin="0,7,0,0"
+                                           Foreground="{StaticResource TextPrimaryBrush}"
+                                           FontSize="18"
+                                           FontWeight="SemiBold"
+                                           Text="Repita exatamente a mesma cena." />
+                                <TextBlock Margin="0,8,0,0"
+                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           Text="Mesmo servidor, rota, resolucao, duracao e processos abertos. Mudancas externas rebaixam o resultado para RETEST."
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+                    </TabItem>
+
+                    <TabItem>
+                        <Border Style="{StaticResource MacCardStyle}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Margin="0,0,14,0">
+                                    <TextBlock Style="{StaticResource MacSectionLabel}" Text="COMPARACAO" />
+                                    <TextBlock Margin="0,8,0,0"
+                                               Foreground="{StaticResource TextPrimaryBrush}"
+                                               FontSize="18"
+                                               FontWeight="SemiBold"
+                                               Text="{Binding ComparisonSummary}" />
+                                    <TextBlock Margin="0,8,0,0"
+                                               Foreground="{StaticResource TextSecondaryBrush}"
+                                               Text="Fatos automaticos, FPS manual, inferencias e itens indisponiveis permanecem visualmente separados no relatorio."
+                                               TextWrapping="Wrap" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Margin="14,0,0,0">
+                                    <TextBlock Style="{StaticResource MacSectionLabel}" Text="DECISOES POSSIVEIS" />
+                                    <TextBlock Margin="0,8,0,0" Foreground="#67D89B" Text="KEEP  melhora comprovada" />
+                                    <TextBlock Margin="0,6,0,0" Foreground="#64B5F6" Text="REVERT  regressao ou falha" />
+                                    <TextBlock Margin="0,6,0,0" Foreground="#F5B942" Text="RETEST  rodada contaminada" />
+                                    <TextBlock Margin="0,6,0,0" Foreground="#F5B942" Text="INSUFFICIENT  dados insuficientes" />
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                    </TabItem>
+
+                    <TabItem>
+                        <Border Style="{StaticResource MacCardStyle}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Style="{StaticResource MacSectionLabel}" Text="FINALIZACAO" />
+                                    <TextBlock Margin="0,7,0,0"
+                                               Foreground="{StaticResource TextPrimaryBrush}"
+                                               FontSize="18"
+                                               FontWeight="SemiBold"
+                                               Text="Mantenha somente o que melhorou." />
+                                    <TextBlock Margin="0,8,0,0"
+                                               Foreground="{StaticResource TextSecondaryBrush}"
+                                               Text="Exporte o relatorio, preserve latest.log/crash-reports e use rollback se o servidor, HUD ou Pokemon apresentarem regressao."
+                                               TextWrapping="Wrap" />
+                                </StackPanel>
+                                <Button x:Name="OpenReportsButton"
+                                        Grid.Column="1"
+                                        Width="150"
+                                        Margin="18,0,0,0"
+                                        Style="{StaticResource MacSecondaryButton}"
+                                        Content="Abrir relatorios"
+                                        Click="OpenReportsButton_OnClick" />
+                            </Grid>
+                        </Border>
+                    </TabItem>
+                </TabControl>
+
+                <Border Margin="0,12,0,0" Style="{StaticResource MacCardStyle}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="1.15*" />
+                            <ColumnDefinition Width="0.85*" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Margin="0,0,14,0">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Style="{StaticResource MacSectionLabel}" Text="BENCHMARK AO VIVO" />
+                                    <TextBlock Margin="0,5,0,0"
+                                               Foreground="{StaticResource TextPrimaryBrush}"
+                                               FontWeight="SemiBold"
+                                               Text="{Binding OperationStatus}" />
+                                </StackPanel>
+                                <TextBlock Grid.Column="1"
+                                           Foreground="{StaticResource TextTertiaryBrush}"
+                                           Text="CPU  •  Java  •  RAM livre" />
+                            </Grid>
+                            <controls:LightweightBenchmarkChart Height="150"
+                                                                Margin="0,10,0,0"
+                                                                PointsSource="{Binding BenchmarkPoints}" />
+                            <ProgressBar Height="4"
+                                         Margin="0,8,0,0"
+                                         Maximum="100"
+                                         Value="{Binding BenchmarkProgress}"
+                                         Foreground="{StaticResource AccentBrush}"
+                                         Background="{StaticResource CardElevatedBrush}" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Margin="14,0,0,0">
+                            <TextBlock Style="{StaticResource MacSectionLabel}" Text="CONTROLES" />
+                            <Button x:Name="BenchmarkButton"
+                                    Margin="0,9,0,0"
+                                    Style="{StaticResource MacPrimaryButton}"
+                                    Content="Benchmark 60 s"
+                                    Click="BenchmarkButton_OnClick" />
+                            <Button x:Name="CancelBenchmarkButton"
+                                    Margin="0,8,0,0"
+                                    Style="{StaticResource MacSecondaryButton}"
+                                    Content="Cancelar com seguranca"
+                                    Click="CancelBenchmarkButton_OnClick" />
+                            <TextBlock Margin="0,10,0,0"
+                                       Foreground="#F5B942"
+                                       FontSize="11"
+                                       Text="FPS e 1% low nao sao capturados automaticamente."
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <Expander Margin="0,12,0,0"
+                          IsExpanded="{Binding IsAdvancedMode, Mode=TwoWay}"
+                          Foreground="{StaticResource TextPrimaryBrush}">
+                    <Expander.Header>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock FontWeight="SemiBold" Text="Area tecnica avancada" />
+                            <TextBlock Margin="10,0,0,0"
+                                       Foreground="{StaticResource TextTertiaryBrush}"
+                                       Text="diffs, quarentena, hashes, observacoes e JVM" />
+                        </StackPanel>
+                    </Expander.Header>
+                    <StackPanel Margin="0,10,0,0">
+                        <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
-                            <Button x:Name="ApplyQuarantineButton"
-                                    Grid.Column="0"
-                                    Margin="0,0,5,0"
-                                    Style="{StaticResource MacPrimaryButton}"
-                                    Content="Mover selecionados"
-                                    Click="ApplyQuarantineButton_OnClick" />
-                            <Button x:Name="RollbackQuarantineButton"
-                                    Grid.Column="1"
-                                    Margin="5,0,0,0"
-                                    Style="{StaticResource MacSecondaryButton}"
-                                    Content="Desfazer quarentena"
-                                    Click="RollbackQuarantineButton_OnClick" />
+
+                            <Border Margin="0,0,6,0" Style="{StaticResource MacCardStyle}">
+                                <StackPanel>
+                                    <TextBlock Style="{StaticResource MacSectionLabel}" Text="APLICACAO DIRETA REVERSIVEL" />
+                                    <Button x:Name="ApplyProfileButton"
+                                            Margin="0,10,0,0"
+                                            Style="{StaticResource MacPrimaryButton}"
+                                            Content="Aplicar dry-run confirmado"
+                                            Click="ApplyProfileButton_OnClick" />
+                                    <TextBlock Margin="0,9,0,0"
+                                               Foreground="{StaticResource TextTertiaryBrush}"
+                                               Text="O fluxo cientifico e preferivel. Aplicacao direta ainda cria backup e relatorio."
+                                               TextWrapping="Wrap" />
+                                    <TextBox x:Name="JavaArgumentsTextBox"
+                                             Margin="0,10,0,0"
+                                             Style="{StaticResource WizardTextBox}"
+                                             IsReadOnly="True"
+                                             Text="JVM recomendada aparecera aqui" />
+                                </StackPanel>
+                            </Border>
+
+                            <Border Grid.Column="1" Margin="6,0,0,0" Style="{StaticResource MacCardStyle}">
+                                <StackPanel>
+                                    <TextBlock Style="{StaticResource MacSectionLabel}" Text="PLANO DE SOBREVIVENCIA" />
+                                    <TextBlock x:Name="SurvivalVerdictText"
+                                               Margin="0,7,0,0"
+                                               Foreground="#F5B942"
+                                               FontSize="15"
+                                               FontWeight="SemiBold"
+                                               Text="Nao calculado" />
+                                    <TextBlock x:Name="SurvivalDetailsText"
+                                               Margin="0,7,0,0"
+                                               Foreground="{StaticResource TextSecondaryBrush}"
+                                               Text="Execute a auditoria."
+                                               TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Border>
                         </Grid>
+
+                        <Border Margin="0,12,0,0" Style="{StaticResource MacCardStyle}">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource MacSectionLabel}" Text="QUARENTENA REVERSIVEL" />
+                                <ListBox x:Name="QuarantineList"
+                                         Height="150"
+                                         Margin="0,9,0,0"
+                                         Background="{StaticResource CardElevatedBrush}"
+                                         BorderBrush="{StaticResource CardBorderBrush}"
+                                         Foreground="{StaticResource TextSecondaryBrush}"
+                                         SelectionMode="Extended"
+                                         SelectionChanged="QuarantineList_OnSelectionChanged">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Margin="4">
+                                                <TextBlock Foreground="{StaticResource TextPrimaryBrush}" FontWeight="SemiBold" Text="{Binding FileName}" />
+                                                <TextBlock Foreground="{StaticResource TextTertiaryBrush}" FontSize="10" Text="{Binding OperationalRecommendation}" TextWrapping="Wrap" />
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                                <WrapPanel Margin="0,10,0,0">
+                                    <Button x:Name="ApplyQuarantineButton"
+                                            Width="160"
+                                            Margin="0,0,8,0"
+                                            Style="{StaticResource MacDestructiveButton}"
+                                            Content="Quarentenar selecionados"
+                                            Click="ApplyQuarantineButton_OnClick" />
+                                    <Button x:Name="RollbackQuarantineButton"
+                                            Width="170"
+                                            Style="{StaticResource MacSecondaryButton}"
+                                            Content="Restaurar quarentena"
+                                            Click="RollbackQuarantineButton_OnClick" />
+                                </WrapPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Margin="0,12,0,0" Style="{StaticResource MacCardStyle}">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource MacSectionLabel}" Text="OBSERVACAO MANUAL" />
+                                <WrapPanel Margin="0,10,0,0">
+                                    <CheckBox x:Name="GameOpenedCheckBox" Style="{StaticResource TechnicalCheckBox}" Content="Jogo abriu" />
+                                    <CheckBox x:Name="MenuReachedCheckBox" Style="{StaticResource TechnicalCheckBox}" Content="Chegou ao menu" />
+                                    <CheckBox x:Name="WorldEnteredCheckBox" Style="{StaticResource TechnicalCheckBox}" Content="Entrou no mundo" />
+                                    <CheckBox x:Name="ServerEnteredCheckBox" Style="{StaticResource TechnicalCheckBox}" Content="Entrou no servidor" />
+                                    <CheckBox x:Name="Playable720pCheckBox" Style="{StaticResource TechnicalCheckBox}" Content="Jogavel" />
+                                    <CheckBox x:Name="SevereDropsCheckBox" Style="{StaticResource TechnicalCheckBox}" Content="Quedas severas" />
+                                    <CheckBox x:Name="CrashedCheckBox" Style="{StaticResource TechnicalCheckBox}" Content="Crash" />
+                                    <CheckBox x:Name="OutOfMemoryCheckBox" Style="{StaticResource TechnicalCheckBox}" Content="Sem memoria" />
+                                </WrapPanel>
+                                <UniformGrid Columns="4" Margin="0,4,0,0">
+                                    <StackPanel Margin="0,0,8,0"><TextBlock Style="{StaticResource MacSectionLabel}" Text="SEGUNDOS ATE MENU" /><TextBox x:Name="MenuSecondsTextBox" Margin="0,5,0,0" Style="{StaticResource WizardTextBox}" /></StackPanel>
+                                    <StackPanel Margin="0,0,8,0"><TextBlock Style="{StaticResource MacSectionLabel}" Text="SEGUNDOS ATE ENTRAR" /><TextBox x:Name="JoinSecondsTextBox" Margin="0,5,0,0" Style="{StaticResource WizardTextBox}" /></StackPanel>
+                                    <StackPanel Margin="0,0,8,0"><TextBlock Style="{StaticResource MacSectionLabel}" Text="FPS MEDIO MANUAL" /><TextBox x:Name="AverageFpsTextBox" Margin="0,5,0,0" Style="{StaticResource WizardTextBox}" /></StackPanel>
+                                    <StackPanel><TextBlock Style="{StaticResource MacSectionLabel}" Text="FPS MINIMO MANUAL" /><TextBox x:Name="MinimumFpsTextBox" Margin="0,5,0,0" Style="{StaticResource WizardTextBox}" /></StackPanel>
+                                </UniformGrid>
+                                <TextBox x:Name="OperationalNotesTextBox"
+                                         Height="64"
+                                         Margin="0,10,0,0"
+                                         Style="{StaticResource WizardTextBox}"
+                                         AcceptsReturn="True"
+                                         TextWrapping="Wrap"
+                                         ToolTip="Registre rota, cena, bugs visuais e comportamento do servidor" />
+                                <WrapPanel Margin="0,10,0,0">
+                                    <Button x:Name="ExportChecklistButton"
+                                            Width="150"
+                                            Margin="0,0,8,0"
+                                            Style="{StaticResource MacSecondaryButton}"
+                                            Content="Exportar checklist"
+                                            Click="ExportChecklistButton_OnClick" />
+                                    <Button x:Name="SaveHomologationButton"
+                                            Width="170"
+                                            Style="{StaticResource MacPrimaryButton}"
+                                            Content="Salvar observacao"
+                                            Click="SaveHomologationButton_OnClick" />
+                                </WrapPanel>
+                                <TextBlock x:Name="OperationalStatusText"
+                                           Margin="0,9,0,0"
+                                           Foreground="{StaticResource TextTertiaryBrush}"
+                                           Text="Dados vazios permanecem NAO_MEDIDOS."
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Margin="0,12,0,0" Style="{StaticResource MacCardStyle}">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource MacSectionLabel}" Text="LEGENDA DE EVIDENCIA E ESTADO" />
+                                <ItemsControl Margin="0,8,0,0" ItemsSource="{Binding VisualStates}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Margin="0,0,8,8" Padding="9,6" Background="{StaticResource CardElevatedBrush}" CornerRadius="10">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <Ellipse Width="8" Height="8" VerticalAlignment="Center" Fill="{Binding Color}" />
+                                                    <TextBlock Margin="6,0,0,0" Foreground="{StaticResource TextPrimaryBrush}" FontWeight="SemiBold" Text="{Binding Label}" />
+                                                    <TextBlock Margin="6,0,0,0" Foreground="{StaticResource TextTertiaryBrush}" Text="{Binding Meaning}" />
+                                                </StackPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Border>
                     </StackPanel>
-                </Border>
+                </Expander>
+            </StackPanel>
+        </ScrollViewer>
 
-                <Border Grid.Column="1"
-                        Margin="7,0,0,0"
-                        Style="{StaticResource MacCardStyle}">
-                    <StackPanel>
-                        <TextBlock Style="{StaticResource MacSectionLabel}" Text="PLANO DE SOBREVIVENCIA 4 GB" />
-                        <TextBlock x:Name="SurvivalVerdictText"
-                                   Margin="0,8,0,0"
-                                   Foreground="#67D89B"
-                                   FontSize="14"
-                                   FontWeight="SemiBold"
-                                   Text="Execute a auditoria para gerar um veredito realista."
-                                   TextWrapping="Wrap" />
-                        <TextBlock x:Name="SurvivalDetailsText"
-                                   Margin="0,10,0,0"
-                                   Style="{StaticResource MacBodyText}"
-                                   Text="O plano combina JVM, mods, graficos, riscos e recomendacoes manuais."
-                                   TextWrapping="Wrap" />
-                    </StackPanel>
-                </Border>
-            </Grid>
-
-            <Border Margin="0,14,0,0" Style="{StaticResource MacCardStyle}">
-                <StackPanel>
-                    <TextBlock Style="{StaticResource MacSectionLabel}" Text="HOMOLOGACAO OPERACIONAL" />
-                    <TextBlock Margin="0,7,0,0"
-                               Style="{StaticResource MacBodyText}"
-                               Text="Registre somente o que foi observado no PC alvo. FPS ausente permanece NAO MEDIDO."
-                               TextWrapping="Wrap" />
-
-                    <WrapPanel Margin="0,12,0,0">
-                        <CheckBox x:Name="GameOpenedCheckBox" Margin="0,0,18,8" Foreground="{StaticResource TextPrimaryBrush}" Content="Jogo abriu" />
-                        <CheckBox x:Name="MenuReachedCheckBox" Margin="0,0,18,8" Foreground="{StaticResource TextPrimaryBrush}" Content="Chegou ao menu" />
-                        <CheckBox x:Name="WorldEnteredCheckBox" Margin="0,0,18,8" Foreground="{StaticResource TextPrimaryBrush}" Content="Entrou no mundo" />
-                        <CheckBox x:Name="ServerEnteredCheckBox" Margin="0,0,18,8" Foreground="{StaticResource TextPrimaryBrush}" Content="Entrou no servidor" />
-                        <CheckBox x:Name="Playable720pCheckBox" Margin="0,0,18,8" Foreground="{StaticResource TextPrimaryBrush}" Content="Jogavel em 720p" />
-                        <CheckBox x:Name="SevereDropsCheckBox" Margin="0,0,18,8" Foreground="{StaticResource TextPrimaryBrush}" Content="Quedas severas" />
-                        <CheckBox x:Name="CrashedCheckBox" Margin="0,0,18,8" Foreground="{StaticResource TextPrimaryBrush}" Content="Crash" />
-                        <CheckBox x:Name="OutOfMemoryCheckBox" Margin="0,0,0,8" Foreground="{StaticResource TextPrimaryBrush}" Content="Falta de memoria" />
-                    </WrapPanel>
-
-                    <Grid Margin="0,4,0,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-                        <StackPanel Grid.Column="0" Margin="0,0,6,0">
-                            <TextBlock Style="{StaticResource MacSectionLabel}" Text="MENU (S)" />
-                            <TextBox x:Name="MenuSecondsTextBox" Margin="0,5,0,0" Style="{StaticResource MinecraftTextBox}" />
-                        </StackPanel>
-                        <StackPanel Grid.Column="1" Margin="6,0">
-                            <TextBlock Style="{StaticResource MacSectionLabel}" Text="ENTRADA (S)" />
-                            <TextBox x:Name="JoinSecondsTextBox" Margin="0,5,0,0" Style="{StaticResource MinecraftTextBox}" />
-                        </StackPanel>
-                        <StackPanel Grid.Column="2" Margin="6,0">
-                            <TextBlock Style="{StaticResource MacSectionLabel}" Text="FPS MEDIO" />
-                            <TextBox x:Name="AverageFpsTextBox" Margin="0,5,0,0" Style="{StaticResource MinecraftTextBox}" />
-                        </StackPanel>
-                        <StackPanel Grid.Column="3" Margin="6,0,0,0">
-                            <TextBlock Style="{StaticResource MacSectionLabel}" Text="FPS MINIMO" />
-                            <TextBox x:Name="MinimumFpsTextBox" Margin="0,5,0,0" Style="{StaticResource MinecraftTextBox}" />
-                        </StackPanel>
-                    </Grid>
-
-                    <TextBox x:Name="OperationalNotesTextBox"
-                             Height="56"
-                             Margin="0,10,0,0"
-                             Padding="12,8"
-                             AcceptsReturn="True"
-                             Background="{StaticResource CardElevatedBrush}"
-                             Foreground="{StaticResource TextPrimaryBrush}"
-                             BorderBrush="{StaticResource CardBorderBrush}"
-                             TextWrapping="Wrap"
-                             ToolTip="Servidor, rota, resolucao, stutter e qualquer comportamento observado" />
-
-                    <Grid Margin="0,10,0,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-                        <Button x:Name="ExportChecklistButton"
-                                Grid.Column="0"
-                                Width="154"
-                                Style="{StaticResource MacSecondaryButton}"
-                                Content="Exportar checklist"
-                                Click="ExportChecklistButton_OnClick" />
-                        <Button x:Name="SaveHomologationButton"
-                                Grid.Column="1"
-                                Width="172"
-                                Margin="10,0,0,0"
-                                Style="{StaticResource MacPrimaryButton}"
-                                Content="Salvar resultado real"
-                                Click="SaveHomologationButton_OnClick" />
-                        <TextBlock x:Name="OperationalStatusText"
-                                   Grid.Column="2"
-                                   Margin="16,0,0,0"
-                                   VerticalAlignment="Center"
-                                   Foreground="{StaticResource TextTertiaryBrush}"
-                                   FontSize="11"
-                                   Text="Aguardando uma instancia real e observacoes do teste."
-                                   TextWrapping="Wrap" />
-                    </Grid>
+        <Border Grid.Row="1"
+                Margin="0,8,14,0"
+                Padding="12"
+                Background="{StaticResource SidebarBgBrush}"
+                BorderBrush="{StaticResource SeparatorBrush}"
+                BorderThickness="1"
+                CornerRadius="12">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <Button Width="105"
+                        Style="{StaticResource MacSecondaryButton}"
+                        Content="Voltar"
+                        Command="{Binding BackCommand}" />
+                <StackPanel Grid.Column="1" Margin="12,0" VerticalAlignment="Center">
+                    <TextBlock HorizontalAlignment="Center"
+                               Foreground="{StaticResource TextTertiaryBrush}"
+                               FontSize="10"
+                               Text="ALTERACAO GERENCIADA" />
+                    <Button x:Name="RollbackButton"
+                            Width="210"
+                            Margin="0,4,0,0"
+                            HorizontalAlignment="Center"
+                            Style="{StaticResource MacSecondaryButton}"
+                            Content="Desfazer ultima alteracao"
+                            Click="RollbackButton_OnClick" />
                 </StackPanel>
-            </Border>
-
-            <Border Margin="0,14,0,0" Style="{StaticResource MacCardStyle}">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-
-                    <StackPanel>
-                        <TextBlock Style="{StaticResource MacSectionLabel}" Text="BENCHMARK E RELATORIOS" />
-                        <TextBlock x:Name="OperationText"
-                                   Margin="0,7,0,0"
-                                   Style="{StaticResource MacBodyText}"
-                                   Text="Abra o Minecraft para medir RAM, CPU, configs, latest.log e crash reports. Sem processo, o resultado sera NAO_TESTADO." />
-                        <TextBox x:Name="JavaArgumentsTextBox"
-                                 Margin="0,10,0,0"
-                                 Style="{StaticResource MinecraftTextBox}"
-                                 IsReadOnly="True"
-                                 Text="JVM recomendada aparecera aqui" />
-                    </StackPanel>
-
-                    <Button x:Name="BenchmarkButton"
-                            Grid.Column="1"
-                            Width="132"
-                            Margin="18,0,0,0"
-                            VerticalAlignment="Center"
+                <StackPanel Grid.Column="2" Orientation="Horizontal">
+                    <Button x:Name="ScientificAdvanceButton"
+                            Width="155"
+                            Margin="0,0,8,0"
+                            Style="{StaticResource MacPrimaryButton}"
+                            Content="Avancar etapa"
+                            Click="ScientificAdvanceButton_OnClick" />
+                    <Button Width="105"
                             Style="{StaticResource MacSecondaryButton}"
-                            Content="Benchmark 60 s"
-                            Click="BenchmarkButton_OnClick" />
-                    <Button x:Name="OpenReportsButton"
-                            Grid.Column="2"
-                            Width="126"
-                            Margin="10,0,0,0"
-                            VerticalAlignment="Center"
-                            Style="{StaticResource MacSecondaryButton}"
-                            Content="Abrir relatorios"
-                            Click="OpenReportsButton_OnClick" />
-                </Grid>
-            </Border>
-        </StackPanel>
-    </ScrollViewer>
+                            Content="Proximo"
+                            Command="{Binding NextCommand}" />
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
 </UserControl>

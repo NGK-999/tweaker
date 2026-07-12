@@ -35,12 +35,40 @@ internal sealed class MinecraftScientificExperimentService
         return (plan, reportService.WritePlan(plan, outputDirectory));
     }
 
+    public (MinecraftScientificOptimizationPlan Plan, MinecraftScientificReportPaths Reports) PlanCustom(
+        string selectedPath,
+        string experimentId,
+        string? outputDirectory = null)
+    {
+        var plan = autoOptimizeService.BuildCustomPlan(selectedPath, experimentId);
+        return (plan, reportService.WritePlan(plan, outputDirectory));
+    }
+
     public MinecraftScientificOperationResult StartGuided(
         string selectedPath,
         int? maximumFps = null)
     {
         var plan = autoOptimizeService.BuildPlan(selectedPath, maximumFps);
         return StartWithPlan(plan);
+    }
+
+    public MinecraftScientificOperationResult StartCustom(
+        string selectedPath,
+        string experimentId)
+    {
+        var plan = autoOptimizeService.BuildCustomPlan(selectedPath, experimentId);
+        var definition = plan.ProfilePlan.Experiment
+            ?? throw new InvalidOperationException("Experimento customizado sem definicao persistida.");
+        var hypothesis = new ScientificHypothesis(
+            ScientificHypothesisKind.Custom,
+            $"{definition.DisplayName}: {definition.ExpectedEffect}",
+            ExpectedMetrics(definition.Variable),
+            definition.Description,
+            definition.Variable is MinecraftExperimentVariable.ResourcePacks or MinecraftExperimentVariable.JavaHeap
+                ? ScientificActionRisk.Medium
+                : ScientificActionRisk.Low,
+            ManualChangeRequired: false);
+        return StartWithPlan(plan, hypothesis);
     }
 
     internal MinecraftScientificOperationResult StartWithPlan(
@@ -115,9 +143,11 @@ internal sealed class MinecraftScientificExperimentService
         MinecraftScientificExperiment updated;
         if (kind == ScientificMeasurementKind.Baseline)
         {
-            var baselinePlan = autoOptimizeService.BuildPlan(
-                experiment.InstanceRoot,
-                experiment.OptimizationPlan.MaximumFps);
+            var baselinePlan = experiment.OptimizationPlan.ProfilePlan.Experiment is { } customExperiment
+                ? autoOptimizeService.BuildCustomPlan(experiment.InstanceRoot, customExperiment.Id)
+                : autoOptimizeService.BuildPlan(
+                    experiment.InstanceRoot,
+                    experiment.OptimizationPlan.MaximumFps);
             updated = experiment with
             {
                 UpdatedAtUtc = now,
@@ -345,6 +375,59 @@ internal sealed class MinecraftScientificExperimentService
         return Persist(updated, messages);
     }
 
+    public MinecraftScientificOperationResult Cancel(
+        string experimentId,
+        bool rollbackConfirmed)
+    {
+        var experiment = store.Load(experimentId);
+        if (experiment.Phase is ScientificExperimentPhase.Kept or ScientificExperimentPhase.Reverted)
+        {
+            throw new InvalidOperationException($"Experimento ja finalizado como {experiment.Phase}.");
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        var auditTrail = experiment.AuditTrail;
+        var messages = new List<string>();
+        var phase = ScientificExperimentPhase.NeedsRetest;
+        if (!string.IsNullOrWhiteSpace(experiment.AppliedProfileBackupId))
+        {
+            if (!rollbackConfirmed)
+            {
+                throw new InvalidOperationException("Confirme o rollback para cancelar um candidato ja aplicado.");
+            }
+
+            var rollback = profileService.RollbackBackup(
+                experiment.InstanceRoot,
+                experiment.AppliedProfileBackupId);
+            if (experiment.Baseline is not null)
+            {
+                EnsureManagedConfigsRestored(experiment, evidenceService.Capture(experiment.InstanceRoot));
+            }
+
+            phase = ScientificExperimentPhase.Reverted;
+            auditTrail = Append(
+                auditTrail,
+                Audit(now, $"Experimento cancelado; rollback exato {rollback.BackupId} concluido e conferido."));
+            messages.Add($"Cancelamento seguro: backup {rollback.BackupId} restaurado.");
+        }
+        else
+        {
+            auditTrail = Append(
+                auditTrail,
+                Audit(now, "Experimento cancelado antes do apply; nenhum arquivo precisou de rollback."));
+            messages.Add("Experimento cancelado sem escrita gerenciada.");
+        }
+
+        return Persist(
+            experiment with
+            {
+                UpdatedAtUtc = now,
+                Phase = phase,
+                AuditTrail = auditTrail
+            },
+            messages);
+    }
+
     private MinecraftScientificOperationResult Persist(
         MinecraftScientificExperiment experiment,
         IReadOnlyList<string> messages)
@@ -358,6 +441,19 @@ internal sealed class MinecraftScientificExperimentService
 
     private static ScientificHypothesis BuildHypothesis(MinecraftScientificOptimizationPlan plan)
     {
+        if (plan.ProfilePlan.Experiment is { } experiment)
+        {
+            return new ScientificHypothesis(
+                ScientificHypothesisKind.Custom,
+                $"{experiment.DisplayName}: {experiment.ExpectedEffect}",
+                ExpectedMetrics(experiment.Variable),
+                experiment.Description,
+                experiment.Variable is MinecraftExperimentVariable.ResourcePacks or MinecraftExperimentVariable.JavaHeap
+                    ? ScientificActionRisk.Medium
+                    : ScientificActionRisk.Low,
+                ManualChangeRequired: false);
+        }
+
         return plan.SelectedProfile switch
         {
             MinecraftProfileKind.RamLimited => new ScientificHypothesis(
@@ -395,6 +491,24 @@ internal sealed class MinecraftScientificExperimentService
                 $"Aplicar {plan.SelectedProfile} e comparar na mesma cena.",
                 ScientificActionRisk.Low,
                 ManualChangeRequired: false)
+        };
+    }
+
+    private static IReadOnlyList<string> ExpectedMetrics(MinecraftExperimentVariable variable)
+    {
+        return variable switch
+        {
+            MinecraftExperimentVariable.JavaHeap =>
+                ["Pico RAM Java", "Menor RAM livre", "Delta pagefile", "OOM", "Stutter manual"],
+            MinecraftExperimentVariable.FpsCap or MinecraftExperimentVariable.RenderDistance or
+                MinecraftExperimentVariable.SimulationDistance =>
+                ["CPU media", "CPU pico", "FPS minimo manual", "Quedas severas", "Entrada no servidor"],
+            MinecraftExperimentVariable.Resolution or MinecraftExperimentVariable.WindowMode or
+                MinecraftExperimentVariable.VisualQuality or MinecraftExperimentVariable.EntityDistance =>
+                ["FPS medio manual", "FPS minimo manual", "CPU media", "RAM Java", "Artefatos visuais"],
+            MinecraftExperimentVariable.ResourcePacks =>
+                ["Tempo ate menu", "Pico RAM Java", "Menor RAM livre", "Entrada no servidor"],
+            _ => ["RAM", "CPU", "FPS manual", "Crash"]
         };
     }
 

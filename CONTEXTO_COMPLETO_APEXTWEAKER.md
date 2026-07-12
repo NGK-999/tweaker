@@ -8,7 +8,7 @@ Regra: fatos marcados como **confirmados** foram verificados no repositorio loca
 
 - Nome: ApexTweaker.
 - Autor/empresa: Igor Silva.
-- Versao atual declarada: `3.0.1`.
+- Versao atual declarada: `3.1.0`.
 - Plataforma: Windows 10/11, com foco atual em Windows 11.
 - Framework atual: `.NET 10`, destino `net10.0-windows`.
 - Objetivo tecnico: otimizar estabilidade de frametime e 1% low, reduzir stutters e oferecer telemetria, backup e rollback.
@@ -27,7 +27,7 @@ Regra: fatos marcados como **confirmados** foram verificados no repositorio loca
 
 - Repositorio: `https://github.com/NGK-999/tweaker.git`.
 - Branch: `main`.
-- Estado local confirmado em 2026-07-12: patch `3.0.1` em preparacao e alinhado a `origin/main` antes da publicacao.
+- Estado local confirmado em 2026-07-12: versao `3.1.0` em preparacao sobre a `v3.0.1` publicada.
 - Base publicada antes deste patch: `6c8c018` (`v3.0.0`).
 - O repositorio atual nao exige excecao local de `safe.directory`.
 
@@ -434,7 +434,7 @@ Uma otimizacao so pode ser anunciada como aplicada quando:
 Continue o ApexTweaker em C:\projetos\Apextweaker usando CONTEXTO_COMPLETO_APEXTWEAKER.md como handoff. Nao trate pedidos historicos como implementados sem verificar o codigo. Preserve o motor cientifico da v3, mantenha privilegio minimo, execute build/self-test/Test-Release e teste exatamente o executavel publicado. Nao substitua release-v2 enquanto ApexTweaker.exe estiver em execucao.
 ```
 
-## 16. Minecraft/Cobblemon 3.0.1
+## 16. Minecraft/Cobblemon 3.1.0
 
 - A shell WPF possui a pagina `MinecraftView`, exibida como **Cobblemon**.
 - O modulo em `src/Minecraft` audita JARs, inclusive dependencias aninhadas, sem escrever na pasta de mods.

@@ -1,6 +1,6 @@
 # Minecraft Scientific Optimization Engine
 
-Versao: **ApexTweaker 3.0.1**
+Versao: **ApexTweaker 3.1.0**
 
 ## Objetivo e limite
 
@@ -121,7 +121,7 @@ O benchmark automatico coleta por segundo:
 - RAM fisica livre;
 - CPU media e pico normalizadas pelos processadores logicos;
 - bytes lidos e escritos pelo processo Java;
-- pagefile antes/depois;
+- commit por segundo e pagefile antes/depois;
 - `latest.log`, crash report e sinais de `OutOfMemoryError`;
 - hashes das configs e nomes dos JARs ativos.
 
@@ -188,9 +188,10 @@ suficiente, e o relatorio identifica a inferencia.
 | `SAFE` | mudancas pequenas e conservadoras |
 | `LOW_END` | hardware limitado acima do caso extremo |
 | `EXTREME_4GB` | configuracao minima geral para 4 GB |
+| `POTATO_COBBLEMON_4GB` | 960x540, render 2, simulation 5, entidades 30% e 24 FPS |
 | `GPU_LIMITED` | 720p, efeitos minimos, entidades baixas e 30 FPS |
-| `RAM_LIMITED` | render/simulation 4, heap conservador e 30 FPS |
-| `CPU_LIMITED` | simulation 4, entidades reduzidas e 30 FPS |
+| `RAM_LIMITED` | render 4/simulation 5, heap conservador e 30 FPS |
+| `CPU_LIMITED` | simulation 5, entidades reduzidas e 30 FPS |
 | `SERVER_ENTRY_COMPATIBLE` | preserva mods e prioriza compatibilidade, 45 FPS |
 | `COBBLEMON_SERVER_CLIENT` | perfil operacional anterior para cliente do servidor |
 | `BENCHMARK` | ambiente controlado para rodada comparativa |
@@ -204,6 +205,7 @@ O primeiro teste em maquina com aproximadamente 4 GB usa:
 Heaps maiores ficam reservados para hipoteses posteriores:
 
 ```text
+-Xms512M -Xmx1792M
 -Xms512M -Xmx2304M
 -Xms512M -Xmx2560M
 ```
@@ -217,8 +219,8 @@ recebem um arquivo de instrucao manual.
 | Mod | Automacao | Comportamento |
 |---|---|---|
 | Sodium 0.6.13 | suportada | somente chaves existentes de culling/fog/texturas/memory tracing |
-| ImmediatelyFast 1.6.11 | suportada | quatro chaves estaveis; `hud_batching` preservado |
-| EntityCulling 1.10.5 | suportada | somente chaves existentes validadas |
+| ImmediatelyFast 1.6.11 | defaults recomendados | teste isolado; reverta crash ou bug visual |
+| EntityCulling 1.10.5 | defaults recomendados | validar Pokemon; whitelist permanece manual |
 | Iris | suportada parcialmente | apenas `enableShaders=false` |
 | Lithium | defaults recomendados | nenhum override inventado |
 | FerriteCore | sem config necessaria | ganho vem da instalacao |

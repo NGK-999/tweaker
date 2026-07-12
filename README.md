@@ -4,7 +4,7 @@ Utilitario Windows em .NET 10 + WPF para diagnostico de hardware, telemetria,
 otimizacoes reversiveis e preparacao segura de Minecraft/Cobblemon em hardware
 limitado.
 
-Versao: **3.0.1** | Autor: **Igor Silva**
+Versao: **3.1.0** | Autor: **Igor Silva**
 
 ## Minecraft Scientific Optimization Engine
 
@@ -16,12 +16,12 @@ A aba **Cobblemon** adiciona um motor experimental separado das mutacoes de Wind
 - classifica mods com postura conservadora para requisitos de servidor;
 - gera relatorios JSON, Markdown e TXT;
 - gera dry-run de quarentena e move somente JARs explicitamente selecionados;
-- oferece os perfis `SAFE`, `LOW_END`, `EXTREME_4GB`,
+- oferece os perfis `SAFE`, `LOW_END`, `EXTREME_4GB`, `POTATO_COBBLEMON_4GB`,
   `COBBLEMON_SERVER_CLIENT` e `BENCHMARK`;
 - cria backup antes de alterar `options.txt`, configs suportadas e memoria Prism/MultiMC;
 - permite rollback separado do perfil e da quarentena;
 - mede RAM, CPU, configs, logs e crashes do processo Minecraft por ate 10 minutos;
-- permite escolher 30, 45 ou 60 FPS e explica o patamar de heap de 4 GB;
+- permite escolher 20, 24, 30, 45 ou 60 FPS e explica o patamar de heap de 4 GB;
 - gera checklist e resultado de homologacao sem inventar FPS ou entrada no servidor;
 - exige confirmacao adicional do manifesto para quarentenar mod possivelmente server-side;
 - nunca exclui mods e nunca preseleciona candidatos de quarentena.
@@ -32,10 +32,15 @@ A aba **Cobblemon** adiciona um motor experimental separado das mutacoes de Wind
 - distingue fato medido, inferencia e recomendacao manual;
 - oferece perfis `GPU_LIMITED`, `RAM_LIMITED`, `CPU_LIMITED` e
   `SERVER_ENTRY_COMPATIBLE` alem dos perfis anteriores.
+- apresenta um wizard MVVM em dez etapas, modo simples/avancado, progresso,
+  cancelamento e grafico WPF leve de CPU/RAM/commit;
+- oferece experimentos isolados para resolucao, FPS, render, simulation,
+  entidades, qualidade, resource packs, janela e heap.
 
 Documentacao completa: [docs/COBBLEMON_LOW_END.md](docs/COBBLEMON_LOW_END.md).
 Fluxo para o PC real: [docs/HOMOLOGACAO_OPERACIONAL_COBBLEMON.md](docs/HOMOLOGACAO_OPERACIONAL_COBBLEMON.md).
 Motor cientifico e CLI: [docs/SCIENTIFIC_ENGINE.md](docs/SCIENTIFIC_ENGINE.md).
+Frontend e Potato: [docs/V3_1_FRONTEND_POTATO.md](docs/V3_1_FRONTEND_POTATO.md).
 Arquitetura da v3: [docs/ARCHITECTURE_V3.md](docs/ARCHITECTURE_V3.md).
 
 ## Interface
@@ -87,7 +92,7 @@ Artefatos oficiais:
 - [ApexTweaker.exe](https://github.com/NGK-999/tweaker/releases/latest/download/ApexTweaker.exe)
 - [ApexTweaker.Native.dll](https://github.com/NGK-999/tweaker/releases/latest/download/ApexTweaker.Native.dll)
 - [ApexTweaker-Setup.exe](https://github.com/NGK-999/tweaker/releases/latest/download/ApexTweaker-Setup.exe)
-- [ApexTweaker-Portable-v3.0.1.zip](https://github.com/NGK-999/tweaker/releases/download/v3.0.1/ApexTweaker-Portable-v3.0.1.zip)
+- [ApexTweaker-Portable-v3.1.0.zip](https://github.com/NGK-999/tweaker/releases/download/v3.1.0/ApexTweaker-Portable-v3.1.0.zip)
 
 O executavel publicado e self-contained, inicia em modo normal e nao exige .NET
 instalado. Apenas mutacoes protegidas do Windows solicitam UAC sob demanda.
@@ -110,8 +115,9 @@ Requisito: Visual Studio Build Tools com suporte a C++ para compilar
 - Relatorios Minecraft: `%LOCALAPPDATA%\ApexTweaker\MinecraftReports`
 - Experimentos cientificos: `%LOCALAPPDATA%\ApexTweaker\MinecraftExperiments`
 - Telemetria de usuario: `%LOCALAPPDATA%\ApexTweaker\Telemetry`
-- O perfil altera `options.txt` e apenas chaves existentes validadas de Sodium,
-  ImmediatelyFast e EntityCulling, alem de desativar Iris por chave reconhecida.
+- O perfil altera `options.txt`, chaves existentes validadas de Sodium e
+  `enableShaders=false` do Iris. ImmediatelyFast e EntityCulling permanecem
+  nos defaults para experimentos isolados e validacao visual.
 - Prism/MultiMC recebem memoria por instancia; outros launchers recebem uma
   instrucao JVM manual.
 - Defender, Windows Update, pagefile e mods de servidor nao sao desativados ou

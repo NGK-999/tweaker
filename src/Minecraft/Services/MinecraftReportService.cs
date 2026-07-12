@@ -61,6 +61,8 @@ internal sealed class MinecraftReportService
             .AppendLine()
             .AppendLine($"- Pico RAM Java: `{FormatBytes(result.PeakWorkingSetBytes)}`")
             .AppendLine($"- Menor RAM livre: `{result.MinimumAvailableMemoryGb:0.00} GB`")
+            .AppendLine($"- CPU Java media/pico: `{(result.Samples.Count == 0 ? 0 : result.Samples.Average(sample => sample.CpuPercent)):0.0}%` / `{(result.Samples.Count == 0 ? 0 : result.Samples.Max(sample => sample.CpuPercent)):0.0}%`")
+            .AppendLine($"- Pico de commit do Windows: `{(result.Samples.Count == 0 ? 0 : result.Samples.Max(sample => sample.CommitUsedMb))} MB`")
             .AppendLine($"- Disco Java leitura/escrita: `{FormatBytes(result.Samples.Count == 0 ? 0 : result.Samples.Max(sample => sample.DiskReadBytes))}` / `{FormatBytes(result.Samples.Count == 0 ? 0 : result.Samples.Max(sample => sample.DiskWriteBytes))}`")
             .AppendLine($"- Mods ativos: `{result.ActiveMods.Count}`")
             .AppendLine($"- Evidencia OOM: `{(result.OutOfMemoryEvidence ? "SIM" : "NAO")}`")
@@ -97,6 +99,9 @@ internal sealed class MinecraftReportService
             $"PROCESS={result.ProcessName ?? "NAO DETECTADO"}\r\n" +
             $"PEAK_WORKING_SET={result.PeakWorkingSetBytes}\r\n" +
             $"MIN_AVAILABLE_GB={result.MinimumAvailableMemoryGb:0.00}\r\n" +
+            $"AVERAGE_CPU_PERCENT={(result.Samples.Count == 0 ? 0 : result.Samples.Average(sample => sample.CpuPercent)):0.0}\r\n" +
+            $"PEAK_CPU_PERCENT={(result.Samples.Count == 0 ? 0 : result.Samples.Max(sample => sample.CpuPercent)):0.0}\r\n" +
+            $"PEAK_COMMIT_MB={(result.Samples.Count == 0 ? 0 : result.Samples.Max(sample => sample.CommitUsedMb))}\r\n" +
             $"DISK_READ_BYTES={(result.Samples.Count == 0 ? 0 : result.Samples.Max(sample => sample.DiskReadBytes))}\r\n" +
             $"DISK_WRITE_BYTES={(result.Samples.Count == 0 ? 0 : result.Samples.Max(sample => sample.DiskWriteBytes))}\r\n" +
             $"FPS_MEASURED={result.FpsMeasured}\r\n" +

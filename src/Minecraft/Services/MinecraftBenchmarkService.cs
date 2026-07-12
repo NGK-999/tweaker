@@ -107,14 +107,16 @@ internal sealed class MinecraftBenchmarkService
                     : Math.Clamp(cpuDeltaSeconds / elapsedSeconds / Environment.ProcessorCount * 100d, 0d, 100d);
                 var io = ReadIoCounters(process);
 
+                var memory = ReadMemorySnapshot();
                 var sample = new MinecraftBenchmarkSample(
                     DateTimeOffset.UtcNow,
                     process.WorkingSet64,
                     process.PrivateMemorySize64,
-                    ReadAvailableMemoryGb(),
+                    memory.AvailableMemoryGb,
                     Math.Round(cpuPercent, 2),
                     Math.Max(0, io.ReadBytes - initialIo.ReadBytes),
-                    Math.Max(0, io.WriteBytes - initialIo.WriteBytes));
+                    Math.Max(0, io.WriteBytes - initialIo.WriteBytes),
+                    memory.CommitUsedMb);
                 samples.Add(sample);
                 progress?.Report(sample);
                 previousCpu = currentCpu;
@@ -382,6 +384,7 @@ internal sealed class MinecraftBenchmarkService
                        (crashTail ?? string.Empty);
         var outOfMemory = combined.Contains("OutOfMemoryError", StringComparison.OrdinalIgnoreCase) ||
                           combined.Contains("Java heap space", StringComparison.OrdinalIgnoreCase) ||
+                          combined.Contains("GC overhead limit exceeded", StringComparison.OrdinalIgnoreCase) ||
                           combined.Contains("Could not reserve enough space", StringComparison.OrdinalIgnoreCase);
         var crash = crashPath is not null ||
                     combined.Contains("---- Minecraft Crash Report ----", StringComparison.OrdinalIgnoreCase) ||
@@ -456,13 +459,26 @@ internal sealed class MinecraftBenchmarkService
 
     private static decimal ReadAvailableMemoryGb()
     {
+        return ReadMemorySnapshot().AvailableMemoryGb;
+    }
+
+    private static (decimal AvailableMemoryGb, long CommitUsedMb) ReadMemorySnapshot()
+    {
         var status = new MemoryStatusEx
         {
             Length = checked((uint)Marshal.SizeOf<MemoryStatusEx>())
         };
-        return GlobalMemoryStatusEx(ref status)
-            ? Math.Round(status.AvailablePhysical / 1024m / 1024m / 1024m, 2)
-            : 0m;
+        if (!GlobalMemoryStatusEx(ref status))
+        {
+            return (0m, 0L);
+        }
+
+        var commitUsed = status.TotalPageFile >= status.AvailablePageFile
+            ? status.TotalPageFile - status.AvailablePageFile
+            : 0UL;
+        return (
+            Math.Round(status.AvailablePhysical / 1024m / 1024m / 1024m, 2),
+            checked((long)Math.Min(commitUsed / 1024UL / 1024UL, long.MaxValue)));
     }
 
     [DllImport("kernel32.dll", SetLastError = true)]

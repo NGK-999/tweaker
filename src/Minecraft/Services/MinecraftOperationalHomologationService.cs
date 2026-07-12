@@ -57,7 +57,7 @@ internal sealed class MinecraftOperationalHomologationService
                 $"Executar auditoria e revisar duplicidades antes do perfil. JVM proposta: {javaArguments}.",
                 $"Executar dry-run EXTREME_4GB com limite de {fpsLimit} FPS.",
                 "Confirmar backup, arquivos e valores antes/depois; somente entao executar Apply.",
-                "Verificar render 4, simulation 4, particulas minimas, nuvens off, biome blend 0, mipmap 0 e VSync off.",
+                "Verificar render 4, simulation 5, particulas minimas, nuvens off, biome blend 0, mipmap 0 e VSync off.",
                 "Confirmar Iris enableShaders=false e desativar manualmente resource packs pesados.",
                 "Nao colocar nenhum mod em quarentena durante o primeiro baseline."
             ],
@@ -66,7 +66,7 @@ internal sealed class MinecraftOperationalHomologationService
                 "Registrar tempo do clique ate o menu e do menu ate entrar no mundo/servidor.",
                 "Executar benchmark automatico por 60 segundos depois de entrar e permanecer no mesmo local.",
                 "Registrar FPS medio e minimo pelo F3, Spark ou PresentMon; o ApexTweaker nao inventa FPS.",
-                "Repetir com 30, 45 e 60 FPS; manter o menor limite que entregar frametime estavel.",
+                "Repetir com 20, 24, 30, 45 e 60 FPS; manter o menor limite que entregar frametime estavel.",
                 "Testar heaps 2048, 2304 e 2560 MB somente quando a recomendacao de RAM livre permitir.",
                 "Adicionar ImmediatelyFast sozinho, repetir o teste e reverter se houver crash ou artefato de HUD.",
                 "Testar uma quarentena por vez e validar novamente a entrada no servidor."

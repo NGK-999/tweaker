@@ -69,6 +69,47 @@ internal sealed class MinecraftScientificAutoOptimizeService
             ]);
     }
 
+    public MinecraftScientificOptimizationPlan BuildCustomPlan(string selectedPath, string experimentId)
+    {
+        if (!instanceService.TryResolve(selectedPath, out var instance))
+        {
+            throw new InvalidOperationException("Experimento customizado exige uma instancia real com options.txt e pasta mods.");
+        }
+
+        var audit = auditService.Audit(instance.GameDirectory);
+        var profilePlan = profileService.PlanExperiment(instance.GameDirectory, experimentId);
+        var diagnosis = diagnosticService.Diagnose(audit, profilePlan: profilePlan);
+        var quarantine = quarantineService.BuildPlan(audit);
+        var instanceEvidence = evidenceService.Capture(instance.GameDirectory);
+        var criticalBlockers = audit.Issues.Any(issue => issue.Severity == AuditSeverity.Error);
+        var experiment = profilePlan.Experiment
+            ?? throw new InvalidOperationException("O plano customizado perdeu a definicao da hipotese.");
+        return new MinecraftScientificOptimizationPlan(
+            $"plan-{DateTime.UtcNow:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}",
+            DateTimeOffset.UtcNow,
+            instance.GameDirectory,
+            audit,
+            diagnosis,
+            profilePlan.Profile,
+            profilePlan.MaximumFps,
+            BuildAppliedMemoryRecommendation(profilePlan),
+            profilePlan,
+            BuildActions(profilePlan, quarantine, audit, instanceEvidence),
+            configContracts.Assess(audit, instance.ConfigDirectory),
+            criticalBlockers,
+            audit.ManualActions
+                .Concat(diagnosis.Recommendations)
+                .Concat(BuildVanillaManualActions(instanceEvidence))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray(),
+            [
+                $"Hipotese isolada: {experiment.DisplayName}.",
+                "Somente as chaves existentes declaradas no experimento podem mudar.",
+                "Baseline, benchmark equivalente e rollback permanecem obrigatorios.",
+                "JARs, Windows, Defender, Windows Update e pagefile nao sao alterados."
+            ]);
+    }
+
     internal MinecraftScientificOptimizationPlan BuildPlan(
         string selectedPath,
         MinecraftAuditResult audit,
@@ -235,6 +276,7 @@ internal sealed class MinecraftScientificAutoOptimizeService
     {
         var tier = plan.MaximumHeapMb switch
         {
+            <= 1792 => JavaMemoryTier.Survival1792,
             <= 2048 => JavaMemoryTier.Safe2048,
             <= 2304 => JavaMemoryTier.Balanced2304,
             <= 2560 => JavaMemoryTier.Aggressive2560,

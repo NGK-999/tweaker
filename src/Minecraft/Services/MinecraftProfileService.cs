@@ -30,28 +30,36 @@ internal sealed partial class MinecraftProfileService
                 MinecraftProfileKind.Safe, "SAFE", 8, 5, "0.75", 1, 1, 2, 60, true, 3072,
                 "Reducao moderada com boa qualidade visual."),
             [MinecraftProfileKind.LowEnd] = CreateProfile(
-                MinecraftProfileKind.LowEnd, "LOW_END", 6, 4, "0.60", 2, 0, 1, 60, false, 2560,
+                MinecraftProfileKind.LowEnd, "LOW_END", 6, 5, "0.60", 2, 0, 1, 60, false, 2560,
                 "Equilibrio para hardware antigo com 6 a 8 GB."),
             [MinecraftProfileKind.Extreme4Gb] = CreateProfile(
-                MinecraftProfileKind.Extreme4Gb, "EXTREME_4GB", 4, 4, "0.50", 2, 0, 0, 30, false, 2048,
+                MinecraftProfileKind.Extreme4Gb, "EXTREME_4GB", 4, 5, "0.50", 2, 0, 0, 30, false, 2048,
                 "Primeiro teste seguro: 720p, 30 FPS e heap de 2048 MB."),
+            [MinecraftProfileKind.PotatoCobblemon4Gb] = CreateProfile(
+                MinecraftProfileKind.PotatoCobblemon4Gb, "POTATO_COBBLEMON_4GB", 2, 5, "0.30", 2, 0, 0, 24, false, 2048,
+                "Modo sobrevivencia: 960x540, 24 FPS e somente opcoes vanilla existentes.",
+                width: 960,
+                height: 540,
+                onlyExistingOptions: true,
+                disableViewBobbing: true,
+                disableResourcePacks: true),
             [MinecraftProfileKind.GpuLimited] = CreateProfile(
-                MinecraftProfileKind.GpuLimited, "GPU_LIMITED", 4, 4, "0.45", 2, 0, 0, 30, false, 2560,
+                MinecraftProfileKind.GpuLimited, "GPU_LIMITED", 4, 5, "0.45", 2, 0, 0, 30, false, 2560,
                 "Reduz pixels, efeitos, distancia e carga de entidades para GPU integrada."),
             [MinecraftProfileKind.RamLimited] = CreateProfile(
-                MinecraftProfileKind.RamLimited, "RAM_LIMITED", 4, 4, "0.45", 2, 0, 0, 30, false, 2048,
+                MinecraftProfileKind.RamLimited, "RAM_LIMITED", 4, 5, "0.45", 2, 0, 0, 30, false, 2048,
                 "Reserva memoria para Windows e pagefile; usa heap conservador de 2048 MB."),
             [MinecraftProfileKind.CpuLimited] = CreateProfile(
-                MinecraftProfileKind.CpuLimited, "CPU_LIMITED", 5, 4, "0.50", 2, 0, 0, 30, false, 2304,
+                MinecraftProfileKind.CpuLimited, "CPU_LIMITED", 5, 5, "0.50", 2, 0, 0, 30, false, 2304,
                 "Limita simulacao, entidades e FPS para estabilizar o tempo de frame da CPU."),
             [MinecraftProfileKind.ServerEntryCompatible] = CreateProfile(
-                MinecraftProfileKind.ServerEntryCompatible, "SERVER_ENTRY_COMPATIBLE", 5, 4, "0.60", 2, 0, 0, 45, false, 2304,
+                MinecraftProfileKind.ServerEntryCompatible, "SERVER_ENTRY_COMPATIBLE", 5, 5, "0.60", 2, 0, 0, 45, false, 2304,
                 "Mantem todos os mods e aplica somente configuracoes client-side reversiveis."),
             [MinecraftProfileKind.CobblemonServerClient] = CreateProfile(
-                MinecraftProfileKind.CobblemonServerClient, "COBBLEMON_SERVER_CLIENT", 5, 4, "0.60", 2, 0, 1, 60, false, 2560,
+                MinecraftProfileKind.CobblemonServerClient, "COBBLEMON_SERVER_CLIENT", 5, 5, "0.60", 2, 0, 1, 60, false, 2560,
                 "Cliente leve sem alterar mods possivelmente exigidos pelo servidor."),
             [MinecraftProfileKind.Benchmark] = CreateProfile(
-                MinecraftProfileKind.Benchmark, "BENCHMARK", 6, 4, "0.60", 2, 0, 1, 120, false, 2560,
+                MinecraftProfileKind.Benchmark, "BENCHMARK", 6, 5, "0.60", 2, 0, 1, 60, false, 2560,
                 "Cenario fixo para comparacao A/B com VSync desligado.")
         };
 
@@ -63,25 +71,6 @@ internal sealed partial class MinecraftProfileService
             ["performance.useFogOcclusion"] = true,
             ["performance.useBlockFaceCulling"] = true,
             ["advanced.enableMemoryTracing"] = false
-        };
-
-    private static readonly IReadOnlyDictionary<string, object> ImmediatelyFastSettings =
-        new Dictionary<string, object>(StringComparer.Ordinal)
-        {
-            ["font_atlas_resizing"] = true,
-            ["map_atlas_generation"] = true,
-            ["fast_text_lookup"] = true,
-            ["fast_buffer_upload"] = true
-        };
-
-    private static readonly IReadOnlyDictionary<string, object> EntityCullingSettings =
-        new Dictionary<string, object>(StringComparer.Ordinal)
-        {
-            ["debugMode"] = false,
-            ["skipEntityCulling"] = false,
-            ["skipBlockEntityCulling"] = false,
-            ["tickCulling"] = true,
-            ["blockEntityFrustumCulling"] = true
         };
 
     private readonly string backupRoot;
@@ -108,6 +97,8 @@ internal sealed partial class MinecraftProfileService
 
     public static IReadOnlyCollection<MinecraftProfileDefinition> AvailableProfiles => Profiles.Values.ToArray();
 
+    public static IReadOnlyList<MinecraftExperimentDefinition> AvailableExperiments => MinecraftExtremeExperimentCatalog.All;
+
     public static bool TryResolveInstanceRoot(string selectedPath, out string instanceRoot)
     {
         var resolved = new MinecraftInstanceService().TryResolve(selectedPath, out var instance);
@@ -131,12 +122,21 @@ internal sealed partial class MinecraftProfileService
         return ApplyOperation(BuildOperation(selectedPath, profileKind, maximumFps));
     }
 
+    public MinecraftProfilePlan PlanExperiment(string selectedPath, string experimentId)
+    {
+        return BuildExperimentOperation(selectedPath, MinecraftExtremeExperimentCatalog.Get(experimentId)).Plan;
+    }
+
     internal MinecraftProfileApplyResult ApplyVerifiedProfile(MinecraftProfilePlan expectedPlan)
     {
-        var operation = BuildOperation(
-            expectedPlan.Instance.GameDirectory,
-            expectedPlan.Profile,
-            expectedPlan.MaximumFps);
+        var operation = expectedPlan.Experiment is null
+            ? BuildOperation(
+                expectedPlan.Instance.GameDirectory,
+                expectedPlan.Profile,
+                expectedPlan.MaximumFps)
+            : BuildExperimentOperation(
+                expectedPlan.Instance.GameDirectory,
+                MinecraftExtremeExperimentCatalog.Get(expectedPlan.Experiment.Id));
         EnsurePlansEquivalent(expectedPlan, operation.Plan);
         return ApplyOperation(operation);
     }
@@ -244,10 +244,13 @@ internal sealed partial class MinecraftProfileService
             .Select(NormalizeChange)
             .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
             .ToArray();
+        var compareJavaMemory = expected.Experiment is null ||
+                                expected.Experiment.Variable == MinecraftExperimentVariable.JavaHeap;
         var equivalent = expected.Profile == current.Profile &&
-                         expected.MaximumHeapMb == current.MaximumHeapMb &&
+                         string.Equals(expected.Experiment?.Id, current.Experiment?.Id, StringComparison.OrdinalIgnoreCase) &&
+                         (!compareJavaMemory || expected.MaximumHeapMb == current.MaximumHeapMb) &&
                          expected.MaximumFps == current.MaximumFps &&
-                         string.Equals(expected.JavaArguments, current.JavaArguments, StringComparison.Ordinal) &&
+                         (!compareJavaMemory || string.Equals(expected.JavaArguments, current.JavaArguments, StringComparison.Ordinal)) &&
                          expectedChanges.SequenceEqual(currentChanges, StringComparer.OrdinalIgnoreCase);
         if (!equivalent)
         {
@@ -257,7 +260,12 @@ internal sealed partial class MinecraftProfileService
                 details.Add($"perfil {expected.Profile}->{current.Profile}");
             }
 
-            if (expected.MaximumHeapMb != current.MaximumHeapMb)
+            if (!string.Equals(expected.Experiment?.Id, current.Experiment?.Id, StringComparison.OrdinalIgnoreCase))
+            {
+                details.Add($"experimento {expected.Experiment?.Id ?? "nenhum"}->{current.Experiment?.Id ?? "nenhum"}");
+            }
+
+            if (compareJavaMemory && expected.MaximumHeapMb != current.MaximumHeapMb)
             {
                 details.Add($"heap {expected.MaximumHeapMb}->{current.MaximumHeapMb}");
             }
@@ -440,7 +448,10 @@ internal sealed partial class MinecraftProfileService
             $"Limite de FPS escolhido para homologacao: {fpsLimit}."
         };
 
-        var optionsMutation = BuildOptionsMutation(instance.OptionsPath, desiredOptions);
+        var optionsMutation = BuildOptionsMutation(
+            instance.OptionsPath,
+            desiredOptions,
+            profile.OnlyExistingOptions);
         mutations.Add(optionsMutation);
         changes.AddRange(optionsMutation.Changes);
 
@@ -462,22 +473,10 @@ internal sealed partial class MinecraftProfileService
             mutations,
             changes,
             messages);
-        messages.Add("Resource packs nao sao removidos automaticamente; desative packs pesados manualmente apos revisar requisitos do servidor.");
-        messages.Add("ImmediatelyFast hud_batching e preservado para nao reativar uma opcao desabilitada por compatibilidade.");
-        AddJsonMutation(
-            Path.Combine(instance.ConfigDirectory, "immediatelyfast.json"),
-            "ImmediatelyFast 1.6.11",
-            ImmediatelyFastSettings,
-            mutations,
-            changes,
-            messages);
-        AddJsonMutation(
-            Path.Combine(instance.ConfigDirectory, "entityculling.json"),
-            "EntityCulling 1.10.5",
-            EntityCullingSettings,
-            mutations,
-            changes,
-            messages);
+        messages.Add(profile.Kind == MinecraftProfileKind.PotatoCobblemon4Gb
+            ? "Resource packs locais ativos serao desmarcados somente se resourcePacks ja existir; nenhum pack sera excluido."
+            : "Resource packs nao sao removidos automaticamente; desative packs pesados manualmente apos revisar requisitos do servidor.");
+        messages.Add("ImmediatelyFast e EntityCulling permanecem nos defaults; use experimentos isolados e reverta diante de artefatos visuais.");
 
         var javaArgumentsPath = Path.Combine(instance.GameDirectory, JavaArgumentsFileName);
         var javaContent =
@@ -528,6 +527,126 @@ internal sealed partial class MinecraftProfileService
             changes,
             messages);
         return new ProfileOperation(plan, mutations);
+    }
+
+    private ProfileOperation BuildExperimentOperation(
+        string selectedPath,
+        MinecraftExperimentDefinition experiment)
+    {
+        MinecraftExtremeExperimentCatalog.Validate(experiment);
+        if (!instanceService.TryResolve(selectedPath, out var instance))
+        {
+            throw new InvalidOperationException("Experimento extremo exige uma instancia real com options.txt e pasta mods.");
+        }
+
+        var environment = environmentService.Capture();
+        var automaticMemory = MinecraftEnvironmentService.RecommendJavaMemory(
+            environment.TotalMemoryGb,
+            environment.AvailableMemoryGb);
+        var heapMb = experiment.HeapMb ?? automaticMemory.MaximumHeapMb;
+        var javaArguments = $"-Xms512M -Xmx{heapMb}M";
+        var fps = experiment.OptionValues.TryGetValue("maxFps", out var fpsValue) &&
+                  int.TryParse(fpsValue, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedFps)
+            ? parsedFps
+            : ReadCurrentIntegerOption(instance.OptionsPath, "maxFps", 30);
+        var mutations = new List<FileMutation>();
+        var changes = new List<MinecraftProfileSettingChange>();
+        var messages = new List<string>
+        {
+            "DRY-RUN cientifico: exatamente uma hipotese foi selecionada.",
+            $"Experimento: {experiment.DisplayName}.",
+            $"Efeito esperado: {experiment.ExpectedEffect}",
+            "Opcoes ausentes nao sao criadas; execute o Minecraft uma vez antes do experimento."
+        };
+
+        if (experiment.OptionValues.Count > 0)
+        {
+            var optionMutation = BuildOptionsMutation(
+                instance.OptionsPath,
+                experiment.OptionValues,
+                onlyExistingOptions: true);
+            mutations.Add(optionMutation);
+            changes.AddRange(optionMutation.Changes);
+        }
+
+        if (experiment.HeapMb is not null)
+        {
+            AddJavaMemoryMutations(
+                instance,
+                javaArguments,
+                $"Experimento isolado {experiment.DisplayName}",
+                fps,
+                mutations,
+                changes,
+                messages);
+        }
+
+        var plan = new MinecraftProfilePlan(
+            DateTimeOffset.UtcNow,
+            instance,
+            MinecraftProfileKind.PotatoCobblemon4Gb,
+            javaArguments,
+            heapMb,
+            fps,
+            experiment.HeapMb is null
+                ? automaticMemory.Reason
+                : $"Heap fixado pela hipotese {experiment.DisplayName}; manter somente apos benchmark.",
+            changes,
+            messages,
+            experiment);
+        return new ProfileOperation(plan, mutations);
+    }
+
+    private static void AddJavaMemoryMutations(
+        MinecraftInstanceDescriptor instance,
+        string javaArguments,
+        string label,
+        int fps,
+        ICollection<FileMutation> mutations,
+        ICollection<MinecraftProfileSettingChange> changes,
+        ICollection<string> messages)
+    {
+        var maximumHeapMb = ParseMaximumHeapMb(javaArguments);
+        var javaArgumentsPath = Path.Combine(instance.GameDirectory, JavaArgumentsFileName);
+        var content =
+            $"# ApexTweaker {label}\r\n" +
+            $"# Launcher detectado: {instance.Launcher}\r\n" +
+            $"# FPS observado: {fps} | Heap candidato: {maximumHeapMb} MB\r\n" +
+            "# Mantenha somente depois de comparar pagefile, OOM e stutter.\r\n" +
+            $"{javaArguments}\r\n";
+        var javaMutation = BuildWholeFileMutation(
+            javaArgumentsPath,
+            content,
+            MinecraftProfileChangeKind.GeneratedInstruction,
+            "JVM arguments",
+            "Hipotese isolada de heap com backup e rollback.");
+        mutations.Add(javaMutation);
+        foreach (var change in javaMutation.Changes)
+        {
+            changes.Add(change);
+        }
+
+        if (instance.LauncherConfigPath is not null &&
+            instance.Launcher is MinecraftLauncherKind.PrismLauncher or MinecraftLauncherKind.MultiMC)
+        {
+            var launcherMutation = BuildKeyValueMutation(
+                instance.LauncherConfigPath,
+                new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["OverrideMemory"] = "true",
+                    ["MinMemAlloc"] = "512",
+                    ["MaxMemAlloc"] = maximumHeapMb.ToString(CultureInfo.InvariantCulture)
+                });
+            mutations.Add(launcherMutation);
+            foreach (var change in launcherMutation.Changes)
+            {
+                changes.Add(change);
+            }
+        }
+        else
+        {
+            messages.Add($"{instance.Launcher}: aplique {javaArguments} manualmente e registre a confirmacao.");
+        }
     }
 
     private static void AddJsonMutation(
@@ -591,11 +710,16 @@ internal sealed partial class MinecraftProfileService
 
     private static FileMutation BuildOptionsMutation(
         string path,
-        IReadOnlyDictionary<string, string> desired)
+        IReadOnlyDictionary<string, string> desired,
+        bool onlyExistingOptions = false)
     {
         var existingLines = File.ReadAllLines(path);
         var current = ParseKeyValueLines(existingLines, ':');
-        var updated = BuildUpdatedKeyValueLines(existingLines, desired, ':');
+        var writable = onlyExistingOptions
+            ? desired.Where(item => current.ContainsKey(item.Key))
+                .ToDictionary(item => item.Key, item => item.Value, StringComparer.OrdinalIgnoreCase)
+            : new Dictionary<string, string>(desired, StringComparer.OrdinalIgnoreCase);
+        var updated = BuildUpdatedKeyValueLines(existingLines, writable, ':');
         var changes = desired
             .OrderBy(item => item.Key, StringComparer.OrdinalIgnoreCase)
             .Select(item => new MinecraftProfileSettingChange(
@@ -604,8 +728,10 @@ internal sealed partial class MinecraftProfileService
                 item.Key,
                 current.GetValueOrDefault(item.Key),
                 item.Value,
-                !HasOnlyDesiredValue(existingLines, item.Key, item.Value, ':'),
-                "Opcao vanilla reconhecida para o perfil selecionado."))
+                writable.ContainsKey(item.Key) && !HasOnlyDesiredValue(existingLines, item.Key, item.Value, ':'),
+                writable.ContainsKey(item.Key)
+                    ? "Opcao vanilla reconhecida para o perfil selecionado."
+                    : "Opcao ausente no options.txt; preservada sem inventar chave."))
             .ToArray();
         return new FileMutation(path, string.Join(Environment.NewLine, updated) + Environment.NewLine, changes);
     }
@@ -1052,8 +1178,19 @@ internal sealed partial class MinecraftProfileService
         int maximumFps,
         bool ambientOcclusion,
         int preferredHeapMb,
-        string description)
+        string description,
+        int width = 1280,
+        int height = 720,
+        bool onlyExistingOptions = false,
+        bool disableViewBobbing = false,
+        bool disableResourcePacks = false)
     {
+        if (renderDistance < MinecraftExtremeExperimentCatalog.MinimumRenderDistance ||
+            simulationDistance < MinecraftExtremeExperimentCatalog.MinimumSimulationDistance)
+        {
+            throw new InvalidOperationException("Perfil vanilla fora dos limites validados do Minecraft 1.21.1.");
+        }
+
         var options = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             ["ao"] = ambientOcclusion ? "true" : "false",
@@ -1062,20 +1199,37 @@ internal sealed partial class MinecraftProfileService
             ["enableVsync"] = "false",
             ["entityDistanceScaling"] = entityDistance,
             ["entityShadows"] = "false",
-            ["fovEffectScale"] = "0.50",
+            ["fovEffectScale"] = kind == MinecraftProfileKind.PotatoCobblemon4Gb ? "0.0" : "0.50",
             ["fullscreen"] = "false",
             ["graphicsMode"] = "0",
             ["maxFps"] = maximumFps.ToString(CultureInfo.InvariantCulture),
             ["mipmapLevels"] = mipmap.ToString(CultureInfo.InvariantCulture),
-            ["overrideHeight"] = "720",
-            ["overrideWidth"] = "1280",
+            ["overrideHeight"] = height.ToString(CultureInfo.InvariantCulture),
+            ["overrideWidth"] = width.ToString(CultureInfo.InvariantCulture),
             ["particles"] = particles.ToString(CultureInfo.InvariantCulture),
             ["renderDistance"] = renderDistance.ToString(CultureInfo.InvariantCulture),
-            ["screenEffectScale"] = "0.25",
+            ["screenEffectScale"] = kind == MinecraftProfileKind.PotatoCobblemon4Gb ? "0.0" : "0.25",
             ["simulationDistance"] = simulationDistance.ToString(CultureInfo.InvariantCulture)
         };
 
-        return new MinecraftProfileDefinition(kind, displayName, options, 2048, preferredHeapMb, description);
+        if (disableViewBobbing)
+        {
+            options["bobView"] = "false";
+        }
+
+        if (disableResourcePacks)
+        {
+            options["resourcePacks"] = "[]";
+        }
+
+        return new MinecraftProfileDefinition(
+            kind,
+            displayName,
+            options,
+            kind == MinecraftProfileKind.PotatoCobblemon4Gb ? 1792 : 2048,
+            preferredHeapMb,
+            description,
+            onlyExistingOptions);
     }
 
     private static int ParseMaximumHeapMb(string javaArguments)
@@ -1086,9 +1240,9 @@ internal sealed partial class MinecraftProfileService
 
     private static int ResolveMaximumFps(MinecraftProfileDefinition profile, int? requested)
     {
-        if (requested is not null && requested is not (30 or 45 or 60))
+        if (requested is not null && requested is not (20 or 24 or 30 or 45 or 60))
         {
-            throw new ArgumentOutOfRangeException(nameof(requested), "Use limite de FPS 30, 45 ou 60.");
+            throw new ArgumentOutOfRangeException(nameof(requested), "Use limite de FPS 20, 24, 30, 45 ou 60.");
         }
 
         if (requested is not null)
@@ -1099,6 +1253,15 @@ internal sealed partial class MinecraftProfileService
         return int.TryParse(profile.Options["maxFps"], NumberStyles.Integer, CultureInfo.InvariantCulture, out var value)
             ? value
             : 45;
+    }
+
+    private static int ReadCurrentIntegerOption(string path, string key, int fallback)
+    {
+        var options = ParseKeyValueLines(File.ReadAllLines(path), ':');
+        return options.TryGetValue(key, out var raw) &&
+               int.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value)
+            ? value
+            : fallback;
     }
 
     private static void AtomicWriteAllText(string path, string content)

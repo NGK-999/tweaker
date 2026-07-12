@@ -177,6 +177,7 @@ public partial class MainWindow : Window
             minecraftView.ApplyQuarantineRequested += ApplyMinecraftQuarantineAsync;
             minecraftView.RollbackQuarantineRequested += RollbackMinecraftQuarantineAsync;
             minecraftView.BenchmarkRequested += RunMinecraftBenchmarkAsync;
+            minecraftView.CancelBenchmarkRequested += CancelMinecraftBenchmark;
             minecraftView.ExportChecklistRequested += ExportMinecraftOperationalChecklistAsync;
             minecraftView.SaveHomologationRequested += SaveMinecraftOperationalHomologationAsync;
             minecraftView.ScientificPlanRequested += RunMinecraftScientificPlanAsync;
@@ -816,8 +817,15 @@ public partial class MainWindow : Window
 
     private async Task RollbackMinecraftProfileAsync(string path)
     {
+        var activeExperiment = latestMinecraftScientificExperiment;
+        var cancelScientific = activeExperiment is not null &&
+                               activeExperiment.Phase is not ScientificExperimentPhase.Kept and
+                                   not ScientificExperimentPhase.Reverted &&
+                               !string.IsNullOrWhiteSpace(activeExperiment.AppliedProfileBackupId);
         if (System.Windows.MessageBox.Show(
-                "Restaurar o ultimo backup de configuracao Minecraft desta instancia?",
+                cancelScientific
+                    ? "Cancelar o experimento ativo e restaurar exatamente o backup do candidato?"
+                    : "Restaurar o ultimo backup de configuracao Minecraft desta instancia?",
                 "Rollback Minecraft",
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Question) != MessageBoxResult.Yes)
@@ -836,12 +844,26 @@ public partial class MainWindow : Window
 
         try
         {
-            var result = await Task.Run(() => minecraftProfileService.RollbackLatest(path));
-            WriteLines(result.Messages);
-            Minecraft.SetOperationText($"Rollback concluido: {result.BackupId}");
+            if (cancelScientific)
+            {
+                var cancelled = await Task.Run(() => minecraftScientificExperimentService.Cancel(
+                    activeExperiment!.ExperimentId,
+                    rollbackConfirmed: true));
+                latestMinecraftScientificExperiment = cancelled.Experiment;
+                WriteLines(cancelled.Messages);
+                Minecraft.SetScientificExperiment(cancelled.Experiment, cancelled.Reports.MarkdownPath);
+                Minecraft.SetOperationText("Experimento cancelado e candidato restaurado pelo backup exato.");
+            }
+            else
+            {
+                var result = await Task.Run(() => minecraftProfileService.RollbackLatest(path));
+                WriteLines(result.Messages);
+                Minecraft.SetOperationText($"Rollback concluido: {result.BackupId}");
+                InvalidateMinecraftScientificState("Experimento invalidado: ocorreu rollback externo de perfil.");
+            }
+
             latestMinecraftProfilePlan = null;
             latestMinecraftBenchmarkResult = null;
-            InvalidateMinecraftScientificState("Experimento invalidado: ocorreu rollback externo de perfil.");
             SetStatus("Minecraft: configuracao anterior restaurada.");
         }
         catch (Exception ex)
@@ -1010,8 +1032,10 @@ public partial class MainWindow : Window
         {
             minecraftBenchmarkCancellation?.Dispose();
             minecraftBenchmarkCancellation = new CancellationTokenSource();
+            Minecraft.BeginBenchmark();
             var progress = new Progress<MinecraftBenchmarkSample>(sample =>
             {
+                Minecraft.AddBenchmarkSample(sample);
                 Minecraft.SetOperationText(
                     $"Benchmark: RAM Java {sample.WorkingSetBytes / 1024d / 1024d:0} MB | " +
                     $"RAM livre {sample.AvailableMemoryGb:0.00} GB | CPU {sample.CpuPercent:0.0}%");
@@ -1025,6 +1049,7 @@ public partial class MainWindow : Window
                 TimeSpan.FromSeconds(15));
             var result = await minecraftBenchmarkTask;
             latestMinecraftBenchmarkResult = result;
+            Minecraft.CompleteBenchmark(result);
             var reportPath = await Task.Run(() => minecraftReportService.WriteBenchmark(result));
             WriteLine($"Status: {result.Status}");
             WriteLine($"Pico de RAM Java: {result.PeakWorkingSetBytes / 1024d / 1024d:0} MB");
@@ -1046,12 +1071,14 @@ public partial class MainWindow : Window
         }
         catch (OperationCanceledException)
         {
+            Minecraft.CompleteBenchmark(null, cancelled: true);
             WriteLine("Benchmark Minecraft cancelado.");
             Minecraft.SetOperationText("Benchmark cancelado sem alterar a instancia.");
             SetStatus("Minecraft: benchmark cancelado.");
         }
         catch (Exception ex)
         {
+            Minecraft.CompleteBenchmark(null);
             WriteLine($"Benchmark Minecraft indisponivel: {ex.Message}");
             Minecraft.SetOperationText($"Benchmark nao iniciado: {ex.Message}");
             SetStatus("Minecraft: abra o jogo e tente o benchmark novamente.");
@@ -1063,6 +1090,17 @@ public partial class MainWindow : Window
             minecraftBenchmarkCancellation = null;
             EndTweaking();
         }
+    }
+
+    private void CancelMinecraftBenchmark()
+    {
+        if (minecraftBenchmarkCancellation is null)
+        {
+            return;
+        }
+
+        Minecraft.SetOperationText("Cancelamento solicitado; aguardando encerramento seguro da amostragem...");
+        minecraftBenchmarkCancellation.Cancel();
     }
 
     private async Task ExportMinecraftOperationalChecklistAsync(string selectedPath, int maximumFps)
@@ -1158,7 +1196,10 @@ public partial class MainWindow : Window
         }
     }
 
-    private async Task RunMinecraftScientificPlanAsync(string selectedPath, int maximumFps)
+    private async Task RunMinecraftScientificPlanAsync(
+        string selectedPath,
+        int maximumFps,
+        string? customExperimentId)
     {
         const string section = "Diagnostico cientifico Minecraft";
         if (!TryBeginTweaking(section))
@@ -1168,9 +1209,9 @@ public partial class MainWindow : Window
 
         try
         {
-            var result = await Task.Run(() => minecraftScientificExperimentService.Plan(
-                selectedPath,
-                maximumFps));
+            var result = await Task.Run(() => customExperimentId is null
+                ? minecraftScientificExperimentService.Plan(selectedPath, maximumFps)
+                : minecraftScientificExperimentService.PlanCustom(selectedPath, customExperimentId));
             Minecraft.SetScientificPlan(result.Plan, result.Reports.MarkdownPath);
             WriteLine($"Gargalo principal: {result.Plan.Diagnosis.Primary} ({result.Plan.Diagnosis.Confidence})");
             WriteLine($"Perfil candidato: {result.Plan.SelectedProfile} | {result.Plan.JavaMemory.Arguments} | {result.Plan.MaximumFps} FPS");
@@ -1188,7 +1229,10 @@ public partial class MainWindow : Window
         }
     }
 
-    private async Task StartMinecraftScientificExperimentAsync(string selectedPath, int maximumFps)
+    private async Task StartMinecraftScientificExperimentAsync(
+        string selectedPath,
+        int maximumFps,
+        string? customExperimentId)
     {
         const string section = "Novo experimento cientifico Minecraft";
         if (!TryBeginTweaking(section))
@@ -1198,9 +1242,9 @@ public partial class MainWindow : Window
 
         try
         {
-            var result = await Task.Run(() => minecraftScientificExperimentService.StartGuided(
-                selectedPath,
-                maximumFps));
+            var result = await Task.Run(() => customExperimentId is null
+                ? minecraftScientificExperimentService.StartGuided(selectedPath, maximumFps)
+                : minecraftScientificExperimentService.StartCustom(selectedPath, customExperimentId));
             latestMinecraftScientificExperiment = result.Experiment;
             latestMinecraftBenchmarkResult = null;
             Minecraft.ClearOperationalObservation();

@@ -231,13 +231,13 @@ internal sealed class MinecraftBottleneckDiagnosticService
         {
             MinecraftBottleneckKind.RamLimited =>
             [
-                "Use RAM_LIMITED: render/simulation 4, 720p, FPS 30 e Xmx2048M como baseline.",
+                "Use RAM_LIMITED: render 4/simulation 5, 720p, FPS 30 e Xmx2048M como baseline.",
                 "Teste sem mods visuais client-only, um por vez e sempre com rollback.",
                 "Mantenha o pagefile ativo; 8 GB em dual-channel continua sendo o upgrade prioritario."
             ],
             MinecraftBottleneckKind.CpuLimited =>
             [
-                "Use CPU_LIMITED: simulation 4, distancia de entidades baixa e limite de 30 FPS.",
+                "Use CPU_LIMITED: simulation 5, distancia de entidades baixa e limite de 30 FPS.",
                 "Mantenha Lithium e investigue mods de IA, entidades e animacoes.",
                 "Compare CPU media e pico na mesma cena."
             ],
@@ -268,6 +268,7 @@ internal sealed class MinecraftBottleneckDiagnosticService
             MinecraftBottleneckKind.PageFilePressure =>
             [
                 "Reduza heap e mods visuais; mantenha pagefile gerenciado pelo Windows em SSD.",
+                "Teste Xmx1792M isoladamente contra 2048M; mantenha somente se pagefile e stutter diminuirem.",
                 "Use FPS 30 e repita a mesma cena.",
                 "Upgrade para 8 GB e a correcao estrutural."
             ],

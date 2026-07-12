@@ -6,6 +6,7 @@ using System.Text.Json;
 using ApexTweaker.Minecraft.Models;
 using ApexTweaker.Minecraft.Services;
 using ApexTweaker.Services;
+using ApexTweaker.UI.Wpf.ViewModels;
 using ApexTweaker.UI.Wpf.Views;
 
 namespace ApexTweaker.Minecraft;
@@ -38,6 +39,40 @@ internal static class MinecraftSelfTest
                    new MinecraftScientificExperimentStore().Root == ApplicationPaths.MinecraftExperiments,
                 "Um servico Minecraft ainda depende de ProgramData por padrao.");
             messages.Add("PASS: Minecraft usa privilegio minimo e dados em LocalAppData.");
+
+            var wizard = new MinecraftWizardViewModel();
+            Assert(wizard.Steps.Count == 10 && wizard.CurrentStepIndex == 0 && wizard.OverallProgress == 0,
+                "Wizard nao iniciou com dez etapas no objetivo.");
+            wizard.NextCommand.Execute(null);
+            Assert(wizard.CurrentStepIndex == 1 && wizard.OverallProgress > 0,
+                "Navegacao Proximo do wizard nao avancou o progresso.");
+            wizard.BackCommand.Execute(null);
+            Assert(wizard.CurrentStepIndex == 0, "Navegacao Voltar do wizard falhou.");
+            wizard.ToggleModeCommand.Execute(null);
+            Assert(wizard.IsAdvancedMode && wizard.ModeLabel == "Modo avancado",
+                "Alternancia simples/avancado nao atualizou o ViewModel.");
+            var cancelRequested = false;
+            wizard.CancelRequested += () => cancelRequested = true;
+            wizard.BeginBenchmark();
+            wizard.AddBenchmarkSample(new MinecraftBenchmarkSample(
+                DateTimeOffset.UtcNow,
+                1024L * 1024L * 1024L,
+                1200L * 1024L * 1024L,
+                0.75m,
+                45d,
+                1024,
+                2048,
+                3300));
+            wizard.CancelCommand.Execute(null);
+            wizard.CompleteBenchmark(null, cancelled: true);
+            Assert(cancelRequested && !wizard.IsBenchmarkRunning && wizard.BenchmarkPoints.Count == 1,
+                "Cancelamento seguro ou serie visual do benchmark falhou.");
+            Assert(wizard.VisualStates.Select(state => state.Label).Contains("Medido") &&
+                   wizard.VisualStates.Select(state => state.Label).Contains("Inferido") &&
+                   wizard.VisualStates.Select(state => state.Label).Contains("Manual") &&
+                   wizard.VisualStates.Select(state => state.Label).Contains("Inconclusivo"),
+                "Legenda visual nao separou as fontes e estados obrigatorios.");
+            messages.Add("PASS: wizard MVVM cobre navegacao, progresso, modos, estados e cancelamento.");
 
             var modsDirectory = Path.Combine(root, "audit", "mods");
             Directory.CreateDirectory(modsDirectory);
@@ -129,7 +164,27 @@ internal static class MinecraftSelfTest
                 new Dictionary<string, string>());
             Directory.CreateDirectory(Path.Combine(instanceRoot, "config"));
             var optionsPath = Path.Combine(instanceRoot, "options.txt");
-            const string originalOptions = "renderDistance:12\nsimulationDistance:12\nmaxFps:120\ncustomOption:keep\n";
+            const string originalOptions =
+                "renderDistance:12\n" +
+                "simulationDistance:12\n" +
+                "maxFps:120\n" +
+                "ao:true\n" +
+                "biomeBlendRadius:5\n" +
+                "clouds:true\n" +
+                "enableVsync:true\n" +
+                "entityDistanceScaling:1.0\n" +
+                "entityShadows:true\n" +
+                "fovEffectScale:1.0\n" +
+                "fullscreen:true\n" +
+                "graphicsMode:1\n" +
+                "mipmapLevels:4\n" +
+                "overrideHeight:1080\n" +
+                "overrideWidth:1920\n" +
+                "particles:0\n" +
+                "screenEffectScale:1.0\n" +
+                "bobView:true\n" +
+                "resourcePacks:[\"vanilla\",\"file/heavy.zip\"]\n" +
+                "customOption:keep\n";
             File.WriteAllText(optionsPath, originalOptions, new UTF8Encoding(false));
 
             var sodiumPath = Path.Combine(instanceRoot, "config", "sodium-options.json");
@@ -180,24 +235,35 @@ internal static class MinecraftSelfTest
             Assert(File.ReadAllText(sodiumPath) == originalSodium, "O dry-run alterou Sodium.");
             Assert(File.ReadAllText(instanceConfigPath).Replace("\r\n", "\n") == originalInstanceConfig,
                 "O dry-run alterou instance.cfg.");
+            File.WriteAllText(sodiumPath, "{json-invalido", new UTF8Encoding(false));
+            var invalidSodiumPlan = profileService.PlanProfile(managedRoot, MinecraftProfileKind.Extreme4Gb, 30);
+            Assert(!invalidSodiumPlan.Changes.Any(change =>
+                    change.Kind == MinecraftProfileChangeKind.JsonConfig &&
+                    string.Equals(change.FilePath, sodiumPath, StringComparison.OrdinalIgnoreCase)),
+                "Perfil planejou editar Sodium sem JSON validado.");
+            File.WriteAllText(sodiumPath, originalSodium, new UTF8Encoding(false));
             Assert(profileService.PlanProfile(managedRoot, MinecraftProfileKind.Extreme4Gb, 45).MaximumFps == 45,
                 "O perfil nao aceitou 45 FPS.");
             Assert(profileService.PlanProfile(managedRoot, MinecraftProfileKind.Extreme4Gb, 60).MaximumFps == 60,
                 "O perfil nao aceitou 60 FPS.");
+            Assert(profileService.PlanProfile(managedRoot, MinecraftProfileKind.PotatoCobblemon4Gb, 20).MaximumFps == 20 &&
+                   profileService.PlanProfile(managedRoot, MinecraftProfileKind.PotatoCobblemon4Gb, 24).MaximumFps == 24,
+                "POTATO nao aceitou os caps extremos de 20/24 FPS.");
             Assert(MinecraftProfileService.AvailableProfiles.Any(profile => profile.Kind == MinecraftProfileKind.RamLimited) &&
                    MinecraftProfileService.AvailableProfiles.Any(profile => profile.Kind == MinecraftProfileKind.CpuLimited) &&
                    MinecraftProfileService.AvailableProfiles.Any(profile => profile.Kind == MinecraftProfileKind.GpuLimited) &&
-                   MinecraftProfileService.AvailableProfiles.Any(profile => profile.Kind == MinecraftProfileKind.ServerEntryCompatible),
+                   MinecraftProfileService.AvailableProfiles.Any(profile => profile.Kind == MinecraftProfileKind.ServerEntryCompatible) &&
+                   MinecraftProfileService.AvailableProfiles.Any(profile => profile.Kind == MinecraftProfileKind.PotatoCobblemon4Gb),
                 "Os perfis cientificos por gargalo nao foram registrados.");
             AssertThrows<ArgumentOutOfRangeException>(
                 () => profileService.PlanProfile(managedRoot, MinecraftProfileKind.Extreme4Gb, 50),
-                "O perfil aceitou um limite fora de 30/45/60 FPS.");
+                "O perfil aceitou um limite fora de 20/24/30/45/60 FPS.");
             messages.Add("PASS: dry-run planeja options, JSONs, Iris, FPS e Prism sem escrever.");
 
             var applied = profileService.ApplyProfile(managedRoot, MinecraftProfileKind.Extreme4Gb, 30);
             var changedOptions = File.ReadAllText(optionsPath);
             Assert(changedOptions.Contains("renderDistance:4", StringComparison.Ordinal), "Render distance nao foi aplicada.");
-            Assert(changedOptions.Contains("simulationDistance:4", StringComparison.Ordinal), "Simulation distance nao foi aplicada.");
+            Assert(changedOptions.Contains("simulationDistance:5", StringComparison.Ordinal), "Simulation distance valida nao foi aplicada.");
             Assert(changedOptions.Contains("maxFps:30", StringComparison.Ordinal), "O limite selecionado de 30 FPS nao foi aplicado.");
             Assert(changedOptions.Contains("customOption:keep", StringComparison.Ordinal), "Opcao desconhecida foi perdida.");
             Assert(Directory.Exists(applied.BackupDirectory), "Backup nao foi criado.");
@@ -215,6 +281,11 @@ internal static class MinecraftSelfTest
                 Assert(!immediatelyFast.RootElement.GetProperty("experimental_screen_batching").GetBoolean(),
                     "Opcao experimental do ImmediatelyFast foi alterada.");
             }
+
+            Assert(File.ReadAllText(immediatelyFastPath) == originalImmediatelyFast,
+                "Perfil completo alterou defaults do ImmediatelyFast fora de experimento isolado.");
+            Assert(File.ReadAllText(entityCullingPath) == originalEntityCulling,
+                "Perfil completo alterou defaults do EntityCulling fora de diagnostico visual.");
 
             Assert(File.ReadAllText(instanceConfigPath).Contains("OverrideMemory=true", StringComparison.Ordinal),
                 "Override de memoria do Prism nao foi ativado.");
@@ -240,6 +311,72 @@ internal static class MinecraftSelfTest
             Assert(!File.Exists(Path.Combine(instanceRoot, "apextweaker-java-args.txt")),
                 "Rollback nao removeu o arquivo criado pelo proprio ApexTweaker.");
             messages.Add("PASS: rollback restaura options, JSONs e launcher e remove somente o arquivo gerado.");
+
+            var potatoPlan = profileService.PlanProfile(
+                managedRoot,
+                MinecraftProfileKind.PotatoCobblemon4Gb);
+            Assert(potatoPlan.MaximumFps == 24 &&
+                   potatoPlan.MaximumHeapMb == 2048 &&
+                   potatoPlan.Changes.Any(change => change.Setting == "renderDistance" && change.After == "2") &&
+                   potatoPlan.Changes.Any(change => change.Setting == "simulationDistance" && change.After == "5") &&
+                   potatoPlan.Changes.Any(change => change.Setting == "overrideWidth" && change.After == "960") &&
+                   potatoPlan.Changes.Any(change => change.Setting == "overrideHeight" && change.After == "540"),
+                "POTATO_COBBLEMON_4GB nao gerou o preset 960x540/2/5/24/2048 esperado.");
+            var potatoApplied = profileService.ApplyProfile(
+                managedRoot,
+                MinecraftProfileKind.PotatoCobblemon4Gb);
+            var potatoOptions = File.ReadAllText(optionsPath);
+            Assert(potatoOptions.Contains("entityDistanceScaling:0.30", StringComparison.Ordinal) &&
+                   potatoOptions.Contains("bobView:false", StringComparison.Ordinal) &&
+                   potatoOptions.Contains("resourcePacks:[]", StringComparison.Ordinal) &&
+                   potatoOptions.Contains("screenEffectScale:0.0", StringComparison.Ordinal),
+                "POTATO nao aplicou as opcoes extremas existentes.");
+            Assert(File.ReadAllText(immediatelyFastPath) == originalImmediatelyFast &&
+                   File.ReadAllText(entityCullingPath) == originalEntityCulling,
+                "POTATO alterou configs de mods que deveriam permanecer nos defaults.");
+            _ = profileService.RollbackBackup(managedRoot, potatoApplied.BackupId);
+            Assert(File.ReadAllText(optionsPath).Replace("\r\n", "\n") == originalOptions,
+                "Rollback do POTATO nao restaurou options.txt byte a byte.");
+
+            var resolutionExperiment = profileService.PlanExperiment(managedRoot, "resolution-854x480");
+            var resolutionChanges = resolutionExperiment.Changes.Where(change => change.WillWrite).ToArray();
+            Assert(resolutionExperiment.Experiment?.Variable == MinecraftExperimentVariable.Resolution &&
+                   resolutionChanges.Length == 2 &&
+                   resolutionChanges.All(change => change.Setting is "overrideWidth" or "overrideHeight"),
+                "Experimento de resolucao alterou mais de uma variavel independente.");
+            var heapExperiment = profileService.PlanExperiment(managedRoot, "heap-1792");
+            Assert(heapExperiment.MaximumHeapMb == 1792 &&
+                   heapExperiment.JavaArguments == "-Xms512M -Xmx1792M" &&
+                   heapExperiment.Changes.Any(change => change.Setting == "MaxMemAlloc" && change.After == "1792"),
+                "Experimento de heap 1792 MB nao foi planejado para Prism.");
+            foreach (var heap in new[] { 2048, 2304, 2560 })
+            {
+                var heapPlan = profileService.PlanExperiment(managedRoot, $"heap-{heap}");
+                Assert(heapPlan.MaximumHeapMb == heap &&
+                       heapPlan.JavaArguments == $"-Xms512M -Xmx{heap}M",
+                    $"Experimento de heap {heap} MB nao preservou o valor isolado.");
+            }
+            var fpsCatalog = MinecraftProfileService.AvailableExperiments
+                .Where(experiment => experiment.Variable == MinecraftExperimentVariable.FpsCap)
+                .Select(experiment => experiment.OptionValues["maxFps"])
+                .ToHashSet(StringComparer.Ordinal);
+            Assert(new[] { "20", "24", "30", "45", "60" }.All(fpsCatalog.Contains),
+                "Catalogo nao cobre todos os FPS caps permitidos.");
+            AssertThrows<InvalidOperationException>(
+                () => MinecraftExtremeExperimentCatalog.Validate(new MinecraftExperimentDefinition(
+                    "invalid-simulation",
+                    "Simulation distance",
+                    "4 chunks",
+                    MinecraftExperimentVariable.SimulationDistance,
+                    new Dictionary<string, string> { ["simulationDistance"] = "4" },
+                    null,
+                    "invalido",
+                    "invalido")),
+                "Catalogo aceitou simulation distance abaixo do minimo validado.");
+            var resourcePackEvidence = new MinecraftInstanceEvidenceService().Capture(managedRoot);
+            Assert(resourcePackEvidence.ActiveResourcePacks.Contains("file/heavy.zip", StringComparer.Ordinal),
+                "Resource pack ativo nao foi detectado no options.txt.");
+            messages.Add("PASS: POTATO e experimentos extremos respeitam limites, defaults e rollback.");
 
             var legacyProfileRoot = Path.Combine(root, "legacy-profile-backups");
             var legacyDirectory = Path.Combine(legacyProfileRoot, "legacy-v21");
@@ -513,6 +650,34 @@ internal static class MinecraftSelfTest
             Assert(File.ReadAllText(optionsPath).Replace("\r\n", "\n") == originalOptions,
                 "Limpeza do teste INSUFFICIENT_DATA nao restaurou options.txt.");
 
+            var customStarted = scientificService.StartCustom(managedRoot, "resolution-854x480");
+            Assert(customStarted.Experiment.Hypothesis.Kind == ScientificHypothesisKind.Custom &&
+                   customStarted.Experiment.OptimizationPlan.ProfilePlan.Experiment?.Id == "resolution-854x480",
+                "Experimento customizado nao persistiu hipotese e variavel independente.");
+            _ = scientificService.RecordMeasurement(
+                customStarted.Experiment.ExperimentId,
+                ScientificMeasurementKind.Baseline,
+                baselineObservation,
+                baselineBenchmark);
+            var customApplied = scientificService.ApplyCandidate(
+                customStarted.Experiment.ExperimentId,
+                userConfirmed: true);
+            var customOptions = File.ReadAllText(optionsPath);
+            Assert(customOptions.Contains("overrideWidth:854", StringComparison.Ordinal) &&
+                   customOptions.Contains("overrideHeight:480", StringComparison.Ordinal) &&
+                   customOptions.Contains("renderDistance:12", StringComparison.Ordinal) &&
+                   File.ReadAllText(sodiumPath) == originalSodium,
+                "Candidato de resolucao alterou configuracao fora da hipotese.");
+            var customCancelled = scientificService.Cancel(
+                customStarted.Experiment.ExperimentId,
+                rollbackConfirmed: true);
+            Assert(customCancelled.Experiment.Phase == ScientificExperimentPhase.Reverted &&
+                   File.ReadAllText(optionsPath).Replace("\r\n", "\n") == originalOptions,
+                "Cancelamento cientifico nao restaurou o baseline exato.");
+            Assert(customApplied.Experiment.AppliedProfileBackupId is not null,
+                "Candidato customizado nao registrou backup para cancelamento.");
+            messages.Add("PASS: experimento isolado altera somente a hipotese e cancela com rollback exato.");
+
             var metricsService = new MinecraftScientificMetricsService();
             var comparisonService = new MinecraftScientificComparisonService();
             var stableMetrics = metricsService.Build(baselineObservation, baselineBenchmark);
@@ -606,7 +771,8 @@ internal static class MinecraftSelfTest
             Assert(benchmarkMarkdown.Contains("FPS automatico: `NAO DISPONIVEL`", StringComparison.Ordinal) &&
                    benchmarkMarkdown.Contains("Metricas coletadas automaticamente", StringComparison.Ordinal) &&
                    benchmarkMarkdown.Contains("Metricas informadas pelo usuario", StringComparison.Ordinal) &&
-                   benchmarkMarkdown.Contains("Metricas estimadas ou inferidas", StringComparison.Ordinal),
+                   benchmarkMarkdown.Contains("Metricas estimadas ou inferidas", StringComparison.Ordinal) &&
+                   benchmarkMarkdown.Contains("Pico de commit do Windows", StringComparison.Ordinal),
                 "Relatorio de benchmark nao separou fontes ou declarou FPS indisponivel.");
             messages.Add("PASS: benchmark separa fontes e nunca inventa FPS.");
 
@@ -674,7 +840,8 @@ internal static class MinecraftSelfTest
                 minimumAvailableGb + (index % 2) * 0.05m,
                 averageCpu,
                 index * 4L * 1024L * 1024L,
-                index * 1L * 1024L * 1024L))
+                index * 1L * 1024L * 1024L,
+                3072 + index))
             .ToArray();
         return new MinecraftBenchmarkResult(
             started,

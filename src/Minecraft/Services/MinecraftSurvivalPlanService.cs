@@ -63,10 +63,10 @@ internal sealed class MinecraftSurvivalPlanService
             quarantineCandidates,
             [
                 "Resolucao 1280x720",
-                "Render distance 4 / simulation distance 4",
+                "Render distance 4 / simulation distance 5",
                 "Graficos rapidos, nuvens e sombras de entidades desligadas",
                 "Particulas minimas, biome blend 0, mipmap 0",
-                "VSync desligado e limite inicial de 45 FPS",
+                "VSync desligado e limite inicial de 30 FPS",
                 "Shaders e resource packs pesados desativados"
             ],
             risks,

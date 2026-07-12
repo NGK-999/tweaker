@@ -1,6 +1,6 @@
 param(
     [string]$ExePath = (Join-Path (Split-Path -Parent $PSScriptRoot) 'release-v2\ApexTweaker.exe'),
-    [string]$ExpectedVersion = '3.0.1'
+    [string]$ExpectedVersion = '3.1.0'
 )
 
 $ErrorActionPreference = 'Stop'
