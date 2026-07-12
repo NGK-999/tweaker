@@ -11,7 +11,7 @@ Pasta: `release-v2/`
 
 O cliente nao precisa instalar .NET. Target: **Windows 10/11 64-bit**.
 
-Versao atual: **2.0.1**.
+Versao atual: **2.1.0**.
 
 ## Como gerar o portatil
 

@@ -12,6 +12,9 @@ using WpfButton = System.Windows.Controls.Button;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
+using Microsoft.Win32;
+using ApexTweaker.Minecraft.Models;
+using ApexTweaker.Minecraft.Services;
 using ApexTweaker.UI.Wpf.Animations;
 using ApexTweaker.UI.Wpf.Views;
 using ApexTweaker;
@@ -26,6 +29,7 @@ public partial class MainWindow : Window
     private const string DashboardPageKey = "Dashboard";
     private const string ModulesPageKey = "Modules";
     private const string TelemetryPageKey = "Telemetry";
+    private const string MinecraftPageKey = "Minecraft";
     private const string UtilitiesPageKey = "Utilities";
 
     private readonly SystemDiagnosticsService diagnosticsService = new();
@@ -35,14 +39,21 @@ public partial class MainWindow : Window
     private readonly MasterRollbackService masterRollbackService = new();
     private readonly OptimizationEngine optimizationEngine = new();
     private readonly HardwareTelemetryService hardwareTelemetryService = new();
+    private readonly MinecraftAuditService minecraftAuditService = new();
+    private readonly MinecraftProfileService minecraftProfileService = new();
+    private readonly MinecraftReportService minecraftReportService = new();
+    private readonly MinecraftBenchmarkService minecraftBenchmarkService = new();
     private readonly EtwFrameTracker etwFrameTracker;
     private DashboardView? dashboardView;
     private ModulesView? modulesView;
     private TelemetryView? telemetryView;
+    private MinecraftView? minecraftView;
     private UtilitiesView? utilitiesView;
     private readonly Dictionary<string, Func<FrameworkElement>> pageFactories = new(StringComparer.OrdinalIgnoreCase);
     private readonly List<string> consoleLines = [];
     private CancellationTokenSource? transitionCancellation;
+    private CancellationTokenSource? minecraftBenchmarkCancellation;
+    private Task<MinecraftBenchmarkResult>? minecraftBenchmarkTask;
     private bool isTweaking;
     private bool telemetryRunning;
     private bool baselineCaptured;
@@ -61,6 +72,7 @@ public partial class MainWindow : Window
         pageFactories[DashboardPageKey] = () => Dashboard;
         pageFactories[ModulesPageKey] = () => Modules;
         pageFactories[TelemetryPageKey] = () => Telemetry;
+        pageFactories[MinecraftPageKey] = () => Minecraft;
         pageFactories[UtilitiesPageKey] = () => Utilities;
 
         WireRuntimeEvents();
@@ -131,6 +143,37 @@ public partial class MainWindow : Window
             utilitiesView.AboutRequested += ShowAbout;
             utilitiesView.RiotSupportRequested += OpenRiotSupport;
             return utilitiesView;
+        }
+    }
+
+    private MinecraftView Minecraft
+    {
+        get
+        {
+            if (minecraftView is not null)
+            {
+                return minecraftView;
+            }
+
+            minecraftView = new MinecraftView();
+            minecraftView.BrowseRequested += BrowseMinecraftFolder;
+            minecraftView.AuditRequested += RunMinecraftAuditAsync;
+            minecraftView.ApplyProfileRequested += ApplyMinecraftProfileAsync;
+            minecraftView.RollbackRequested += RollbackMinecraftProfileAsync;
+            minecraftView.BenchmarkRequested += RunMinecraftBenchmarkAsync;
+            minecraftView.OpenReportsRequested += OpenMinecraftReports;
+
+            var defaultModsPath = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                "Downloads",
+                "mods",
+                "mods");
+            if (Directory.Exists(defaultModsPath))
+            {
+                minecraftView.SetSelectedPath(defaultModsPath);
+            }
+
+            return minecraftView;
         }
     }
 
@@ -307,8 +350,17 @@ public partial class MainWindow : Window
             DashboardPageKey => "Dashboard",
             ModulesPageKey => "M\u00F3dulos",
             TelemetryPageKey => "Telemetria",
+            MinecraftPageKey => "Cobblemon",
             UtilitiesPageKey => "Utilidades",
             _ => AppInfo.Name
+        };
+        HeaderSubtitleText.Text = pageKey switch
+        {
+            MinecraftPageKey => "Auditoria de mods, perfis reversiveis e benchmark low-end",
+            TelemetryPageKey => "Frametime, sensores e comparacao antes/depois",
+            ModulesPageKey => "Ajustes individuais com snapshot e verificacao",
+            UtilitiesPageKey => "Rollback, suporte e manutencao",
+            _ => "Performance, telemetria e rollback transacional"
         };
 
         try
@@ -341,7 +393,7 @@ public partial class MainWindow : Window
 
     private void SetActiveNav(WpfButton selectedButton)
     {
-        foreach (var button in new[] { DashboardButton, ModulesButton, TelemetryButton, UtilitiesButton })
+        foreach (var button in new[] { DashboardButton, ModulesButton, TelemetryButton, MinecraftButton, UtilitiesButton })
         {
             button.Tag = ReferenceEquals(button, selectedButton) ? "Active" : null;
         }
@@ -360,6 +412,7 @@ public partial class MainWindow : Window
         modulesView?.SetBusy(true);
         utilitiesView?.SetBusy(true);
         telemetryView?.SetBusy(true);
+        minecraftView?.SetBusy(true);
         return true;
     }
 
@@ -370,6 +423,7 @@ public partial class MainWindow : Window
         modulesView?.SetBusy(false);
         utilitiesView?.SetBusy(false);
         telemetryView?.SetBusy(false);
+        minecraftView?.SetBusy(false);
         Dashboard.SetAutoOptimizeIdle(optimizationEngine.CheckIfAlreadyOptimized());
     }
 
@@ -533,6 +587,231 @@ public partial class MainWindow : Window
         finally
         {
             EndTweaking();
+        }
+    }
+
+    private void BrowseMinecraftFolder()
+    {
+        var dialog = new OpenFolderDialog
+        {
+            Title = "Selecione a pasta mods ou a raiz da instancia Minecraft",
+            Multiselect = false
+        };
+
+        if (Directory.Exists(Minecraft.SelectedPath))
+        {
+            dialog.InitialDirectory = Minecraft.SelectedPath;
+        }
+
+        if (dialog.ShowDialog(this) == true)
+        {
+            Minecraft.SetSelectedPath(dialog.FolderName);
+            SetStatus("Pasta Minecraft selecionada. Execute a auditoria antes de aplicar um perfil.");
+        }
+    }
+
+    private async Task RunMinecraftAuditAsync(string path)
+    {
+        if (!Directory.Exists(path))
+        {
+            System.Windows.MessageBox.Show(
+                "Selecione uma pasta existente com arquivos .jar.",
+                "Auditoria Cobblemon",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return;
+        }
+
+        const string section = "Auditoria Cobblemon";
+        if (!TryBeginTweaking(section))
+        {
+            return;
+        }
+
+        WriteSection(section);
+        WriteLine("Lendo metadados dos JARs em modo somente leitura...");
+        SetStatus("Cobblemon: auditando dependencias, duplicidades e compatibilidade...");
+
+        try
+        {
+            var result = await Task.Run(() => minecraftAuditService.Audit(path));
+            var reports = await Task.Run(() => minecraftReportService.WriteAudit(result));
+
+            Minecraft.SetAuditResult(result, reports);
+            WriteLine($"Mods encontrados: {result.Summary.TotalMods}");
+            WriteLine($"Performance: {result.Summary.PerformanceMods}");
+            WriteLine($"IDs duplicados: {result.Summary.DuplicateModIds}");
+            WriteLine($"Dependencias ausentes: {result.Summary.MissingDependencies}");
+            WriteLine($"Conflitos possiveis: {result.Summary.PossibleConflicts}");
+            WriteLine($"JVM recomendada: {result.Environment.RecommendedJavaArguments}");
+            WriteLine($"Relatorio Markdown: {reports.MarkdownPath}");
+            WriteLine($"Sugestoes de quarentena: {reports.QuarantineSuggestionsDirectory}");
+            WriteLine("Nenhum JAR foi excluido, movido ou modificado.");
+            SetStatus("Auditoria Cobblemon concluida. Revise os alertas antes de alterar o pacote.");
+        }
+        catch (Exception ex)
+        {
+            WriteLine($"Falha na auditoria Cobblemon: {ex.Message}");
+            Minecraft.SetOperationText($"Falha na auditoria: {ex.Message}");
+            SetStatus("Auditoria Cobblemon falhou. Veja o diagnostico.");
+        }
+        finally
+        {
+            EndTweaking();
+        }
+    }
+
+    private async Task ApplyMinecraftProfileAsync(string path, MinecraftProfileKind profile)
+    {
+        if (System.Windows.MessageBox.Show(
+                $"Aplicar o perfil {profile} nesta instancia?\n\n" +
+                "O ApexTweaker criara backup de options.txt, nao movera mods e apenas gerara uma recomendacao de argumentos JVM.",
+                "Aplicar perfil Minecraft",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning) != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        const string section = "Perfil Minecraft";
+        if (!TryBeginTweaking(section))
+        {
+            return;
+        }
+
+        WriteSection(section);
+        SetStatus($"Minecraft: aplicando {profile} com backup...");
+
+        try
+        {
+            var result = await Task.Run(() => minecraftProfileService.ApplyProfile(path, profile));
+            WriteLines(result.Messages);
+            Minecraft.SetJavaArguments(result.JavaArguments);
+            Minecraft.SetOperationText($"{profile} aplicado. Backup: {result.BackupDirectory}");
+            SetStatus($"Minecraft: perfil {profile} aplicado e verificavel por rollback.");
+        }
+        catch (Exception ex)
+        {
+            WriteLine($"Falha ao aplicar perfil Minecraft: {ex.Message}");
+            Minecraft.SetOperationText($"Perfil nao aplicado: {ex.Message}");
+            SetStatus("Minecraft: perfil nao aplicado. Nenhum mod foi alterado.");
+        }
+        finally
+        {
+            EndTweaking();
+        }
+    }
+
+    private async Task RollbackMinecraftProfileAsync(string path)
+    {
+        if (System.Windows.MessageBox.Show(
+                "Restaurar o ultimo backup de configuracao Minecraft desta instancia?",
+                "Rollback Minecraft",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question) != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        const string section = "Rollback Minecraft";
+        if (!TryBeginTweaking(section))
+        {
+            return;
+        }
+
+        WriteSection(section);
+        SetStatus("Minecraft: restaurando o ultimo perfil...");
+
+        try
+        {
+            var result = await Task.Run(() => minecraftProfileService.RollbackLatest(path));
+            WriteLines(result.Messages);
+            Minecraft.SetOperationText($"Rollback concluido: {result.BackupId}");
+            SetStatus("Minecraft: configuracao anterior restaurada.");
+        }
+        catch (Exception ex)
+        {
+            WriteLine($"Falha no rollback Minecraft: {ex.Message}");
+            Minecraft.SetOperationText($"Rollback nao concluido: {ex.Message}");
+            SetStatus("Minecraft: rollback nao concluido.");
+        }
+        finally
+        {
+            EndTweaking();
+        }
+    }
+
+    private async Task RunMinecraftBenchmarkAsync()
+    {
+        const string section = "Benchmark Minecraft";
+        if (!TryBeginTweaking(section))
+        {
+            return;
+        }
+
+        WriteSection(section);
+        WriteLine("Procurando o processo Java com maior consumo de memoria...");
+        SetStatus("Minecraft: benchmark de 60 segundos em andamento...");
+
+        try
+        {
+            minecraftBenchmarkCancellation?.Dispose();
+            minecraftBenchmarkCancellation = new CancellationTokenSource();
+            var progress = new Progress<MinecraftBenchmarkSample>(sample =>
+            {
+                Minecraft.SetOperationText(
+                    $"Benchmark: RAM Java {sample.WorkingSetBytes / 1024d / 1024d:0} MB | " +
+                    $"RAM livre {sample.AvailableMemoryGb:0.00} GB | CPU {sample.CpuPercent:0.0}%");
+            });
+
+            minecraftBenchmarkTask = minecraftBenchmarkService.CaptureAsync(
+                TimeSpan.FromSeconds(60),
+                progress,
+                minecraftBenchmarkCancellation.Token);
+            var result = await minecraftBenchmarkTask;
+            var reportPath = await Task.Run(() => minecraftReportService.WriteBenchmark(result));
+            WriteLine($"Status: {result.Status}");
+            WriteLine($"Pico de RAM Java: {result.PeakWorkingSetBytes / 1024d / 1024d:0} MB");
+            WriteLine($"Menor RAM livre: {result.MinimumAvailableMemoryGb:0.00} GB");
+            WriteLine($"Relatorio: {reportPath}");
+            Minecraft.SetOperationText($"Benchmark {result.Status}. Relatorio: {reportPath}");
+            SetStatus($"Minecraft: benchmark {result.Status}. FPS deve ser medido externamente.");
+        }
+        catch (OperationCanceledException)
+        {
+            WriteLine("Benchmark Minecraft cancelado.");
+            Minecraft.SetOperationText("Benchmark cancelado sem alterar a instancia.");
+            SetStatus("Minecraft: benchmark cancelado.");
+        }
+        catch (Exception ex)
+        {
+            WriteLine($"Benchmark Minecraft indisponivel: {ex.Message}");
+            Minecraft.SetOperationText($"Benchmark nao iniciado: {ex.Message}");
+            SetStatus("Minecraft: abra o jogo e tente o benchmark novamente.");
+        }
+        finally
+        {
+            minecraftBenchmarkTask = null;
+            minecraftBenchmarkCancellation?.Dispose();
+            minecraftBenchmarkCancellation = null;
+            EndTweaking();
+        }
+    }
+
+    private void OpenMinecraftReports()
+    {
+        try
+        {
+            Directory.CreateDirectory(minecraftReportService.DefaultReportRoot);
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = minecraftReportService.DefaultReportRoot,
+                UseShellExecute = true
+            });
+        }
+        catch (Exception ex)
+        {
+            WriteLine($"Falha ao abrir relatorios Minecraft: {ex.Message}");
         }
     }
 
@@ -722,6 +1001,23 @@ public partial class MainWindow : Window
 
     private async Task ShutdownBackgroundServicesAsync()
     {
+        minecraftBenchmarkCancellation?.Cancel();
+        if (minecraftBenchmarkTask is not null)
+        {
+            try
+            {
+                await minecraftBenchmarkTask;
+            }
+            catch (OperationCanceledException)
+            {
+                // Expected when the window closes during a Minecraft benchmark.
+            }
+            catch
+            {
+                // Benchmark teardown must not block application shutdown.
+            }
+        }
+
         if (telemetryRunning)
         {
             await StopTelemetryAsync();
@@ -832,6 +1128,11 @@ public partial class MainWindow : Window
         await ShowPageAsync(TelemetryPageKey, TelemetryButton);
     }
 
+    private async void MinecraftButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        await ShowPageAsync(MinecraftPageKey, MinecraftButton);
+    }
+
     private async void UtilitiesButton_OnClick(object sender, RoutedEventArgs e)
     {
         await ShowPageAsync(UtilitiesPageKey, UtilitiesButton);
@@ -871,5 +1172,3 @@ public partial class MainWindow : Window
         MaximizeButton.ToolTip = WindowState == WindowState.Maximized ? "Restaurar" : "Maximizar";
     }
 }
-
-

@@ -2,7 +2,7 @@
 
 ApexTweaker e um utilitario Windows (.NET 10) focado em performance, telemetria de frametime, backup e rollback reversivel. A shell ativa e **WPF**; codigo WinForms legado ainda compila no mesmo assembly, mas nao e iniciado por `Program.cs`.
 
-Versao atual: **2.0.1**.
+Versao atual: **2.1.0**.
 
 ## Pastas principais
 
@@ -20,6 +20,7 @@ Shell WPF ativa (unica UI do app):
 - `Views/DashboardView` — Auto-Tuning e restore point.
 - `Views/ModulesView` — modulos individuais de otimizacao.
 - `Views/TelemetryView` — teste A/B, grafico, metricas e console.
+- `Views/MinecraftView` - auditoria Cobblemon, perfis, benchmark e rollback.
 - `Views/UtilitiesView` — revert, desinstalar, sobre, suporte Riot.
 - `Windows/StartupDisclaimerWindow` — aviso legal inicial.
 - `Windows/LoadingWindow` — warmup de hardware durante o boot da UI.
@@ -53,6 +54,20 @@ Regras e acoes do backend:
 | `TelemetryPipeServer.cs` | Servidor IPC de telemetria |
 
 Comandos estruturados em `ExtremeMutationCommands.cs` e `MemoryCompressionTweakCommand.cs`.
+
+### `src/Minecraft`
+
+Modulo isolado para Minecraft/Cobblemon:
+
+- `Models/MinecraftAuditModels.cs` - contratos de auditoria, perfil, backup e benchmark.
+- `Services/ModJarScanner.cs` - metadados Fabric/Forge/NeoForge e JARs aninhados.
+- `Services/MinecraftAuditService.cs` - classificacao, dependencias e conflitos.
+- `Services/MinecraftEnvironmentService.cs` - hardware, Java, pagefile e launchers.
+- `Services/MinecraftProfileService.cs` - `options.txt`, backup e rollback.
+- `Services/MinecraftBenchmarkService.cs` - amostras do processo Java.
+- `Services/MinecraftReportService.cs` - JSON, Markdown e TXT.
+- `MinecraftCommandLine.cs` - automacao headless.
+- `MinecraftSelfTest.cs` - teste integrado sem pacotes externos.
 
 ### `src/Core/Pipeline`
 
@@ -115,6 +130,8 @@ Orquestrado por `MutationExecutor` com ledger em `BackupService`. Nenhuma mutaca
 | Caminho | Conteudo |
 |---------|----------|
 | `C:\ProgramData\ApexTweaker\Backups` | Backups granulares, ledger de mutacoes, sessoes de telemetria |
+| `C:\ProgramData\ApexTweaker\MinecraftBackups` | Backups de perfis de instancia Minecraft |
+| `C:\ProgramData\ApexTweaker\MinecraftReports` | Auditorias e benchmarks Minecraft |
 | `C:\ProgramData\ApexTweaker\Logs\latest_runtime.log` | Log da sessao em execucao |
 
 ## Pastas geradas pelo .NET

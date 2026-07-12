@@ -1,40 +1,69 @@
 # ApexTweaker
 
-Utilitario Windows (.NET 10 + WPF) focado em performance, estabilidade de frametime, telemetria e otimizacoes reversiveis — com foco em jogos competitivos, especialmente VALORANT.
+Utilitario Windows em .NET 10 + WPF para diagnostico de hardware, telemetria,
+otimizacoes reversiveis e preparacao segura de Minecraft/Cobblemon em hardware
+limitado.
 
-Versao: **2.0.1** · Autor: **Igor Silva**
+Versao: **2.1.0** | Autor: **Igor Silva**
 
-## Distribuicao
+## Cobblemon Low-End Lab
 
-Executavel oficial para clientes:
+A aba **Cobblemon** adiciona um fluxo separado das mutacoes de Windows:
 
-`release-v2/ApexTweaker.exe`
+- le `fabric.mod.json`, metadados Forge/NeoForge e JARs aninhados;
+- identifica loader, versao, ambiente, dependencias, `provides` e `breaks`;
+- calcula SHA-256 e encontra duplicidades sem modificar os arquivos;
+- classifica mods com postura conservadora para requisitos de servidor;
+- gera relatorios JSON, Markdown e TXT;
+- cria uma pasta de sugestoes de quarentena com hashes, sem mover JARs;
+- oferece os perfis `SAFE`, `LOW_END`, `EXTREME_4GB`,
+  `COBBLEMON_SERVER_CLIENT` e `BENCHMARK`;
+- cria backup antes de alterar `options.txt`;
+- permite rollback do ultimo perfil;
+- mede RAM, CPU e pressao de memoria do processo Java por ate 10 minutos;
+- nunca exclui ou move mods automaticamente.
 
-Baixar da release:
+Documentacao completa: [docs/COBBLEMON_LOW_END.md](docs/COBBLEMON_LOW_END.md).
 
-- [ApexTweaker.exe (portatil)](https://github.com/NGK-999/tweaker/releases/latest/download/ApexTweaker.exe)
-- [ApexTweaker-Setup.exe (instalador)](https://github.com/NGK-999/tweaker/releases/latest/download/ApexTweaker-Setup.exe)
-
-O `.exe` e self-contained, pede Administrador pelo manifesto e nao exige .NET instalado.
-
-## Fluxo recomendado
-
-1. Abrir o app e revisar o resumo de hardware no Dashboard
-2. Criar ponto de restauracao (opcional, recomendado)
-3. Executar **Auto-Tuning** ou modulos especificos
-4. Reiniciar o PC
-5. Usar **Telemetria** para comparar estabilidade antes/depois
-
-## Interface (WPF)
+## Interface
 
 | Aba | Funcao |
 |-----|--------|
-| **Dashboard** | Auto-Tuning inteligente, restore point, resumo de hardware |
-| **Modulos** | Tweaks individuais (energia, CPU, GPU, rede, etc.) |
-| **Telemetria** | Teste A/B, grafico de FPS, metricas de kernel, console |
-| **Utilidades** | Reverter, desinstalar, sobre, suporte Riot |
+| **Dashboard** | Auto-Tuning, restore point e resumo de hardware |
+| **Modulos** | Tweaks individuais de energia, CPU, GPU e rede |
+| **Telemetria** | Teste A/B, frametime, metricas e console |
+| **Cobblemon** | Auditoria de mods, perfis, benchmark e rollback Minecraft |
+| **Utilidades** | Rollback mestre, desinstalacao e suporte |
 
-Documentacao detalhada dos modulos: [`docs/TWEAK_BUTTONS.md`](docs/TWEAK_BUTTONS.md).
+## Linha de comando
+
+Auditoria somente leitura:
+
+```powershell
+dotnet run --project ApexTweaker.csproj -- `
+  --minecraft-audit `
+  --mods "$env:USERPROFILE\Downloads\mods\mods" `
+  --output ".\artifacts\cobblemon-audit"
+```
+
+Autoteste do scanner, relatorios, perfil e rollback:
+
+```powershell
+dotnet run --project ApexTweaker.csproj -- --minecraft-self-test
+```
+
+Use `--minecraft-help` para listar os demais comandos. Operacoes de escrita por
+CLI exigem `--yes` e uma instancia valida com `options.txt` e subpasta `mods`.
+
+## Distribuicao
+
+Artefatos oficiais:
+
+- [ApexTweaker.exe](https://github.com/NGK-999/tweaker/releases/latest/download/ApexTweaker.exe)
+- [ApexTweaker-Setup.exe](https://github.com/NGK-999/tweaker/releases/latest/download/ApexTweaker-Setup.exe)
+
+O executavel publicado e self-contained, pede Administrador pelo manifesto e
+nao exige .NET instalado.
 
 ## Build local
 
@@ -43,14 +72,21 @@ dotnet build ApexTweaker.sln -c Release
 dotnet publish ApexTweaker.csproj -c Release -r win-x64 --self-contained true -o release-v2
 ```
 
-Requisito de build: **Visual Studio Build Tools com C++** (compila `ApexTweaker.Native.dll`).
+Requisito: Visual Studio Build Tools com suporte a C++ para compilar
+`ApexTweaker.Native.dll`.
 
-Mais detalhes: [`docs/DISTRIBUTION.md`](docs/DISTRIBUTION.md) e [`docs/PROJECT_STRUCTURE.md`](docs/PROJECT_STRUCTURE.md).
+## Dados e seguranca
 
-## Observacoes
-
-- O app **nao modifica arquivos de jogos**.
-- O app **evita hooks agressivos** em processos protegidos por anti-cheat.
-- Backups: `C:\ProgramData\ApexTweaker\Backups`
+- Backups de Windows: `C:\ProgramData\ApexTweaker\Backups`
+- Backups Minecraft: `C:\ProgramData\ApexTweaker\MinecraftBackups`
+- Relatorios Minecraft: `C:\ProgramData\ApexTweaker\MinecraftReports`
 - Logs: `C:\ProgramData\ApexTweaker\Logs\latest_runtime.log`
-- Toda mutacao passa por pipeline transacional com snapshot e rollback (`MutationExecutor` + `BackupService`).
+- O perfil Minecraft altera somente `options.txt` e cria
+  `apextweaker-java-args.txt` depois de um backup verificavel.
+- Argumentos Java sao recomendados, nao injetados automaticamente no launcher.
+- Defender, Windows Update, pagefile e mods de servidor nao sao desativados ou
+  removidos por esse fluxo.
+
+Mais detalhes de build e distribuicao:
+[docs/DISTRIBUTION.md](docs/DISTRIBUTION.md) e
+[docs/PROJECT_STRUCTURE.md](docs/PROJECT_STRUCTURE.md).

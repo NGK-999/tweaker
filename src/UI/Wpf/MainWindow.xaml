@@ -100,7 +100,7 @@
                             <TextBlock Margin="0,4,0,0"
                                        Foreground="{StaticResource TextTertiaryBrush}"
                                        FontSize="12"
-                                       Text="v2.0.1" />
+                                       Text="v2.1.0" />
                         </StackPanel>
 
                         <StackPanel Grid.Row="1"
@@ -118,6 +118,10 @@
                                     Content="Telemetria"
                                     Style="{StaticResource MacNavButton}"
                                     Click="TelemetryButton_OnClick" />
+                            <Button x:Name="MinecraftButton"
+                                    Content="Cobblemon"
+                                    Style="{StaticResource MacNavButton}"
+                                    Click="MinecraftButton_OnClick" />
                             <Button x:Name="UtilitiesButton"
                                     Content="Utilidades"
                                     Style="{StaticResource MacNavButton}"

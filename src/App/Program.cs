@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Windows;
+using ApexTweaker.Minecraft;
 using ApexTweaker.UI.Wpf;
 using ApexTweaker.UI.Wpf.Windows;
 
@@ -8,8 +9,14 @@ namespace ApexTweaker;
 internal static class Program
 {
     [STAThread]
-    private static void Main()
+    private static void Main(string[] args)
     {
+        if (MinecraftCommandLine.TryRun(args, out var exitCode))
+        {
+            Environment.ExitCode = exitCode;
+            return;
+        }
+
         AppDomain.CurrentDomain.UnhandledException += (_, args) =>
         {
             if (args.ExceptionObject is Exception ex)

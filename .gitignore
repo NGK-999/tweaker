@@ -25,6 +25,7 @@ TestResults/
 native-msbuild-path.txt
 page0_render.bin
 pdf-pages/
+artifacts/
 
 # Graphify
 graphify-out/cost.json
