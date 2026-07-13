@@ -2,7 +2,7 @@
 
 ApexTweaker e um utilitario Windows (.NET 10) focado em performance, telemetria de frametime, backup e rollback reversivel. A shell ativa e **WPF**; codigo WinForms legado ainda compila no mesmo assembly, mas nao e iniciado por `Program.cs`.
 
-Versao atual: **3.1.0**.
+Versao atual: **3.2.0**.
 
 ## Pastas principais
 
@@ -23,7 +23,10 @@ Shell WPF ativa (unica UI do app):
 - `Views/ModulesView` — modulos individuais de otimizacao.
 - `Views/TelemetryView` — teste A/B, grafico, metricas e console.
 - `Views/MinecraftView` - diagnostico cientifico, experimentos, auditoria,
-  wizard simples/avancado, perfis, benchmark e rollback.
+  host da experiencia facil e do laboratorio avancado.
+- `Views/CobblemonEasyView` - seis acoes principais, resumo, teste guiado,
+  restauracao e exportacao de diagnostico.
+- `ViewModels/CobblemonEasyViewModel.cs` - estados e mensagens do fluxo leigo.
 - `ViewModels/MinecraftWizardViewModel.cs` - estado, navegacao, progresso,
   cancelamento e estados visuais via CommunityToolkit.Mvvm.
 - `Controls/LightweightBenchmarkChart.cs` - grafico WPF sem SkiaSharp.

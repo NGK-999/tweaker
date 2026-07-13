@@ -18,6 +18,8 @@ internal static class ApplicationPaths
 
     public static string MinecraftReports { get; } = Path.Combine(UserDataRoot, "MinecraftReports");
 
+    public static string MinecraftDiagnosticPackages { get; } = Path.Combine(UserDataRoot, "MinecraftDiagnosticPackages");
+
     public static string MinecraftScientificReports { get; } = Path.Combine(UserDataRoot, "MinecraftScientificReports");
 
     public static string MinecraftExperiments { get; } = Path.Combine(UserDataRoot, "MinecraftExperiments");

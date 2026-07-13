@@ -1,6 +1,6 @@
 # Minecraft Scientific Optimization Engine
 
-Versao: **ApexTweaker 3.1.0**
+Versao: **ApexTweaker 3.2.0**
 
 ## Objetivo e limite
 

@@ -249,11 +249,20 @@ internal static class MinecraftSelfTest
             Assert(profileService.PlanProfile(managedRoot, MinecraftProfileKind.PotatoCobblemon4Gb, 20).MaximumFps == 20 &&
                    profileService.PlanProfile(managedRoot, MinecraftProfileKind.PotatoCobblemon4Gb, 24).MaximumFps == 24,
                 "POTATO nao aceitou os caps extremos de 20/24 FPS.");
+            var potato480Plan = profileService.PlanProfile(
+                managedRoot,
+                MinecraftProfileKind.PotatoCobblemon4Gb480p,
+                24);
+            Assert(potato480Plan.Changes.Any(change => change.Setting == "overrideWidth" && change.After == "854") &&
+                   potato480Plan.Changes.Any(change => change.Setting == "overrideHeight" && change.After == "480") &&
+                   potato480Plan.MaximumHeapMb == 2048,
+                "POTATO 480p nao preservou 854x480 e heap seguro de 2048 MB.");
             Assert(MinecraftProfileService.AvailableProfiles.Any(profile => profile.Kind == MinecraftProfileKind.RamLimited) &&
                    MinecraftProfileService.AvailableProfiles.Any(profile => profile.Kind == MinecraftProfileKind.CpuLimited) &&
                    MinecraftProfileService.AvailableProfiles.Any(profile => profile.Kind == MinecraftProfileKind.GpuLimited) &&
                    MinecraftProfileService.AvailableProfiles.Any(profile => profile.Kind == MinecraftProfileKind.ServerEntryCompatible) &&
-                   MinecraftProfileService.AvailableProfiles.Any(profile => profile.Kind == MinecraftProfileKind.PotatoCobblemon4Gb),
+                   MinecraftProfileService.AvailableProfiles.Any(profile => profile.Kind == MinecraftProfileKind.PotatoCobblemon4Gb) &&
+                   MinecraftProfileService.AvailableProfiles.Any(profile => profile.Kind == MinecraftProfileKind.PotatoCobblemon4Gb480p),
                 "Os perfis cientificos por gargalo nao foram registrados.");
             AssertThrows<ArgumentOutOfRangeException>(
                 () => profileService.PlanProfile(managedRoot, MinecraftProfileKind.Extreme4Gb, 50),
@@ -447,6 +456,139 @@ internal static class MinecraftSelfTest
             Assert(contractAssessments.Single(contract => contract.ModId == "lithium").Status == ModConfigAutomationStatus.DefaultsRecommended,
                 "Lithium deveria preservar os defaults estaveis.");
             messages.Add("PASS: diagnostico de gargalo e contratos de configs distinguem fato, inferencia e manual.");
+
+            var logsDirectory = Path.Combine(instanceRoot, "logs");
+            Directory.CreateDirectory(logsDirectory);
+            File.WriteAllText(
+                Path.Combine(logsDirectory, "latest.log"),
+                "[main/INFO] Synthetic Cobblemon easy-mode log\n",
+                new UTF8Encoding(false));
+            var easyEnvironment = instanceAudit.Environment with
+            {
+                TotalMemoryGb = 4m,
+                AvailableMemoryGb = 2.5m,
+                Java = instanceAudit.Environment.Java with
+                {
+                    Found = true,
+                    Version = "21-test",
+                    Is64Bit = true
+                }
+            };
+            var easyService = new MinecraftEasyModeService(
+                new MinecraftInstanceService(),
+                () => easyEnvironment);
+            var easyInstance = easyService.Detect(managedRoot);
+            Assert(easyInstance.State == MinecraftEasyState.Ready &&
+                   easyInstance.Instance?.Launcher == MinecraftLauncherKind.PrismLauncher &&
+                   easyInstance.JavaFound && easyInstance.OptionsFound && easyInstance.ModsFound &&
+                   easyInstance.ConfigFound && easyInstance.LogsFound,
+                "Cobblemon Facil nao validou a instancia Prism completa.");
+            var easySummary = easyService.SummarizeMods(instanceAudit);
+            Assert(easySummary.EssentialMods == 1 && easySummary.PerformanceMods >= 2,
+                "Resumo facil nao separou mods essenciais e de performance.");
+            var serverReadiness = easyService.PrepareForServer(instanceAudit, serverRequiresMegaShowdown: true);
+            Assert(serverReadiness.State == MinecraftEasyState.ServerMayReject &&
+                   serverReadiness.Status == "Pode faltar mod obrigatorio",
+                "Preparo de servidor nao avisou sobre Mega Showdown/Fabric API ausente.");
+
+            var easyObservation = new MinecraftOperationalObservation(
+                true, true, null, false, false, null, false, null, null, true, true, true,
+                "Falha sintetica de memoria e servidor.");
+            var easyBenchmark = CreateSyntheticBenchmark(
+                easyEnvironment,
+                instanceRoot,
+                averageCpu: 90d,
+                peakWorkingSetMb: 2000,
+                minimumAvailableGb: 0.20m,
+                pageFileDeltaMb: 700) with
+            {
+                Status = BenchmarkStatus.Failed,
+                OutOfMemoryEvidence = true,
+                CrashEvidence = true,
+                LatestLogTail = "java.lang.OutOfMemoryError: Java heap space"
+            };
+            var corrections = easyService.BuildCorrections(easyBenchmark, easyObservation, instanceAudit);
+            Assert(corrections.State == MinecraftEasyState.TooHeavy &&
+                   corrections.SafeAutomaticSuggestions.Any(item => item.Contains("1792", StringComparison.Ordinal)),
+                "Correcao facil nao recomendou heap 1792 MB diante de OOM/paginacao.");
+
+            var easyViewModel = new CobblemonEasyViewModel();
+            easyViewModel.SetInstance(easyInstance);
+            easyViewModel.SetAudit(easySummary);
+            easyViewModel.SetServerReadiness(serverReadiness);
+            easyViewModel.BeginBenchmark();
+            easyViewModel.CompleteBenchmark(easyBenchmark, cancelled: false);
+            easyViewModel.GameOpened = true;
+            easyViewModel.MenuReached = true;
+            easyViewModel.ServerEntered = false;
+            easyViewModel.ClosedAlone = true;
+            easyViewModel.ApproximateFps = string.Empty;
+            Assert(easyViewModel.BuildObservation().AverageFps is null &&
+                   easyViewModel.OverallStatus == "Falhou",
+                "Modo facil inventou FPS ou nao traduziu falha para linguagem simples.");
+
+            var jarHashesBeforeEasyMode = Directory.EnumerateFiles(
+                    Path.Combine(instanceRoot, "mods"),
+                    "*.jar",
+                    SearchOption.TopDirectoryOnly)
+                .ToDictionary(path => Path.GetFileName(path)!, ComputeSha256, StringComparer.OrdinalIgnoreCase);
+            var potato480Applied = profileService.ApplyProfile(
+                managedRoot,
+                MinecraftProfileKind.PotatoCobblemon4Gb480p,
+                24);
+            Assert(File.ReadAllText(optionsPath).Contains("overrideWidth:854", StringComparison.Ordinal) &&
+                   File.ReadAllText(optionsPath).Contains("overrideHeight:480", StringComparison.Ordinal),
+                "Apply facil 480p nao alterou a resolucao gerenciada.");
+            MinecraftDiagnosticPackageResult diagnostic;
+            var lockedJarPath = Path.Combine(instanceRoot, "mods", "sodium-test.jar");
+            using (new FileStream(lockedJarPath, FileMode.Open, FileAccess.Read, FileShare.None))
+            {
+                diagnostic = new MinecraftDiagnosticPackageService(Path.Combine(root, "diagnostic-packages")).Create(
+                    new MinecraftDiagnosticPackageContext(
+                        managedRoot,
+                        instanceAudit.Environment,
+                        null,
+                        potato480Plan,
+                        potato480Applied,
+                        easyBenchmark,
+                        easyObservation,
+                        serverReadiness,
+                        corrections));
+            }
+            Assert(File.Exists(diagnostic.ZipPath) && diagnostic.Sha256.Length == 64,
+                "Exportacao facil nao criou ZIP com SHA-256.");
+            Assert(diagnostic.IncludedEntries.Contains("diagnostic.json") &&
+                   diagnostic.IncludedEntries.Contains("diagnostic.md") &&
+                   diagnostic.IncludedEntries.Contains("mods/sha256.txt") &&
+                   diagnostic.IncludedEntries.Contains("logs/latest.log") &&
+                   diagnostic.IncludedEntries.Any(entry => entry.StartsWith("configuration-before/", StringComparison.Ordinal)) &&
+                   diagnostic.IncludedEntries.Any(entry => entry.StartsWith("configuration-after/", StringComparison.Ordinal)),
+                "ZIP de diagnostico nao incluiu relatorios, logs, hashes e configuracoes antes/depois.");
+            Assert(diagnostic.OmittedEntries.Any(item => item.Contains("sodium-test.jar", StringComparison.Ordinal)),
+                "ZIP de diagnostico falhou em registrar um JAR temporariamente bloqueado.");
+            using (var diagnosticArchive = ZipFile.OpenRead(diagnostic.ZipPath))
+            {
+                var diagnosticJsonEntry = diagnosticArchive.GetEntry("diagnostic.json")
+                                          ?? throw new InvalidOperationException("diagnostic.json ausente.");
+                using var diagnosticReader = new StreamReader(diagnosticJsonEntry.Open());
+                var diagnosticJson = diagnosticReader.ReadToEnd();
+                Assert(diagnosticJson.Contains("\"environment\"", StringComparison.Ordinal) &&
+                       diagnosticJson.Contains(instanceAudit.Environment.Processor, StringComparison.Ordinal),
+                    "ZIP de diagnostico nao registrou o hardware atual.");
+            }
+            var jarHashesAfterEasyMode = Directory.EnumerateFiles(
+                    Path.Combine(instanceRoot, "mods"),
+                    "*.jar",
+                    SearchOption.TopDirectoryOnly)
+                .ToDictionary(path => Path.GetFileName(path)!, ComputeSha256, StringComparer.OrdinalIgnoreCase);
+            Assert(jarHashesBeforeEasyMode.Count == jarHashesAfterEasyMode.Count &&
+                   jarHashesBeforeEasyMode.All(pair =>
+                       jarHashesAfterEasyMode.TryGetValue(pair.Key, out var hash) && hash == pair.Value),
+                "Cobblemon Facil moveu ou alterou um JAR sem confirmacao.");
+            _ = profileService.RollbackBackup(managedRoot, potato480Applied.BackupId);
+            Assert(File.ReadAllText(optionsPath).Replace("\r\n", "\n") == originalOptions,
+                "Rollback do fluxo facil nao restaurou options.txt.");
+            messages.Add("PASS: Cobblemon Facil detecta, resume, prepara servidor, corrige e exporta ZIP sem mover JARs.");
 
             var scientificRoot = Path.Combine(root, "scientific-experiments");
             var scientificBackupRoot = Path.Combine(root, "scientific-backups");

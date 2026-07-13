@@ -4,7 +4,24 @@ Utilitario Windows em .NET 10 + WPF para diagnostico de hardware, telemetria,
 otimizacoes reversiveis e preparacao segura de Minecraft/Cobblemon em hardware
 limitado.
 
-Versao: **3.1.0** | Autor: **Igor Silva**
+Versao: **3.2.0** | Autor: **Igor Silva**
+
+## Cobblemon One-Click Mode
+
+A pagina **Cobblemon Facil** abre por padrao e reduz o uso real a este fluxo:
+
+`Detectar -> Analisar -> Otimizar -> Testar -> Corrigir ou Restaurar`
+
+- seis botoes principais e mensagens sem jargao tecnico;
+- resumo de mods sem tabela gigante;
+- aplicacao confirmada de `POTATO_COBBLEMON_4GB` em 960x540 ou 854x480;
+- preparo de servidor somente leitura;
+- perguntas simples depois do benchmark;
+- restauracao sempre visivel;
+- ZIP de diagnostico com relatorios, logs, configuracoes e hashes;
+- laboratorio cientifico completo preservado em **Modo Avancado**.
+
+Guia: [docs/V3_2_COBBLEMON_ONE_CLICK.md](docs/V3_2_COBBLEMON_ONE_CLICK.md).
 
 ## Minecraft Scientific Optimization Engine
 
@@ -41,6 +58,7 @@ Documentacao completa: [docs/COBBLEMON_LOW_END.md](docs/COBBLEMON_LOW_END.md).
 Fluxo para o PC real: [docs/HOMOLOGACAO_OPERACIONAL_COBBLEMON.md](docs/HOMOLOGACAO_OPERACIONAL_COBBLEMON.md).
 Motor cientifico e CLI: [docs/SCIENTIFIC_ENGINE.md](docs/SCIENTIFIC_ENGINE.md).
 Frontend e Potato: [docs/V3_1_FRONTEND_POTATO.md](docs/V3_1_FRONTEND_POTATO.md).
+Modo facil: [docs/V3_2_COBBLEMON_ONE_CLICK.md](docs/V3_2_COBBLEMON_ONE_CLICK.md).
 Arquitetura da v3: [docs/ARCHITECTURE_V3.md](docs/ARCHITECTURE_V3.md).
 
 ## Interface
@@ -50,7 +68,7 @@ Arquitetura da v3: [docs/ARCHITECTURE_V3.md](docs/ARCHITECTURE_V3.md).
 | **Dashboard** | Auto-Tuning, restore point e resumo de hardware |
 | **Modulos** | Tweaks individuais de energia, CPU, GPU e rede |
 | **Telemetria** | Teste A/B, frametime, metricas e console |
-| **Cobblemon** | Diagnostico, experimento A/B, perfis, quarentena, benchmark e rollback Minecraft |
+| **Cobblemon Facil** | Fluxo automatico para detectar, analisar, otimizar, testar, corrigir e restaurar; laboratorio tecnico no modo avancado |
 | **Utilidades** | Rollback mestre, desinstalacao e suporte |
 
 ## Linha de comando
@@ -92,7 +110,7 @@ Artefatos oficiais:
 - [ApexTweaker.exe](https://github.com/NGK-999/tweaker/releases/latest/download/ApexTweaker.exe)
 - [ApexTweaker.Native.dll](https://github.com/NGK-999/tweaker/releases/latest/download/ApexTweaker.Native.dll)
 - [ApexTweaker-Setup.exe](https://github.com/NGK-999/tweaker/releases/latest/download/ApexTweaker-Setup.exe)
-- [ApexTweaker-Portable-v3.1.0.zip](https://github.com/NGK-999/tweaker/releases/download/v3.1.0/ApexTweaker-Portable-v3.1.0.zip)
+- [ApexTweaker-Portable-v3.2.0.zip](https://github.com/NGK-999/tweaker/releases/download/v3.2.0/ApexTweaker-Portable-v3.2.0.zip)
 
 O executavel publicado e self-contained, inicia em modo normal e nao exige .NET
 instalado. Apenas mutacoes protegidas do Windows solicitam UAC sob demanda.
@@ -113,6 +131,7 @@ Requisito: Visual Studio Build Tools com suporte a C++ para compilar
 - Backups de perfis Minecraft: `%LOCALAPPDATA%\ApexTweaker\MinecraftBackups`
 - Backups de quarentena: `%LOCALAPPDATA%\ApexTweaker\MinecraftQuarantineBackups`
 - Relatorios Minecraft: `%LOCALAPPDATA%\ApexTweaker\MinecraftReports`
+- Pacotes de diagnostico: `%LOCALAPPDATA%\ApexTweaker\MinecraftDiagnosticPackages`
 - Experimentos cientificos: `%LOCALAPPDATA%\ApexTweaker\MinecraftExperiments`
 - Telemetria de usuario: `%LOCALAPPDATA%\ApexTweaker\Telemetry`
 - O perfil altera `options.txt`, chaves existentes validadas de Sodium e

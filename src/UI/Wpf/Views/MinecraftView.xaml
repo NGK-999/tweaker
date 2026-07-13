@@ -2,6 +2,7 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:controls="clr-namespace:ApexTweaker.UI.Wpf.Controls"
+             xmlns:views="clr-namespace:ApexTweaker.UI.Wpf.Views"
              Background="Transparent"
              FontFamily="Segoe UI Variable Display, Segoe UI, Arial">
     <UserControl.Resources>
@@ -46,7 +47,40 @@
         </ResourceDictionary>
     </UserControl.Resources>
 
-    <Grid Margin="0,0,6,0">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Border Margin="0,0,6,10"
+                Padding="5"
+                HorizontalAlignment="Left"
+                Background="#0D1726"
+                BorderBrush="#263750"
+                BorderThickness="1"
+                CornerRadius="11">
+            <StackPanel Orientation="Horizontal">
+                <Button x:Name="EasyModeTabButton"
+                        MinWidth="145"
+                        Style="{StaticResource MacPrimaryButton}"
+                        Content="Cobblemon F&#x00E1;cil"
+                        Click="EasyModeTabButton_OnClick" />
+                <Button x:Name="AdvancedModeTabButton"
+                        MinWidth="145"
+                        Margin="6,0,0,0"
+                        Style="{StaticResource MacSecondaryButton}"
+                        Content="Modo Avancado"
+                        Click="AdvancedModeTabButton_OnClick" />
+            </StackPanel>
+        </Border>
+
+        <Grid Grid.Row="1">
+            <views:CobblemonEasyView x:Name="EasyView" />
+
+            <Grid x:Name="AdvancedPanel"
+                  Margin="0,0,6,0"
+                  Visibility="Collapsed">
         <Grid.RowDefinitions>
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
@@ -812,5 +846,7 @@
                 </StackPanel>
             </Grid>
         </Border>
+            </Grid>
+        </Grid>
     </Grid>
 </UserControl>

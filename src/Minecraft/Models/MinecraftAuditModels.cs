@@ -52,6 +52,7 @@ internal enum MinecraftProfileKind
     LowEnd,
     Extreme4Gb,
     PotatoCobblemon4Gb,
+    PotatoCobblemon4Gb480p,
     GpuLimited,
     RamLimited,
     CpuLimited,
@@ -129,6 +130,21 @@ internal enum OperationalHomologationStatus
     Approved,
     Unstable,
     Failed
+}
+
+[JsonConverter(typeof(JsonStringEnumConverter))]
+internal enum MinecraftEasyState
+{
+    Ready,
+    Attention,
+    TooHeavy,
+    ServerMayReject,
+    BackupCreated,
+    OptimizationApplied,
+    TestRequired,
+    Restored,
+    Failed,
+    Inconclusive
 }
 
 internal sealed class MinecraftModDescriptor
@@ -519,3 +535,63 @@ internal sealed record MinecraftOperationalHomologationResult(
     IReadOnlyList<MinecraftHomologationCriterion> Criteria,
     IReadOnlyList<string> RemainingRisks,
     IReadOnlyList<string> ManualActions);
+
+internal sealed record MinecraftEasyInstanceStatus(
+    MinecraftEasyState State,
+    string Status,
+    string Message,
+    MinecraftInstanceDescriptor? Instance,
+    IReadOnlyList<MinecraftInstanceDescriptor> Candidates,
+    bool JavaFound,
+    bool GameDirectoryFound,
+    bool OptionsFound,
+    bool ModsFound,
+    bool ConfigFound,
+    bool LogsFound);
+
+internal sealed record MinecraftEasyModSummary(
+    MinecraftEasyState State,
+    string Status,
+    int EssentialMods,
+    int PerformanceMods,
+    int HeavyVisualMods,
+    int DuplicateModIds,
+    int Risks,
+    IReadOnlyList<string> EssentialNames,
+    IReadOnlyList<string> PerformanceNames,
+    IReadOnlyList<string> HeavyVisualNames,
+    IReadOnlyList<string> DuplicateNames,
+    IReadOnlyList<string> RiskMessages);
+
+internal sealed record MinecraftEasyServerReadiness(
+    MinecraftEasyState State,
+    string Status,
+    string Message,
+    bool? ServerRequiresMegaShowdown,
+    IReadOnlyList<string> Checklist,
+    IReadOnlyList<string> Warnings);
+
+internal sealed record MinecraftEasyCorrectionPlan(
+    MinecraftEasyState State,
+    string Status,
+    string Message,
+    IReadOnlyList<string> SafeAutomaticSuggestions,
+    IReadOnlyList<string> ManualActions,
+    IReadOnlyList<string> SuspectedMods);
+
+internal sealed record MinecraftDiagnosticPackageContext(
+    string SelectedPath,
+    MinecraftEnvironmentSnapshot Environment,
+    MinecraftAuditResult? Audit,
+    MinecraftProfilePlan? ProfilePlan,
+    MinecraftProfileApplyResult? ProfileApply,
+    MinecraftBenchmarkResult? Benchmark,
+    MinecraftOperationalObservation? Observation,
+    MinecraftEasyServerReadiness? ServerReadiness,
+    MinecraftEasyCorrectionPlan? CorrectionPlan);
+
+internal sealed record MinecraftDiagnosticPackageResult(
+    string ZipPath,
+    string Sha256,
+    IReadOnlyList<string> IncludedEntries,
+    IReadOnlyList<string> OmittedEntries);

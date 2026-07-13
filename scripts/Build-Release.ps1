@@ -8,6 +8,15 @@ $projectFile = Join-Path $ProjectRoot 'ApexTweaker.csproj'
 $releaseDir = Join-Path $ProjectRoot 'release-v2'
 $stagingDir = Join-Path $ProjectRoot 'release-v2-staging'
 $portableExe = Join-Path $releaseDir 'ApexTweaker.exe'
+$nativeDll = Join-Path $releaseDir 'ApexTweaker.Native.dll'
+
+[xml]$projectXml = Get-Content -LiteralPath $projectFile
+$versionGroup = $projectXml.Project.PropertyGroup | Where-Object { $_.Version } | Select-Object -First 1
+$version = [string]$versionGroup.Version
+if ([string]::IsNullOrWhiteSpace($version)) {
+    throw 'A versao nao foi encontrada no ApexTweaker.csproj.'
+}
+$portableZip = Join-Path $releaseDir "ApexTweaker-Portable-v$version.zip"
 
 $projectRootFull = [System.IO.Path]::GetFullPath($ProjectRoot).TrimEnd('\')
 $releaseDirFull = [System.IO.Path]::GetFullPath($releaseDir).TrimEnd('\')
@@ -65,8 +74,17 @@ Feche instancias do ApexTweaker e apague manualmente a pasta, ou rode o script n
     }
 }
 
+if (-not (Test-Path -LiteralPath $nativeDll)) {
+    throw "DLL nativa nao encontrada depois do publish: $nativeDll"
+}
+
+Compress-Archive -LiteralPath @($portableExe, $nativeDll) -DestinationPath $portableZip -CompressionLevel Optimal
+
 $artifact = Get-Item -LiteralPath $portableExe
+$zipArtifact = Get-Item -LiteralPath $portableZip
 Write-Host ""
 Write-Host "Release pronta para testes:"
 Write-Host "  $($artifact.FullName)"
 Write-Host "  $([math]::Round($artifact.Length / 1MB, 1)) MB | $($artifact.LastWriteTime)"
+Write-Host "  $($zipArtifact.FullName)"
+Write-Host "  $([math]::Round($zipArtifact.Length / 1MB, 1)) MB | $($zipArtifact.LastWriteTime)"

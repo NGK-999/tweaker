@@ -1,4 +1,4 @@
-# Cobblemon Low-End Lab v3.1.0
+# Cobblemon Low-End Lab v3.2.0
 
 ## Objetivo
 
@@ -11,6 +11,12 @@ Nesse hardware, o objetivo e abrir o jogo e obter estabilidade minima em
 2x4 GB em dual-channel, e SSD continuam sendo as melhorias de maior impacto.
 
 ## Fluxos
+
+Para uso comum, abra **Cobblemon Facil** e siga:
+
+`Detectar -> Analisar -> Otimizar -> Testar -> Corrigir ou Restaurar`.
+
+Os fluxos tecnicos abaixo permanecem em **Modo Avancado**.
 
 1. `Audit`: le hardware, Java, pagefile e metadados dos JARs.
 2. `Dry-run`: mostra arquivo, chave, valor atual e valor proposto.
@@ -77,6 +83,9 @@ Use somente quando o primeiro teste seguro ainda nao abre ou pagina demais:
 - particulas minimas, mipmap 0 e biome blend 0;
 - resource packs locais desmarcados sem excluir arquivos;
 - `-Xms512M -Xmx2048M`.
+
+O modo facil tambem oferece a variante confirmada `854x480`, mantendo render 2,
+simulation 5, entity distance 0.30, 24/30 FPS e heap de 2048 MB.
 
 O Potato altera somente opcoes que ja existem no `options.txt`. Abra o jogo uma
 vez antes. Resource packs exigidos pelo servidor devem ser confirmados antes.

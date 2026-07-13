@@ -100,7 +100,7 @@
                             <TextBlock Margin="0,4,0,0"
                                        Foreground="{StaticResource TextTertiaryBrush}"
                                        FontSize="12"
-                                       Text="v3.1.0" />
+                                       Text="v3.2.0" />
                             <TextBlock x:Name="PrivilegeModeText"
                                        Margin="0,4,0,0"
                                        Foreground="{StaticResource AccentBrush}"
@@ -124,7 +124,7 @@
                                     Style="{StaticResource MacNavButton}"
                                     Click="TelemetryButton_OnClick" />
                             <Button x:Name="MinecraftButton"
-                                    Content="Cobblemon"
+                                    Content="Cobblemon F&#x00E1;cil"
                                     Style="{StaticResource MacNavButton}"
                                     Click="MinecraftButton_OnClick" />
                             <Button x:Name="UtilitiesButton"

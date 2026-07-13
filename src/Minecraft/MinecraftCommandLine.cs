@@ -386,6 +386,7 @@ internal static class MinecraftCommandLine
             "LOWEND" => MinecraftProfileKind.LowEnd,
             "EXTREME4GB" => MinecraftProfileKind.Extreme4Gb,
             "POTATOCOBBLEMON4GB" => MinecraftProfileKind.PotatoCobblemon4Gb,
+            "POTATOCOBBLEMON4GB480P" => MinecraftProfileKind.PotatoCobblemon4Gb480p,
             "GPULIMITED" => MinecraftProfileKind.GpuLimited,
             "RAMLIMITED" => MinecraftProfileKind.RamLimited,
             "CPULIMITED" => MinecraftProfileKind.CpuLimited,

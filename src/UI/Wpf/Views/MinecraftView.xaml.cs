@@ -19,6 +19,7 @@ public partial class MinecraftView : WpfUserControl
     private bool profilePreviewReady;
     private bool quarantinePlanReady;
     private ScientificExperimentPhase? scientificPhase;
+    private int easyBenchmarkSampleCount;
     private readonly MinecraftWizardViewModel wizard = new();
 
     public event Action? BrowseRequested;
@@ -51,10 +52,32 @@ public partial class MinecraftView : WpfUserControl
 
     public event Action? CancelBenchmarkRequested;
 
+    public event Func<string, Task>? EasyDetectRequested;
+
+    internal event Func<string, bool, int, Task>? EasyOptimizeRequested;
+
+    public event Func<string, Task>? EasyPrepareServerRequested;
+
+    public event Func<string, Task>? EasyFixRequested;
+
+    public event Func<string, Task>? EasyExportRequested;
+
     public MinecraftView()
     {
         InitializeComponent();
         DataContext = wizard;
+        EasyView.DetectRequested += path => EasyDetectRequested?.Invoke(path) ?? Task.CompletedTask;
+        EasyView.AnalyzeRequested += path => AuditRequested?.Invoke(path) ?? Task.CompletedTask;
+        EasyView.OptimizeRequested += (path, extremeResolution, fps) =>
+            EasyOptimizeRequested?.Invoke(path, extremeResolution, fps) ?? Task.CompletedTask;
+        EasyView.PrepareServerRequested += path => EasyPrepareServerRequested?.Invoke(path) ?? Task.CompletedTask;
+        EasyView.TestRequested += path => BenchmarkRequested?.Invoke(path) ?? Task.CompletedTask;
+        EasyView.SaveTestRequested += (path, observation) =>
+            SaveHomologationRequested?.Invoke(path, observation) ?? Task.CompletedTask;
+        EasyView.FixRequested += path => EasyFixRequested?.Invoke(path) ?? Task.CompletedTask;
+        EasyView.RestoreRequested += path => RollbackRequested?.Invoke(path) ?? Task.CompletedTask;
+        EasyView.ExportRequested += path => EasyExportRequested?.Invoke(path) ?? Task.CompletedTask;
+        EasyView.AdvancedRequested += () => ShowAdvancedMode(true);
         wizard.CancelRequested += () => CancelBenchmarkRequested?.Invoke();
         ProfileComboBox.ItemsSource = MinecraftProfileService.AvailableProfiles
             .OrderBy(profile => profile.Kind)
@@ -77,6 +100,7 @@ public partial class MinecraftView : WpfUserControl
             UpdateActionState();
         };
         UpdateActionState();
+        ShowAdvancedMode(false);
     }
 
     public string SelectedPath => PathTextBox.Text.Trim();
@@ -94,8 +118,25 @@ public partial class MinecraftView : WpfUserControl
             ? "Instancia valida detectada. Perfis e rollback estao disponiveis."
             : "Pasta aceita para auditoria. Perfil bloqueado ate selecionar uma instancia com options.txt e subpasta mods.";
         wizard.SetInstanceState(instanceDetected, InstanceStateText.Text);
+        EasyView.SetSelectedPath(path, instanceDetected);
         UpdateActionState();
     }
+
+    internal void SetEasyInstanceStatus(MinecraftEasyInstanceStatus status) => EasyView.SetInstanceStatus(status);
+
+    internal void SetEasyAudit(MinecraftEasyModSummary summary) => EasyView.SetAudit(summary);
+
+    public void SetEasyOptimizationApplied(string backupId, string javaArguments, bool javaAppliedAutomatically) =>
+        EasyView.SetOptimizationApplied(backupId, javaArguments, javaAppliedAutomatically);
+
+    internal void SetEasyServerReadiness(MinecraftEasyServerReadiness readiness) =>
+        EasyView.SetServerReadiness(readiness);
+
+    internal void SetEasyCorrections(MinecraftEasyCorrectionPlan plan) => EasyView.SetCorrections(plan);
+
+    public void SetEasyRestored(string backupId) => EasyView.SetRestored(backupId);
+
+    internal void SetEasyDiagnostic(MinecraftDiagnosticPackageResult package) => EasyView.SetDiagnostic(package);
 
     internal void SetAuditResult(
         MinecraftAuditResult result,
@@ -176,6 +217,7 @@ public partial class MinecraftView : WpfUserControl
     {
         busy = value;
         wizard.SetBusyState(value);
+        EasyView.SetBusy(value);
         UpdateActionState();
     }
 
@@ -192,6 +234,7 @@ public partial class MinecraftView : WpfUserControl
     internal void SetOperationalResult(OperationalHomologationStatus status, string reportPath)
     {
         OperationalStatusText.Text = $"Resultado {status}. Relatorio: {reportPath}";
+        EasyView.SetOperationalResult(status);
     }
 
     public void SetOperationalChecklist(string reportPath)
@@ -257,18 +300,22 @@ public partial class MinecraftView : WpfUserControl
 
     internal void BeginBenchmark()
     {
+        easyBenchmarkSampleCount = 0;
         wizard.BeginBenchmark();
+        EasyView.BeginBenchmark();
         UpdateActionState();
     }
 
     internal void AddBenchmarkSample(MinecraftBenchmarkSample sample)
     {
         wizard.AddBenchmarkSample(sample);
+        EasyView.AddBenchmarkSample(sample, ++easyBenchmarkSampleCount);
     }
 
     internal void CompleteBenchmark(MinecraftBenchmarkResult? result, bool cancelled = false)
     {
         wizard.CompleteBenchmark(result, cancelled);
+        EasyView.CompleteBenchmark(result, cancelled);
         UpdateActionState();
     }
 
@@ -328,8 +375,21 @@ public partial class MinecraftView : WpfUserControl
             instanceDetected
                 ? "Instancia valida detectada."
                 : "Selecione uma instancia com options.txt, config e mods.");
+        EasyView.SetSelectedPath(PathTextBox.Text.Trim(), instanceDetected);
 
         UpdateActionState();
+    }
+
+    private void EasyModeTabButton_OnClick(object sender, RoutedEventArgs e) => ShowAdvancedMode(false);
+
+    private void AdvancedModeTabButton_OnClick(object sender, RoutedEventArgs e) => ShowAdvancedMode(true);
+
+    private void ShowAdvancedMode(bool advanced)
+    {
+        EasyView.Visibility = advanced ? Visibility.Collapsed : Visibility.Visible;
+        AdvancedPanel.Visibility = advanced ? Visibility.Visible : Visibility.Collapsed;
+        EasyModeTabButton.Style = (Style)FindResource(advanced ? "MacSecondaryButton" : "MacPrimaryButton");
+        AdvancedModeTabButton.Style = (Style)FindResource(advanced ? "MacPrimaryButton" : "MacSecondaryButton");
     }
 
     private async void AuditButton_OnClick(object sender, RoutedEventArgs e)

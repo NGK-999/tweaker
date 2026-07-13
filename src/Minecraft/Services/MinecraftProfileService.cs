@@ -43,6 +43,14 @@ internal sealed partial class MinecraftProfileService
                 onlyExistingOptions: true,
                 disableViewBobbing: true,
                 disableResourcePacks: true),
+            [MinecraftProfileKind.PotatoCobblemon4Gb480p] = CreateProfile(
+                MinecraftProfileKind.PotatoCobblemon4Gb480p, "POTATO_COBBLEMON_4GB_480P", 2, 5, "0.30", 2, 0, 0, 24, false, 2048,
+                "Modo sobrevivencia maximo: 854x480, 24 FPS e somente opcoes vanilla existentes.",
+                width: 854,
+                height: 480,
+                onlyExistingOptions: true,
+                disableViewBobbing: true,
+                disableResourcePacks: true),
             [MinecraftProfileKind.GpuLimited] = CreateProfile(
                 MinecraftProfileKind.GpuLimited, "GPU_LIMITED", 4, 5, "0.45", 2, 0, 0, 30, false, 2560,
                 "Reduz pixels, efeitos, distancia e carga de entidades para GPU integrada."),
@@ -473,7 +481,7 @@ internal sealed partial class MinecraftProfileService
             mutations,
             changes,
             messages);
-        messages.Add(profile.Kind == MinecraftProfileKind.PotatoCobblemon4Gb
+        messages.Add(IsPotatoProfile(profile.Kind)
             ? "Resource packs locais ativos serao desmarcados somente se resourcePacks ja existir; nenhum pack sera excluido."
             : "Resource packs nao sao removidos automaticamente; desative packs pesados manualmente apos revisar requisitos do servidor.");
         messages.Add("ImmediatelyFast e EntityCulling permanecem nos defaults; use experimentos isolados e reverta diante de artefatos visuais.");
@@ -1199,7 +1207,7 @@ internal sealed partial class MinecraftProfileService
             ["enableVsync"] = "false",
             ["entityDistanceScaling"] = entityDistance,
             ["entityShadows"] = "false",
-            ["fovEffectScale"] = kind == MinecraftProfileKind.PotatoCobblemon4Gb ? "0.0" : "0.50",
+            ["fovEffectScale"] = IsPotatoProfile(kind) ? "0.0" : "0.50",
             ["fullscreen"] = "false",
             ["graphicsMode"] = "0",
             ["maxFps"] = maximumFps.ToString(CultureInfo.InvariantCulture),
@@ -1208,7 +1216,7 @@ internal sealed partial class MinecraftProfileService
             ["overrideWidth"] = width.ToString(CultureInfo.InvariantCulture),
             ["particles"] = particles.ToString(CultureInfo.InvariantCulture),
             ["renderDistance"] = renderDistance.ToString(CultureInfo.InvariantCulture),
-            ["screenEffectScale"] = kind == MinecraftProfileKind.PotatoCobblemon4Gb ? "0.0" : "0.25",
+            ["screenEffectScale"] = IsPotatoProfile(kind) ? "0.0" : "0.25",
             ["simulationDistance"] = simulationDistance.ToString(CultureInfo.InvariantCulture)
         };
 
@@ -1226,11 +1234,14 @@ internal sealed partial class MinecraftProfileService
             kind,
             displayName,
             options,
-            kind == MinecraftProfileKind.PotatoCobblemon4Gb ? 1792 : 2048,
+            IsPotatoProfile(kind) ? 1792 : 2048,
             preferredHeapMb,
             description,
             onlyExistingOptions);
     }
+
+    private static bool IsPotatoProfile(MinecraftProfileKind kind) =>
+        kind is MinecraftProfileKind.PotatoCobblemon4Gb or MinecraftProfileKind.PotatoCobblemon4Gb480p;
 
     private static int ParseMaximumHeapMb(string javaArguments)
     {

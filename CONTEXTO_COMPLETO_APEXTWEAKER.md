@@ -8,7 +8,7 @@ Regra: fatos marcados como **confirmados** foram verificados no repositorio loca
 
 - Nome: ApexTweaker.
 - Autor/empresa: Igor Silva.
-- Versao atual declarada: `3.1.0`.
+- Versao atual declarada: `3.2.0`.
 - Plataforma: Windows 10/11, com foco atual em Windows 11.
 - Framework atual: `.NET 10`, destino `net10.0-windows`.
 - Objetivo tecnico: otimizar estabilidade de frametime e 1% low, reduzir stutters e oferecer telemetria, backup e rollback.
@@ -27,7 +27,7 @@ Regra: fatos marcados como **confirmados** foram verificados no repositorio loca
 
 - Repositorio: `https://github.com/NGK-999/tweaker.git`.
 - Branch: `main`.
-- Estado local confirmado em 2026-07-12: versao `3.1.0` em preparacao sobre a `v3.0.1` publicada.
+- Estado local confirmado em 2026-07-13: versao `3.2.0` em preparacao sobre a `v3.1.0` publicada.
 - Base publicada antes deste patch: `6c8c018` (`v3.0.0`).
 - O repositorio atual nao exige excecao local de `safe.directory`.
 
@@ -446,3 +446,13 @@ Continue o ApexTweaker em C:\projetos\Apextweaker usando CONTEXTO_COMPLETO_APEXT
 - A pasta auditada em julho de 2026 tinha 88 mods, duplicidade de `mega_showdown` e colisao entre Sodium 0.6.13 e Indium separado.
 - `--minecraft-self-test` valida scanner, dry-run, fontes de metricas, ausencia de FPS inventado, heap, configs, Prism, quarentena, decisoes cientificas, rollback, privilegio minimo e XAML.
 - Detalhes operacionais: `docs/COBBLEMON_LOW_END.md` e `docs/HOMOLOGACAO_OPERACIONAL_COBBLEMON.md`.
+
+## 17. Cobblemon Facil 3.2.0
+
+- `MinecraftView` abre a camada `CobblemonEasyView` por padrao e preserva o wizard anterior em Modo Avancado.
+- O fluxo leigo possui seis acoes: detectar, analisar, otimizar, preparar servidor, testar e corrigir.
+- O perfil facil usa `POTATO_COBBLEMON_4GB` em 960x540 ou a variante 854x480, com 24/30 FPS e Xmx2048M.
+- Preparar servidor e Corrigir Problemas geram recomendacoes somente leitura; nenhum JAR e movido.
+- Restaurar Tudo usa o manifesto transacional e verifica SHA-256.
+- Exportar Diagnostico cria ZIP em `%LOCALAPPDATA%\ApexTweaker\MinecraftDiagnosticPackages`.
+- A documentacao principal da camada leiga e `docs/V3_2_COBBLEMON_ONE_CLICK.md`.

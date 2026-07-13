@@ -48,6 +48,9 @@ public partial class MainWindow : Window
     private readonly MinecraftInstanceService minecraftInstanceService = new();
     private readonly MinecraftOperationalHomologationService minecraftOperationalHomologationService = new();
     private readonly MinecraftScientificExperimentService minecraftScientificExperimentService = new();
+    private readonly MinecraftEasyModeService minecraftEasyModeService = new();
+    private readonly MinecraftDiagnosticPackageService minecraftDiagnosticPackageService = new();
+    private readonly MinecraftEnvironmentService minecraftEnvironmentService = new();
     private readonly EtwFrameTracker etwFrameTracker;
     private DashboardView? dashboardView;
     private ModulesView? modulesView;
@@ -64,6 +67,10 @@ public partial class MainWindow : Window
     private MinecraftProfilePlan? latestMinecraftProfilePlan;
     private MinecraftBenchmarkResult? latestMinecraftBenchmarkResult;
     private MinecraftScientificExperiment? latestMinecraftScientificExperiment;
+    private MinecraftProfileApplyResult? latestMinecraftProfileApplyResult;
+    private MinecraftOperationalObservation? latestMinecraftObservation;
+    private MinecraftEasyServerReadiness? latestMinecraftServerReadiness;
+    private MinecraftEasyCorrectionPlan? latestMinecraftCorrectionPlan;
     private bool isTweaking;
     private bool telemetryRunning;
     private bool baselineCaptured;
@@ -184,6 +191,11 @@ public partial class MainWindow : Window
             minecraftView.ScientificStartRequested += StartMinecraftScientificExperimentAsync;
             minecraftView.ScientificAdvanceRequested += AdvanceMinecraftScientificExperimentAsync;
             minecraftView.OpenReportsRequested += OpenMinecraftReports;
+            minecraftView.EasyDetectRequested += DetectMinecraftEasyInstanceAsync;
+            minecraftView.EasyOptimizeRequested += OptimizeMinecraftEasyAsync;
+            minecraftView.EasyPrepareServerRequested += PrepareMinecraftEasyServerAsync;
+            minecraftView.EasyFixRequested += BuildMinecraftEasyCorrectionsAsync;
+            minecraftView.EasyExportRequested += ExportMinecraftEasyDiagnosticAsync;
 
             var defaultModsPath = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
@@ -377,13 +389,13 @@ public partial class MainWindow : Window
             DashboardPageKey => "Dashboard",
             ModulesPageKey => "M\u00F3dulos",
             TelemetryPageKey => "Telemetria",
-            MinecraftPageKey => "Cobblemon",
+            MinecraftPageKey => "Cobblemon F\u00e1cil",
             UtilitiesPageKey => "Utilidades",
             _ => AppInfo.Name
         };
         HeaderSubtitleText.Text = pageKey switch
         {
-            MinecraftPageKey => "Auditoria de mods, perfis reversiveis e benchmark low-end",
+            MinecraftPageKey => "Detectar, analisar, otimizar, testar e restaurar sem complexidade",
             TelemetryPageKey => "Frametime, sensores e comparacao antes/depois",
             ModulesPageKey => "Ajustes individuais com snapshot e verificacao",
             UtilitiesPageKey => "Rollback, suporte e manutencao",
@@ -627,6 +639,49 @@ public partial class MainWindow : Window
         }
     }
 
+    private async Task DetectMinecraftEasyInstanceAsync(string selectedPath)
+    {
+        const string section = "Deteccao facil de instancia";
+        if (!TryBeginTweaking(section))
+        {
+            return;
+        }
+
+        MinecraftEasyInstanceStatus? result = null;
+        try
+        {
+            SetStatus("Cobblemon Facil: procurando instancias e Java 21 x64...");
+            result = await Task.Run(() => minecraftEasyModeService.Detect(selectedPath));
+            if (result.Instance is not null)
+            {
+                SelectMinecraftPath(result.Instance.ManagedRoot);
+            }
+
+            Minecraft.SetEasyInstanceStatus(result);
+            WriteLine($"Deteccao facil: {result.Status}. {result.Message}");
+            SetStatus($"Cobblemon Facil: {result.Status}.");
+        }
+        catch (Exception ex)
+        {
+            Minecraft.SetOperationText($"Deteccao nao concluida: {ex.Message}");
+            SetStatus("Cobblemon Facil: nao foi possivel detectar a instancia.");
+        }
+        finally
+        {
+            EndTweaking();
+        }
+
+        if (result?.Instance is null)
+        {
+            System.Windows.MessageBox.Show(
+                result?.Message ?? "Selecione a pasta da instancia manualmente.",
+                "Detectar Instancia",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            BrowseMinecraftFolder();
+        }
+    }
+
     private void BrowseMinecraftFolder()
     {
         var dialog = new OpenFolderDialog
@@ -642,9 +697,42 @@ public partial class MainWindow : Window
 
         if (dialog.ShowDialog(this) == true)
         {
-            Minecraft.SetSelectedPath(dialog.FolderName);
+            SelectMinecraftPath(dialog.FolderName);
             SetStatus("Pasta Minecraft selecionada. Execute a auditoria antes de aplicar um perfil.");
         }
+    }
+
+    private void SelectMinecraftPath(string path)
+    {
+        if (minecraftView is null)
+        {
+            return;
+        }
+
+        if (!SameMinecraftInstance(minecraftView.SelectedPath, path))
+        {
+            latestMinecraftQuarantinePlan = null;
+            latestMinecraftAuditResult = null;
+            latestMinecraftProfilePlan = null;
+            latestMinecraftProfileApplyResult = null;
+            latestMinecraftBenchmarkResult = null;
+            latestMinecraftObservation = null;
+            latestMinecraftServerReadiness = null;
+            latestMinecraftCorrectionPlan = null;
+        }
+
+        minecraftView.SetSelectedPath(path);
+    }
+
+    private bool SameMinecraftInstance(string left, string right)
+    {
+        if (minecraftInstanceService.TryResolve(left, out var leftInstance) &&
+            minecraftInstanceService.TryResolve(right, out var rightInstance))
+        {
+            return SamePath(leftInstance.GameDirectory, rightInstance.GameDirectory);
+        }
+
+        return SamePath(left, right);
     }
 
     private async Task RunMinecraftAuditAsync(string path)
@@ -681,8 +769,11 @@ public partial class MainWindow : Window
             latestMinecraftAuditResult = result;
             latestMinecraftProfilePlan = null;
             latestMinecraftBenchmarkResult = null;
+            latestMinecraftServerReadiness = null;
+            latestMinecraftCorrectionPlan = null;
 
             Minecraft.SetAuditResult(result, reports, quarantine, survival);
+            Minecraft.SetEasyAudit(minecraftEasyModeService.SummarizeMods(result));
             WriteLine($"Mods encontrados: {result.Summary.TotalMods}");
             WriteLine($"Performance: {result.Summary.PerformanceMods}");
             WriteLine($"IDs duplicados: {result.Summary.DuplicateModIds}");
@@ -705,6 +796,31 @@ public partial class MainWindow : Window
         {
             EndTweaking();
         }
+    }
+
+    private async Task OptimizeMinecraftEasyAsync(string path, bool extremeResolution, int maximumFps)
+    {
+        if (!minecraftInstanceService.TryResolve(path, out _))
+        {
+            Minecraft.SetOperationText("Selecione uma instancia completa antes de otimizar.");
+            return;
+        }
+
+        if (!LatestMinecraftAuditMatches(path))
+        {
+            await RunMinecraftAuditAsync(path);
+        }
+
+        if (!LatestMinecraftAuditMatches(path))
+        {
+            Minecraft.SetOperationText("A otimizacao foi bloqueada porque a auditoria desta instancia nao foi concluida.");
+            return;
+        }
+
+        var profile = extremeResolution
+            ? MinecraftProfileKind.PotatoCobblemon4Gb480p
+            : MinecraftProfileKind.PotatoCobblemon4Gb;
+        await ApplyMinecraftProfileAsync(path, profile, maximumFps is 24 or 30 ? maximumFps : 24);
     }
 
     private async Task PreviewMinecraftProfileAsync(string path, MinecraftProfileKind profile, int maximumFps)
@@ -797,8 +913,14 @@ public partial class MainWindow : Window
             Minecraft.SetJavaArguments(result.JavaArguments);
             Minecraft.SetOperationText($"{profile} aplicado. Backup: {result.BackupDirectory}");
             Minecraft.MarkProfileApplied();
+            var javaAppliedAutomatically = result.ChangedFiles.Any(path =>
+                string.Equals(Path.GetFileName(path), "instance.cfg", StringComparison.OrdinalIgnoreCase));
+            Minecraft.SetEasyOptimizationApplied(result.BackupId, result.JavaArguments, javaAppliedAutomatically);
             latestMinecraftProfilePlan = plan;
+            latestMinecraftProfileApplyResult = result;
             latestMinecraftBenchmarkResult = null;
+            latestMinecraftObservation = null;
+            latestMinecraftCorrectionPlan = null;
             InvalidateMinecraftScientificState("Experimento invalidado: um perfil foi aplicado fora do motor cientifico.");
             WriteLine($"Relatorio antes/depois: {result.ReportPath}");
             SetStatus($"Minecraft: perfil {profile} aplicado e verificavel por rollback.");
@@ -844,6 +966,7 @@ public partial class MainWindow : Window
 
         try
         {
+            string restoredBackupId;
             if (cancelScientific)
             {
                 var cancelled = await Task.Run(() => minecraftScientificExperimentService.Cancel(
@@ -853,6 +976,7 @@ public partial class MainWindow : Window
                 WriteLines(cancelled.Messages);
                 Minecraft.SetScientificExperiment(cancelled.Experiment, cancelled.Reports.MarkdownPath);
                 Minecraft.SetOperationText("Experimento cancelado e candidato restaurado pelo backup exato.");
+                restoredBackupId = activeExperiment!.AppliedProfileBackupId!;
             }
             else
             {
@@ -860,10 +984,15 @@ public partial class MainWindow : Window
                 WriteLines(result.Messages);
                 Minecraft.SetOperationText($"Rollback concluido: {result.BackupId}");
                 InvalidateMinecraftScientificState("Experimento invalidado: ocorreu rollback externo de perfil.");
+                restoredBackupId = result.BackupId;
             }
 
             latestMinecraftProfilePlan = null;
+            latestMinecraftProfileApplyResult = null;
             latestMinecraftBenchmarkResult = null;
+            latestMinecraftObservation = null;
+            latestMinecraftCorrectionPlan = null;
+            Minecraft.SetEasyRestored(restoredBackupId);
             SetStatus("Minecraft: configuracao anterior restaurada.");
         }
         catch (Exception ex)
@@ -1016,6 +1145,119 @@ public partial class MainWindow : Window
         }
     }
 
+    private async Task PrepareMinecraftEasyServerAsync(string selectedPath)
+    {
+        if (!LatestMinecraftAuditMatches(selectedPath))
+        {
+            await RunMinecraftAuditAsync(selectedPath);
+        }
+
+        var audit = latestMinecraftAuditResult;
+        if (audit is null || !LatestMinecraftAuditMatches(selectedPath))
+        {
+            Minecraft.SetOperationText("A verificacao do servidor exige uma auditoria concluida desta instancia.");
+            return;
+        }
+
+        var megaAnswer = System.Windows.MessageBox.Show(
+            "O servidor exige o mod Mega Showdown?\n\n" +
+            "Sim: ele sera tratado como obrigatorio.\n" +
+            "Nao: ele continuara ativo, mas duplicatas serao sinalizadas.\n" +
+            "Cancelar: a exigencia permanecera desconhecida.\n\n" +
+            "Nenhum mod sera removido ou movido.",
+            "Preparar para Servidor",
+            MessageBoxButton.YesNoCancel,
+            MessageBoxImage.Question);
+        bool? serverRequiresMega = megaAnswer switch
+        {
+            MessageBoxResult.Yes => true,
+            MessageBoxResult.No => false,
+            _ => null
+        };
+
+        var readiness = await Task.Run(() => minecraftEasyModeService.PrepareForServer(audit, serverRequiresMega));
+        latestMinecraftServerReadiness = readiness;
+        Minecraft.SetEasyServerReadiness(readiness);
+        WriteLine($"Servidor: {readiness.Status}. Nenhum JAR foi alterado.");
+        SetStatus($"Cobblemon Facil: {readiness.Status}.");
+    }
+
+    private Task BuildMinecraftEasyCorrectionsAsync(string selectedPath)
+    {
+        if (!minecraftInstanceService.TryResolve(selectedPath, out _))
+        {
+            Minecraft.SetOperationText("Selecione uma instancia completa antes de corrigir problemas.");
+            return Task.CompletedTask;
+        }
+
+        var plan = minecraftEasyModeService.BuildCorrections(
+            latestMinecraftBenchmarkResult,
+            latestMinecraftObservation,
+            LatestMinecraftAuditMatches(selectedPath) ? latestMinecraftAuditResult : null);
+        latestMinecraftCorrectionPlan = plan;
+        Minecraft.SetEasyCorrections(plan);
+        WriteLine($"Correcao facil: {plan.Status}. {plan.Message}");
+        SetStatus($"Cobblemon Facil: {plan.Status}.");
+        return Task.CompletedTask;
+    }
+
+    private async Task ExportMinecraftEasyDiagnosticAsync(string selectedPath)
+    {
+        if (!minecraftInstanceService.TryResolve(selectedPath, out var instance))
+        {
+            Minecraft.SetOperationText("Selecione uma instancia completa antes de exportar o diagnostico.");
+            return;
+        }
+
+        const string section = "Exportar diagnostico Cobblemon";
+        if (!TryBeginTweaking(section))
+        {
+            return;
+        }
+
+        try
+        {
+            var environment = await Task.Run(minecraftEnvironmentService.Capture);
+            var context = new MinecraftDiagnosticPackageContext(
+                selectedPath,
+                environment,
+                LatestMinecraftAuditMatches(selectedPath) ? latestMinecraftAuditResult : null,
+                latestMinecraftProfilePlan is not null && SamePath(latestMinecraftProfilePlan.Instance.GameDirectory, instance.GameDirectory)
+                    ? latestMinecraftProfilePlan
+                    : null,
+                latestMinecraftProfileApplyResult is not null && SamePath(latestMinecraftProfileApplyResult.InstanceRoot, instance.GameDirectory)
+                    ? latestMinecraftProfileApplyResult
+                    : null,
+                latestMinecraftBenchmarkResult is not null &&
+                SamePath(latestMinecraftBenchmarkResult.InstanceRoot ?? string.Empty, instance.GameDirectory)
+                    ? latestMinecraftBenchmarkResult
+                    : null,
+                latestMinecraftObservation,
+                latestMinecraftServerReadiness,
+                latestMinecraftCorrectionPlan);
+            var package = await Task.Run(() => minecraftDiagnosticPackageService.Create(context));
+            Minecraft.SetEasyDiagnostic(package);
+            WriteLine($"Diagnostico ZIP: {package.ZipPath}");
+            WriteLine($"SHA-256: {package.Sha256}");
+            SetStatus("Cobblemon Facil: diagnostico ZIP criado em modo somente leitura.");
+            System.Windows.MessageBox.Show(
+                $"Diagnostico criado com {package.IncludedEntries.Count} arquivo(s).\n\n{package.ZipPath}\n\nSHA-256: {package.Sha256}",
+                "Exportar Diagnostico",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            Minecraft.SetOperationText($"Diagnostico nao exportado: {ex.Message}");
+            WriteLine($"Falha ao exportar diagnostico: {ex.Message}");
+            SetStatus("Cobblemon Facil: falha ao criar o pacote de diagnostico.");
+        }
+        finally
+        {
+            EndTweaking();
+        }
+    }
+
     private async Task RunMinecraftBenchmarkAsync(string selectedPath)
     {
         const string section = "Benchmark Minecraft";
@@ -1159,6 +1401,7 @@ public partial class MainWindow : Window
         string selectedPath,
         MinecraftOperationalObservation observation)
     {
+        latestMinecraftObservation = observation;
         const string section = "Homologacao operacional Minecraft";
         if (!TryBeginTweaking(section))
         {
@@ -1787,6 +2030,27 @@ public partial class MainWindow : Window
     {
         StatusText.Text = message;
     }
+
+    private bool LatestMinecraftAuditMatches(string selectedPath)
+    {
+        var audit = latestMinecraftAuditResult;
+        if (audit is null || string.IsNullOrWhiteSpace(selectedPath))
+        {
+            return false;
+        }
+
+        if (minecraftInstanceService.TryResolve(selectedPath, out var instance))
+        {
+            return SamePath(audit.ModsDirectory, instance.ModsDirectory);
+        }
+
+        return Directory.Exists(selectedPath) && SamePath(audit.ModsDirectory, selectedPath);
+    }
+
+    private static bool SamePath(string left, string right) =>
+        !string.IsNullOrWhiteSpace(left) &&
+        !string.IsNullOrWhiteSpace(right) &&
+        string.Equals(Path.GetFullPath(left), Path.GetFullPath(right), StringComparison.OrdinalIgnoreCase);
 
     private async void DashboardButton_OnClick(object sender, RoutedEventArgs e)
     {
