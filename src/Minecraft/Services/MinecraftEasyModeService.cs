@@ -5,7 +5,9 @@ namespace ApexTweaker.Minecraft.Services;
 
 internal sealed class MinecraftEasyModeService
 {
-    private static readonly string[] EssentialIds = ["cobblemon", "fabricapi", "fabriclanguagekotlin"];
+    private static readonly string[] MinecraftCoreIds = ["fabricapi", "fabriclanguagekotlin"];
+
+    private static readonly string[] CobblemonCoreIds = ["cobblemon", "fabricapi", "fabriclanguagekotlin"];
 
     private static readonly string[] PerformanceIds =
     [
@@ -48,8 +50,8 @@ internal sealed class MinecraftEasyModeService
         if (selected is null)
         {
             var discoveryMessage = candidates.Count > 1
-                ? $"Foram encontradas {candidates.Count} instancias. Selecione a que contem o Cobblemon."
-                : "Nenhuma instancia completa foi encontrada. Selecione a pasta da instancia manualmente.";
+                ? $"Foram encontradas {candidates.Count} instancias. Selecione a que deseja otimizar."
+                : "Nenhuma instancia inicializada foi encontrada. Abra o Minecraft uma vez ou selecione a pasta manualmente.";
             return new MinecraftEasyInstanceStatus(
                 MinecraftEasyState.Attention,
                 "Instancia incompleta",
@@ -66,19 +68,20 @@ internal sealed class MinecraftEasyModeService
 
         var gameFound = Directory.Exists(selected.GameDirectory);
         var optionsFound = File.Exists(selected.OptionsPath);
-        var modsFound = Directory.Exists(selected.ModsDirectory) &&
-                        Directory.EnumerateFiles(selected.ModsDirectory, "*.jar", SearchOption.TopDirectoryOnly).Any();
+        var modsFound = Directory.Exists(selected.ModsDirectory);
+        var hasModJars = modsFound &&
+                         Directory.EnumerateFiles(selected.ModsDirectory, "*.jar", SearchOption.TopDirectoryOnly).Any();
         var configFound = Directory.Exists(selected.ConfigDirectory);
         var logsFound = Directory.Exists(Path.Combine(selected.GameDirectory, "logs"));
         var javaFound = environment.Java.Found && environment.Java.Is64Bit && IsJava21(environment.Java.Version);
 
         var (state, status, message) = !javaFound
             ? (MinecraftEasyState.Attention, "Java ausente", "Instale ou selecione Java 21 x64 antes de iniciar o jogo.")
-            : !modsFound
-                ? (MinecraftEasyState.Attention, "Mods nao encontrados", "A pasta mods existe, mas nao contem JARs para auditar.")
-                : !gameFound || !optionsFound || !configFound || !logsFound
-                    ? (MinecraftEasyState.Attention, "Instancia incompleta", "Abra esta instancia uma vez para criar options.txt, config e logs.")
-                    : (MinecraftEasyState.Ready, "Pronto para otimizar", "Instancia, Java, mods e arquivos principais foram encontrados.");
+            : !gameFound || !optionsFound
+                ? (MinecraftEasyState.Attention, "Instancia incompleta", "Abra esta instancia uma vez para criar options.txt antes de otimizar.")
+                : (MinecraftEasyState.Ready, "Pronto para otimizar", hasModJars
+                    ? "Instancia modded, Java e arquivos principais foram encontrados."
+                    : "Instancia Minecraft sem mods detectada. A pasta mods e opcional.");
 
         return new MinecraftEasyInstanceStatus(
             state,
@@ -96,7 +99,13 @@ internal sealed class MinecraftEasyModeService
 
     public MinecraftEasyModSummary SummarizeMods(MinecraftAuditResult audit)
     {
-        var essential = SelectKnown(audit.Mods, EssentialIds);
+        var contentProfile = DetectContentProfile(audit.Mods);
+        var essential = SelectKnown(
+            audit.Mods,
+            contentProfile == MinecraftContentProfileKind.Cobblemon ? CobblemonCoreIds : MinecraftCoreIds)
+            .DistinctBy(mod => mod.Id, StringComparer.OrdinalIgnoreCase)
+            .OrderBy(DisplayName, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
         var performance = SelectKnown(audit.Mods, PerformanceIds)
             .Concat(audit.Mods.Where(mod => mod.ClassificationTags.Contains(ModClassification.Performance)))
             .DistinctBy(mod => mod.Id, StringComparer.OrdinalIgnoreCase)
@@ -143,7 +152,9 @@ internal sealed class MinecraftEasyModeService
             performance.Select(DisplayName).ToArray(),
             heavy.Select(DisplayName).ToArray(),
             duplicates,
-            risks);
+            risks,
+            contentProfile,
+            audit.TargetLoader);
     }
 
     public MinecraftEasyServerReadiness PrepareForServer(
@@ -152,7 +163,7 @@ internal sealed class MinecraftEasyModeService
     {
         var ids = audit.Mods.Select(mod => NormalizeId(mod.Id)).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var hasCobblemon = ids.Contains("cobblemon");
-        var hasFabricApi = ids.Contains("fabricapi");
+        var hasFabricApi = ids.Contains("fabricapi") || ids.Contains("fabric-api");
         var megaMods = audit.Mods.Where(mod => NormalizeId(mod.Id).Contains("megashowdown", StringComparison.Ordinal)).ToArray();
         var heavy = SelectKnown(audit.Mods, HeavyVisualIds);
         var missingDependencies = audit.Summary.MissingDependencies;
@@ -160,24 +171,30 @@ internal sealed class MinecraftEasyModeService
 
         var checklist = new List<string>
         {
-            hasCobblemon ? "Cobblemon encontrado." : "Cobblemon nao foi encontrado.",
-            hasFabricApi ? "Fabric API encontrada." : "Fabric API nao foi encontrada.",
+            hasCobblemon ? "Perfil Cobblemon detectado." : "Minecraft geral detectado; Cobblemon nao e obrigatorio.",
+            audit.Mods.Count == 0
+                ? "Instancia sem mods; valide apenas se o servidor aceita cliente vanilla."
+                : $"Loader detectado/alvo: {audit.TargetLoader}.",
             missingDependencies == 0
                 ? "Nenhuma dependencia obrigatoria ausente foi detectada."
                 : $"{missingDependencies} dependencia(s) obrigatoria(s) podem estar ausentes.",
             "Nenhum JAR foi movido, desativado ou excluido."
         };
+        if (hasCobblemon)
+        {
+            checklist.Insert(1, hasFabricApi ? "Fabric API encontrada." : "Fabric API nao foi encontrada.");
+        }
         var warnings = new List<string>();
 
-        if (megaMods.Length > 1)
+        if (hasCobblemon && megaMods.Length > 1)
         {
             warnings.Add($"Mega Showdown aparece em {megaMods.Length} JARs; confirme a versao exata do servidor.");
         }
-        else if (megaMods.Length == 1 && serverRequiresMegaShowdown is null)
+        else if (hasCobblemon && megaMods.Length == 1 && serverRequiresMegaShowdown is null)
         {
             warnings.Add("Confirme se o servidor exige esta versao do Mega Showdown.");
         }
-        else if (serverRequiresMegaShowdown == true && megaMods.Length == 0)
+        else if (hasCobblemon && serverRequiresMegaShowdown == true && megaMods.Length == 0)
         {
             warnings.Add("O servidor exige Mega Showdown, mas ele nao foi encontrado.");
         }
@@ -192,8 +209,9 @@ internal sealed class MinecraftEasyModeService
             warnings.Add($"Mods visuais pesados ativos: {string.Join(", ", heavy.Select(DisplayName))}.");
         }
 
-        var missingCore = !hasCobblemon || !hasFabricApi || missingDependencies > 0 ||
-                          (serverRequiresMegaShowdown == true && megaMods.Length == 0);
+        var missingCore = missingDependencies > 0 ||
+                          (hasCobblemon && !hasFabricApi) ||
+                          (hasCobblemon && serverRequiresMegaShowdown == true && megaMods.Length == 0);
         var (state, status, message) = missingCore
             ? (MinecraftEasyState.ServerMayReject, "Pode faltar mod obrigatorio", "Compare os mods e versoes com a lista oficial do servidor.")
             : duplicateCount > 0
@@ -202,7 +220,7 @@ internal sealed class MinecraftEasyModeService
                     ? (MinecraftEasyState.Attention, "Requer confirmacao manual", "Informe se o servidor exige Mega Showdown antes de testar sem uma versao.")
                     : heavy.Length > 0
                         ? (MinecraftEasyState.TooHeavy, "Ha mods visuais pesados", "A entrada pode funcionar, mas o desempenho pode ser insuficiente em 4 GB.")
-                        : (MinecraftEasyState.Ready, "Provavelmente pronto para servidor", "Os requisitos basicos encontrados foram preservados.");
+                        : (MinecraftEasyState.Ready, "Provavelmente pronto para multiplayer", "Os requisitos encontrados foram preservados; compare com o modpack oficial do servidor.");
 
         return new MinecraftEasyServerReadiness(
             state,
@@ -216,7 +234,8 @@ internal sealed class MinecraftEasyModeService
     public MinecraftEasyCorrectionPlan BuildCorrections(
         MinecraftBenchmarkResult? benchmark,
         MinecraftOperationalObservation? observation,
-        MinecraftAuditResult? audit)
+        MinecraftAuditResult? audit,
+        MinecraftPlayTargetKind playTarget = MinecraftPlayTargetKind.Server)
     {
         var automatic = new List<string>();
         var manual = new List<string>();
@@ -226,7 +245,9 @@ internal sealed class MinecraftEasyModeService
         var severeStutter = observation?.SevereDrops == true ||
                             (benchmark is not null &&
                              benchmark.EnvironmentAfter.PageFileInUseMb - benchmark.EnvironmentBefore.PageFileInUseMb >= 256);
-        var serverRejected = observation?.GameOpened == true && observation.ServerEntered == false;
+        var serverRejected = playTarget == MinecraftPlayTargetKind.Server &&
+                             observation?.GameOpened == true &&
+                             observation.ServerEntered == false;
 
         if (outOfMemory)
         {
@@ -263,7 +284,10 @@ internal sealed class MinecraftEasyModeService
 
         if (automatic.Count == 0 && manual.Count == 0)
         {
-            return observation?.GameOpened == true && observation.ServerEntered == true && observation.Crashed == false
+            var destinationReached = playTarget == MinecraftPlayTargetKind.Server
+                ? observation?.ServerEntered == true
+                : observation?.WorldEntered == true;
+            return observation?.GameOpened == true && destinationReached && observation.Crashed == false
                 ? new MinecraftEasyCorrectionPlan(
                     MinecraftEasyState.Ready,
                     "Pronto",
@@ -316,6 +340,11 @@ internal sealed class MinecraftEasyModeService
 
     private static string NormalizeId(string value) =>
         new(value.Where(char.IsLetterOrDigit).Select(char.ToLowerInvariant).ToArray());
+
+    internal static MinecraftContentProfileKind DetectContentProfile(IReadOnlyCollection<MinecraftModDescriptor> mods) =>
+        mods.Any(mod => string.Equals(NormalizeId(mod.Id), "cobblemon", StringComparison.OrdinalIgnoreCase))
+            ? MinecraftContentProfileKind.Cobblemon
+            : MinecraftContentProfileKind.Minecraft;
 
     private static bool IsJava21(string version)
     {

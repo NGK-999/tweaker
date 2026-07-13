@@ -1,4 +1,7 @@
-# Cobblemon Low-End Lab v3.2.1
+# Cobblemon Low-End Lab v3.3.0
+
+> Na v3.3.0, Cobblemon e um perfil opcional dentro da pagina Minecraft Facil.
+> Instancias vanilla e outros modpacks nao recebem estas exigencias especificas.
 
 ## Objetivo
 
@@ -12,7 +15,7 @@ Nesse hardware, o objetivo e abrir o jogo e obter estabilidade minima em
 
 ## Fluxos
 
-Para uso comum, abra **Cobblemon Facil** e siga:
+Para uso comum, abra **Minecraft Facil** e siga:
 
 `Detectar -> Analisar -> Otimizar -> Testar -> Corrigir ou Restaurar`.
 
@@ -42,7 +45,8 @@ Os fluxos tecnicos abaixo permanecem em **Modo Avancado**.
 - raiz customizada;
 - selecao direta da subpasta `mods`.
 
-Para aplicar perfil, a instancia precisa conter `options.txt` e `mods`. Prism e
+Para aplicar perfil, a instancia precisa conter `options.txt`. A pasta `mods`
+e opcional no Minecraft vanilla. Prism e
 MultiMC podem ser selecionados pela pasta da instancia ou por `.minecraft`.
 
 ## EXTREME_4GB
@@ -70,7 +74,7 @@ Se o arquivo ou a chave nao existir, nada e inventado. Opcoes experimentais e
 debug nao sao ativadas. ImmediatelyFast e EntityCulling permanecem nos defaults
 e devem ser comparados isoladamente por causa de bugs visuais possiveis.
 
-## POTATO_COBBLEMON_4GB
+## POTATO_4GB
 
 Use somente quando o primeiro teste seguro ainda nao abre ou pagina demais:
 

@@ -411,7 +411,7 @@ internal sealed class MinecraftQuarantineService
             mod.Environment,
             AssessSide(mod),
             AssessServerEntryImpact(mod),
-            AssessCobblemonImpact(mod),
+            AssessContentImpact(mod),
             AssessPerformanceImpact(mod),
             AssessOperationalRecommendation(mod));
     }
@@ -443,7 +443,7 @@ internal sealed class MinecraftQuarantineService
             : "DESCONHECIDO: compare com o manifesto do servidor.";
     }
 
-    private static string AssessCobblemonImpact(MinecraftModDescriptor mod)
+    private static string AssessContentImpact(MinecraftModDescriptor mod)
     {
         if (string.Equals(mod.Id, "mega_showdown", StringComparison.OrdinalIgnoreCase))
         {

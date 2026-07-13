@@ -51,6 +51,9 @@ internal enum MinecraftProfileKind
     Safe,
     LowEnd,
     Extreme4Gb,
+    Potato4Gb,
+    Potato4Gb480p,
+    // Legacy names are kept because backup manifests serialize enum names.
     PotatoCobblemon4Gb,
     PotatoCobblemon4Gb480p,
     GpuLimited,
@@ -59,6 +62,21 @@ internal enum MinecraftProfileKind
     ServerEntryCompatible,
     CobblemonServerClient,
     Benchmark
+}
+
+[JsonConverter(typeof(JsonStringEnumConverter))]
+internal enum MinecraftContentProfileKind
+{
+    Auto,
+    Minecraft,
+    Cobblemon
+}
+
+[JsonConverter(typeof(JsonStringEnumConverter))]
+internal enum MinecraftPlayTargetKind
+{
+    World,
+    Server
 }
 
 [JsonConverter(typeof(JsonStringEnumConverter))]
@@ -426,7 +444,7 @@ internal sealed record MinecraftQuarantineCandidate(
     string Environment,
     string SideAssessment,
     string ServerEntryImpact,
-    string CobblemonImpact,
+    string ContentImpact,
     string PerformanceImpact,
     string OperationalRecommendation);
 
@@ -561,7 +579,9 @@ internal sealed record MinecraftEasyModSummary(
     IReadOnlyList<string> PerformanceNames,
     IReadOnlyList<string> HeavyVisualNames,
     IReadOnlyList<string> DuplicateNames,
-    IReadOnlyList<string> RiskMessages);
+    IReadOnlyList<string> RiskMessages,
+    MinecraftContentProfileKind ContentProfile = MinecraftContentProfileKind.Auto,
+    MinecraftLoader DetectedLoader = MinecraftLoader.Unknown);
 
 internal sealed record MinecraftEasyServerReadiness(
     MinecraftEasyState State,
@@ -588,7 +608,8 @@ internal sealed record MinecraftDiagnosticPackageContext(
     MinecraftBenchmarkResult? Benchmark,
     MinecraftOperationalObservation? Observation,
     MinecraftEasyServerReadiness? ServerReadiness,
-    MinecraftEasyCorrectionPlan? CorrectionPlan);
+    MinecraftEasyCorrectionPlan? CorrectionPlan,
+    string? SessionHookReportPath = null);
 
 internal sealed record MinecraftDiagnosticPackageResult(
     string ZipPath,

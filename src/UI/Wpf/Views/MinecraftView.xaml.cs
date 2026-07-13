@@ -106,6 +106,10 @@ public partial class MinecraftView : WpfUserControl
 
     public string EasyStatusLine => EasyView.StatusLine;
 
+    internal MinecraftSessionHookMode EasySessionHookMode => EasyView.SessionHookMode;
+
+    internal MinecraftPlayTargetKind EasyPlayTarget => EasyView.PlayTarget;
+
     public void SetSelectedPath(string path)
     {
         PathTextBox.Text = path;
@@ -117,7 +121,7 @@ public partial class MinecraftView : WpfUserControl
         QuarantineList.ItemsSource = null;
         InstanceStateText.Text = instanceDetected
             ? "Instancia valida detectada. Perfis e rollback estao disponiveis."
-            : "Pasta aceita para auditoria. Perfil bloqueado ate selecionar uma instancia com options.txt e subpasta mods.";
+            : "Pasta aceita para auditoria. Perfil bloqueado ate selecionar uma instancia inicializada com options.txt.";
         wizard.SetInstanceState(instanceDetected, InstanceStateText.Text);
         EasyView.SetSelectedPath(path, instanceDetected);
         UpdateActionState();

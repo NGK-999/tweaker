@@ -246,12 +246,12 @@ internal static class MinecraftSelfTest
                 "O perfil nao aceitou 45 FPS.");
             Assert(profileService.PlanProfile(managedRoot, MinecraftProfileKind.Extreme4Gb, 60).MaximumFps == 60,
                 "O perfil nao aceitou 60 FPS.");
-            Assert(profileService.PlanProfile(managedRoot, MinecraftProfileKind.PotatoCobblemon4Gb, 20).MaximumFps == 20 &&
-                   profileService.PlanProfile(managedRoot, MinecraftProfileKind.PotatoCobblemon4Gb, 24).MaximumFps == 24,
+            Assert(profileService.PlanProfile(managedRoot, MinecraftProfileKind.Potato4Gb, 20).MaximumFps == 20 &&
+                   profileService.PlanProfile(managedRoot, MinecraftProfileKind.Potato4Gb, 24).MaximumFps == 24,
                 "POTATO nao aceitou os caps extremos de 20/24 FPS.");
             var potato480Plan = profileService.PlanProfile(
                 managedRoot,
-                MinecraftProfileKind.PotatoCobblemon4Gb480p,
+                MinecraftProfileKind.Potato4Gb480p,
                 24);
             Assert(potato480Plan.Changes.Any(change => change.Setting == "overrideWidth" && change.After == "854") &&
                    potato480Plan.Changes.Any(change => change.Setting == "overrideHeight" && change.After == "480") &&
@@ -261,9 +261,13 @@ internal static class MinecraftSelfTest
                    MinecraftProfileService.AvailableProfiles.Any(profile => profile.Kind == MinecraftProfileKind.CpuLimited) &&
                    MinecraftProfileService.AvailableProfiles.Any(profile => profile.Kind == MinecraftProfileKind.GpuLimited) &&
                    MinecraftProfileService.AvailableProfiles.Any(profile => profile.Kind == MinecraftProfileKind.ServerEntryCompatible) &&
-                   MinecraftProfileService.AvailableProfiles.Any(profile => profile.Kind == MinecraftProfileKind.PotatoCobblemon4Gb) &&
-                   MinecraftProfileService.AvailableProfiles.Any(profile => profile.Kind == MinecraftProfileKind.PotatoCobblemon4Gb480p),
+                   MinecraftProfileService.AvailableProfiles.Any(profile => profile.Kind == MinecraftProfileKind.Potato4Gb) &&
+                   MinecraftProfileService.AvailableProfiles.Any(profile => profile.Kind == MinecraftProfileKind.Potato4Gb480p),
                 "Os perfis cientificos por gargalo nao foram registrados.");
+            var legacyPotatoPlan = profileService.PlanProfile(managedRoot, MinecraftProfileKind.PotatoCobblemon4Gb, 24);
+            Assert(legacyPotatoPlan.MaximumHeapMb == 2048 &&
+                   legacyPotatoPlan.Changes.Any(change => change.Setting == "overrideWidth" && change.After == "960"),
+                "O alias legado POTATO_COBBLEMON_4GB deixou de ser compativel.");
             AssertThrows<ArgumentOutOfRangeException>(
                 () => profileService.PlanProfile(managedRoot, MinecraftProfileKind.Extreme4Gb, 50),
                 "O perfil aceitou um limite fora de 20/24/30/45/60 FPS.");
@@ -323,17 +327,17 @@ internal static class MinecraftSelfTest
 
             var potatoPlan = profileService.PlanProfile(
                 managedRoot,
-                MinecraftProfileKind.PotatoCobblemon4Gb);
+                MinecraftProfileKind.Potato4Gb);
             Assert(potatoPlan.MaximumFps == 24 &&
                    potatoPlan.MaximumHeapMb == 2048 &&
                    potatoPlan.Changes.Any(change => change.Setting == "renderDistance" && change.After == "2") &&
                    potatoPlan.Changes.Any(change => change.Setting == "simulationDistance" && change.After == "5") &&
                    potatoPlan.Changes.Any(change => change.Setting == "overrideWidth" && change.After == "960") &&
                    potatoPlan.Changes.Any(change => change.Setting == "overrideHeight" && change.After == "540"),
-                "POTATO_COBBLEMON_4GB nao gerou o preset 960x540/2/5/24/2048 esperado.");
+                "POTATO_4GB nao gerou o preset 960x540/2/5/24/2048 esperado.");
             var potatoApplied = profileService.ApplyProfile(
                 managedRoot,
-                MinecraftProfileKind.PotatoCobblemon4Gb);
+                MinecraftProfileKind.Potato4Gb);
             var potatoOptions = File.ReadAllText(optionsPath);
             Assert(potatoOptions.Contains("entityDistanceScaling:0.30", StringComparison.Ordinal) &&
                    potatoOptions.Contains("bobView:false", StringComparison.Ordinal) &&
@@ -477,14 +481,76 @@ internal static class MinecraftSelfTest
             var easyService = new MinecraftEasyModeService(
                 new MinecraftInstanceService(),
                 () => easyEnvironment);
+
+            var vanillaRoot = Path.Combine(root, "vanilla-instance");
+            Directory.CreateDirectory(vanillaRoot);
+            File.WriteAllText(Path.Combine(vanillaRoot, "options.txt"), originalOptions, new UTF8Encoding(false));
+            Assert(new MinecraftInstanceService().TryResolve(vanillaRoot, out var vanillaInstance) &&
+                   vanillaInstance.GameDirectory == Path.GetFullPath(vanillaRoot),
+                "Uma instancia vanilla inicializada sem pasta mods nao foi reconhecida.");
+            var vanillaStatus = easyService.Detect(vanillaRoot);
+            var vanillaAudit = new MinecraftAuditService().Audit(vanillaRoot);
+            var vanillaSummary = easyService.SummarizeMods(vanillaAudit);
+            Assert(vanillaStatus.State == MinecraftEasyState.Ready && vanillaStatus.OptionsFound && !vanillaStatus.ModsFound &&
+                   vanillaAudit.Summary.TotalMods == 0 && vanillaAudit.TargetLoader == MinecraftLoader.Unknown &&
+                   vanillaSummary.ContentProfile == MinecraftContentProfileKind.Minecraft && vanillaAudit.Recommendations.Count == 0,
+                "O fluxo geral confundiu Minecraft vanilla com uma instancia incompleta ou recomendou mods incompativeis.");
+            Assert(easyService.PrepareForServer(vanillaAudit, null).State != MinecraftEasyState.ServerMayReject,
+                "O fluxo geral exigiu Cobblemon/Fabric API de uma instancia vanilla.");
+            messages.Add("PASS: Minecraft vanilla sem mods e aceito sem recomendacoes Fabric inventadas.");
+
+            var sessionHookRoot = Path.Combine(root, "session-hooks");
+            var hookPlatform = new FakeMinecraftSessionHookPlatform();
+            var hookService = new MinecraftSessionHookService(hookPlatform, sessionHookRoot);
+            var hookLease = hookService.StartAsync(
+                    managedRoot,
+                    MinecraftSessionHookMode.Extreme,
+                    TimeSpan.Zero)
+                .GetAwaiter()
+                .GetResult();
+            Assert(hookLease.IsApplied && hookPlatform.ApplyCount == 1 &&
+                   Directory.EnumerateFiles(sessionHookRoot, "active-*.json").Count() == 1,
+                "O hook extremo nao registrou apply e diario de recuperacao.");
+            Assert(hookLease.ApplyActions.All(action =>
+                    action.Id is "priority" or "high-qos" or "hybrid-affinity" or "power-mode"),
+                "O hook de sessao incluiu uma acao fora do catalogo permitido.");
+            hookLease.Restore();
+            hookLease.Restore();
+            Assert(hookPlatform.RestoreCount == 1 &&
+                   !Directory.EnumerateFiles(sessionHookRoot, "active-*.json").Any() &&
+                   hookLease.ReportPath is not null && File.Exists(hookLease.ReportPath),
+                "Rollback do hook nao foi exato, idempotente ou nao removeu o diario ativo.");
+            var hookReport = File.ReadAllText(hookLease.ReportPath!);
+            Assert(hookReport.Contains("Prioridade RealTime nunca e aplicada", StringComparison.Ordinal) &&
+                   hookReport.Contains("Alteracoes de registro, BCD, Defender, servicos e pagefile ficam fora", StringComparison.Ordinal),
+                "Relatorio de hooks nao declarou os limites de seguranca.");
+
+            hookPlatform.RestoreSucceeds = false;
+            var interruptedHook = hookService.StartAsync(
+                    managedRoot,
+                    MinecraftSessionHookMode.Safe,
+                    TimeSpan.Zero)
+                .GetAwaiter()
+                .GetResult();
+            interruptedHook.Restore();
+            Assert(Directory.EnumerateFiles(sessionHookRoot, "active-*.json").Count() == 1,
+                "Uma restauracao falha apagou o diario necessario para recuperacao.");
+            hookPlatform.RestoreSucceeds = true;
+            var recoveryMessages = hookService.RecoverPending();
+            Assert(recoveryMessages.Count == 1 &&
+                   !Directory.EnumerateFiles(sessionHookRoot, "active-*.json").Any(),
+                "A recuperacao de inicializacao nao restaurou uma sessao pendente.");
+            messages.Add("PASS: hooks Safe/Extreme usam catalogo restrito, diario e rollback idempotente.");
+
             var easyInstance = easyService.Detect(managedRoot);
             Assert(easyInstance.State == MinecraftEasyState.Ready &&
                    easyInstance.Instance?.Launcher == MinecraftLauncherKind.PrismLauncher &&
                    easyInstance.JavaFound && easyInstance.OptionsFound && easyInstance.ModsFound &&
                    easyInstance.ConfigFound && easyInstance.LogsFound,
-                "Cobblemon Facil nao validou a instancia Prism completa.");
+                "Minecraft Facil nao validou a instancia Prism completa.");
             var easySummary = easyService.SummarizeMods(instanceAudit);
-            Assert(easySummary.EssentialMods == 1 && easySummary.PerformanceMods >= 2,
+            Assert(easySummary.EssentialMods == 1 && easySummary.PerformanceMods >= 2 &&
+                   easySummary.ContentProfile == MinecraftContentProfileKind.Cobblemon,
                 "Resumo facil nao separou mods essenciais e de performance.");
             var serverReadiness = easyService.PrepareForServer(instanceAudit, serverRequiresMegaShowdown: true);
             Assert(serverReadiness.State == MinecraftEasyState.ServerMayReject &&
@@ -567,7 +633,7 @@ internal static class MinecraftSelfTest
                 .ToDictionary(path => Path.GetFileName(path)!, ComputeSha256, StringComparer.OrdinalIgnoreCase);
             var potato480Applied = profileService.ApplyProfile(
                 managedRoot,
-                MinecraftProfileKind.PotatoCobblemon4Gb480p,
+                MinecraftProfileKind.Potato4Gb480p,
                 24);
             Assert(File.ReadAllText(optionsPath).Contains("overrideWidth:854", StringComparison.Ordinal) &&
                    File.ReadAllText(optionsPath).Contains("overrideHeight:480", StringComparison.Ordinal),
@@ -621,11 +687,20 @@ internal static class MinecraftSelfTest
             Assert(jarHashesBeforeEasyMode.Count == jarHashesAfterEasyMode.Count &&
                    jarHashesBeforeEasyMode.All(pair =>
                        jarHashesAfterEasyMode.TryGetValue(pair.Key, out var hash) && hash == pair.Value),
-                "Cobblemon Facil moveu ou alterou um JAR sem confirmacao.");
+                "Minecraft Facil moveu ou alterou um JAR sem confirmacao.");
             _ = profileService.RollbackBackup(managedRoot, potato480Applied.BackupId);
             Assert(File.ReadAllText(optionsPath).Replace("\r\n", "\n") == originalOptions,
                 "Rollback do fluxo facil nao restaurou options.txt.");
-            messages.Add("PASS: Cobblemon Facil detecta, resume, prepara servidor, corrige e exporta ZIP sem mover JARs.");
+            var localObservation = new MinecraftOperationalObservation(
+                true, true, null, true, false, null, true, null, null, false, false, false, "Mundo local.");
+            var localCorrections = easyService.BuildCorrections(
+                benchmark: null,
+                observation: localObservation,
+                audit: null,
+                playTarget: MinecraftPlayTargetKind.World);
+            Assert(localCorrections.State == MinecraftEasyState.Ready,
+                "Um teste aprovado em mundo local foi tratado como rejeicao de servidor.");
+            messages.Add("PASS: Minecraft Facil detecta, resume, diferencia mundo/servidor e exporta ZIP sem mover JARs.");
 
             var scientificRoot = Path.Combine(root, "scientific-experiments");
             var scientificBackupRoot = Path.Combine(root, "scientific-backups");
@@ -964,8 +1039,8 @@ internal static class MinecraftSelfTest
 
             var view = new MinecraftView();
             view.SetSelectedPath(modsDirectory);
-            Assert(view.SelectedPath == modsDirectory, "A view Cobblemon nao carregou o caminho selecionado.");
-            messages.Add("PASS: XAML da pagina Cobblemon carrega em thread STA.");
+            Assert(view.SelectedPath == modsDirectory, "A view Minecraft nao carregou o caminho selecionado.");
+            messages.Add("PASS: XAML da pagina Minecraft carrega em thread STA.");
 
             messages.Add("SELF_TEST_OK");
             return messages;
@@ -1046,6 +1121,78 @@ internal static class MinecraftSelfTest
             OutOfMemoryEvidence: false,
             CrashEvidence: false,
             ["Synthetic self-test benchmark"]);
+    }
+
+    private sealed class FakeMinecraftSessionHookPlatform : IMinecraftSessionHookPlatform
+    {
+        private readonly MinecraftSessionTarget target = new(4242, "javaw", 123456789);
+
+        public int ApplyCount { get; private set; }
+
+        public int RestoreCount { get; private set; }
+
+        public bool RestoreSucceeds { get; set; } = true;
+
+        public string LastProcessLookupDiagnostic => "Processo sintetico confirmado.";
+
+        public MinecraftSessionTarget? FindMinecraftProcess(string instanceRoot) => target;
+
+        public MinecraftSessionPlatformSnapshot Capture(
+            MinecraftSessionTarget requestedTarget,
+            MinecraftSessionHookMode mode) =>
+            new(
+                requestedTarget.ProcessId,
+                requestedTarget.ProcessName,
+                requestedTarget.StartTimeUtcTicks,
+                0x20,
+                true,
+                false,
+                0x0F,
+                true,
+                1,
+                5,
+                0,
+                mode == MinecraftSessionHookMode.Extreme,
+                Guid.Parse("11111111-1111-1111-1111-111111111111"),
+                Guid.Parse("22222222-2222-2222-2222-222222222222"));
+
+        public IReadOnlyList<MinecraftSessionHookAction> Apply(
+            MinecraftSessionTarget requestedTarget,
+            MinecraftSessionPlatformSnapshot snapshot,
+            MinecraftSessionHookMode mode)
+        {
+            ApplyCount++;
+            return mode == MinecraftSessionHookMode.Extreme
+                ?
+                [
+                    new MinecraftSessionHookAction("priority", "Prioridade High", true, true, "Aplicada."),
+                    new MinecraftSessionHookAction("high-qos", "HighQoS", true, true, "Aplicado."),
+                    new MinecraftSessionHookAction("hybrid-affinity", "P-cores", true, true, "Aplicada."),
+                    new MinecraftSessionHookAction("power-mode", "Melhor desempenho", true, true, "Aplicado.")
+                ]
+                :
+                [
+                    new MinecraftSessionHookAction("priority", "Prioridade AboveNormal", true, true, "Aplicada."),
+                    new MinecraftSessionHookAction("high-qos", "HighQoS", true, true, "Aplicado.")
+                ];
+        }
+
+        public IReadOnlyList<MinecraftSessionHookAction> Restore(
+            MinecraftSessionTarget requestedTarget,
+            MinecraftSessionPlatformSnapshot snapshot,
+            MinecraftSessionHookMode mode)
+        {
+            RestoreCount++;
+            return
+            [
+                new MinecraftSessionHookAction(
+                    "restore",
+                    "Snapshot original",
+                    RestoreSucceeds,
+                    true,
+                    RestoreSucceeds ? "Restaurado." : "Falha sintetica.")
+            ];
+        }
     }
 
     private static void Assert(bool condition, string message)

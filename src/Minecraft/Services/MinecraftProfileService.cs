@@ -35,6 +35,22 @@ internal sealed partial class MinecraftProfileService
             [MinecraftProfileKind.Extreme4Gb] = CreateProfile(
                 MinecraftProfileKind.Extreme4Gb, "EXTREME_4GB", 4, 5, "0.50", 2, 0, 0, 30, false, 2048,
                 "Primeiro teste seguro: 720p, 30 FPS e heap de 2048 MB."),
+            [MinecraftProfileKind.Potato4Gb] = CreateProfile(
+                MinecraftProfileKind.Potato4Gb, "POTATO_4GB", 2, 5, "0.30", 2, 0, 0, 24, false, 2048,
+                "Modo sobrevivencia Minecraft: 960x540, 24 FPS e somente opcoes vanilla existentes.",
+                width: 960,
+                height: 540,
+                onlyExistingOptions: true,
+                disableViewBobbing: true,
+                disableResourcePacks: true),
+            [MinecraftProfileKind.Potato4Gb480p] = CreateProfile(
+                MinecraftProfileKind.Potato4Gb480p, "POTATO_4GB_480P", 2, 5, "0.30", 2, 0, 0, 24, false, 2048,
+                "Modo sobrevivencia Minecraft maximo: 854x480, 24 FPS e somente opcoes vanilla existentes.",
+                width: 854,
+                height: 480,
+                onlyExistingOptions: true,
+                disableViewBobbing: true,
+                disableResourcePacks: true),
             [MinecraftProfileKind.PotatoCobblemon4Gb] = CreateProfile(
                 MinecraftProfileKind.PotatoCobblemon4Gb, "POTATO_COBBLEMON_4GB", 2, 5, "0.30", 2, 0, 0, 24, false, 2048,
                 "Modo sobrevivencia: 960x540, 24 FPS e somente opcoes vanilla existentes.",
@@ -103,7 +119,10 @@ internal sealed partial class MinecraftProfileService
 
     public string BackupRoot => backupRoot;
 
-    public static IReadOnlyCollection<MinecraftProfileDefinition> AvailableProfiles => Profiles.Values.ToArray();
+    public static IReadOnlyCollection<MinecraftProfileDefinition> AvailableProfiles => Profiles.Values
+        .Where(profile => profile.Kind is not MinecraftProfileKind.PotatoCobblemon4Gb and
+            not MinecraftProfileKind.PotatoCobblemon4Gb480p)
+        .ToArray();
 
     public static IReadOnlyList<MinecraftExperimentDefinition> AvailableExperiments => MinecraftExtremeExperimentCatalog.All;
 
@@ -592,7 +611,7 @@ internal sealed partial class MinecraftProfileService
         var plan = new MinecraftProfilePlan(
             DateTimeOffset.UtcNow,
             instance,
-            MinecraftProfileKind.PotatoCobblemon4Gb,
+            MinecraftProfileKind.Potato4Gb,
             javaArguments,
             heapMb,
             fps,
@@ -1241,7 +1260,8 @@ internal sealed partial class MinecraftProfileService
     }
 
     private static bool IsPotatoProfile(MinecraftProfileKind kind) =>
-        kind is MinecraftProfileKind.PotatoCobblemon4Gb or MinecraftProfileKind.PotatoCobblemon4Gb480p;
+        kind is MinecraftProfileKind.Potato4Gb or MinecraftProfileKind.Potato4Gb480p or
+            MinecraftProfileKind.PotatoCobblemon4Gb or MinecraftProfileKind.PotatoCobblemon4Gb480p;
 
     private static int ParseMaximumHeapMb(string javaArguments)
     {

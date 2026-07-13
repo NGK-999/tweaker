@@ -331,6 +331,18 @@ internal static class MinecraftCommandLine
                 return true;
             }
 
+            if (HasFlag(args, "--minecraft-recover-session-hooks"))
+            {
+                var recovered = new MinecraftSessionHookService().RecoverPending();
+                foreach (var message in recovered.DefaultIfEmpty("Nenhuma sessao de hook pendente."))
+                {
+                    Console.WriteLine(message);
+                }
+
+                WriteStatusFile(args, "SESSION_HOOK_RECOVERY_OK", string.Join(Environment.NewLine, recovered));
+                return true;
+            }
+
             if (HasFlag(args, "--minecraft-benchmark"))
             {
                 var secondsText = GetValue(args, "--seconds") ?? "60";
@@ -345,13 +357,49 @@ internal static class MinecraftCommandLine
                     throw new ArgumentException("--wait-seconds deve estar entre 0 e 300.");
                 }
 
-                var benchmark = new MinecraftBenchmarkService()
-                    .CaptureAsync(
-                        TimeSpan.FromSeconds(seconds),
-                        selectedPath: GetValue(args, "--instance"),
-                        processWait: TimeSpan.FromSeconds(waitSeconds))
-                    .GetAwaiter()
-                    .GetResult();
+                var selectedPath = GetValue(args, "--instance");
+                var hookMode = ParseSessionHookMode(GetValue(args, "--hooks") ?? "off");
+                if (hookMode != MinecraftSessionHookMode.Off && string.IsNullOrWhiteSpace(selectedPath))
+                {
+                    throw new ArgumentException("--instance e obrigatorio quando --hooks nao for off.");
+                }
+
+                MinecraftSessionHookLease? hookLease = null;
+                MinecraftBenchmarkResult benchmark;
+                try
+                {
+                    if (selectedPath is not null && hookMode != MinecraftSessionHookMode.Off)
+                    {
+                        hookLease = new MinecraftSessionHookService()
+                            .StartAsync(
+                                selectedPath,
+                                hookMode,
+                                TimeSpan.FromSeconds(waitSeconds))
+                            .GetAwaiter()
+                            .GetResult();
+                        foreach (var action in hookLease.ApplyActions)
+                        {
+                            Console.WriteLine($"HOOK {action.Id}: {(action.Applied ? "APPLIED" : "SKIPPED")} | {action.Message}");
+                        }
+                    }
+
+                    benchmark = new MinecraftBenchmarkService()
+                        .CaptureAsync(
+                            TimeSpan.FromSeconds(seconds),
+                            selectedPath: selectedPath,
+                            processWait: hookLease is null ? TimeSpan.FromSeconds(waitSeconds) : TimeSpan.Zero)
+                        .GetAwaiter()
+                        .GetResult();
+                }
+                finally
+                {
+                    hookLease?.Restore();
+                    if (hookLease?.ReportPath is not null)
+                    {
+                        Console.WriteLine($"HOOK_REPORT={hookLease.ReportPath}");
+                    }
+                }
+
                 var path = new MinecraftReportService().WriteBenchmark(benchmark, GetValue(args, "--output"));
                 Console.WriteLine(path);
                 WriteStatusFile(args, "BENCHMARK_OK", path);
@@ -385,6 +433,8 @@ internal static class MinecraftCommandLine
             "SAFE" => MinecraftProfileKind.Safe,
             "LOWEND" => MinecraftProfileKind.LowEnd,
             "EXTREME4GB" => MinecraftProfileKind.Extreme4Gb,
+            "POTATO4GB" => MinecraftProfileKind.Potato4Gb,
+            "POTATO4GB480P" => MinecraftProfileKind.Potato4Gb480p,
             "POTATOCOBBLEMON4GB" => MinecraftProfileKind.PotatoCobblemon4Gb,
             "POTATOCOBBLEMON4GB480P" => MinecraftProfileKind.PotatoCobblemon4Gb480p,
             "GPULIMITED" => MinecraftProfileKind.GpuLimited,
@@ -394,6 +444,17 @@ internal static class MinecraftCommandLine
             "COBBLEMONSERVERCLIENT" => MinecraftProfileKind.CobblemonServerClient,
             "BENCHMARK" => MinecraftProfileKind.Benchmark,
             _ => throw new ArgumentException($"Perfil desconhecido: {value}")
+        };
+    }
+
+    private static MinecraftSessionHookMode ParseSessionHookMode(string value)
+    {
+        return value.Trim().ToUpperInvariant() switch
+        {
+            "OFF" or "DESATIVADO" => MinecraftSessionHookMode.Off,
+            "SAFE" or "SEGURO" => MinecraftSessionHookMode.Safe,
+            "EXTREME" or "EXTREMO" => MinecraftSessionHookMode.Extreme,
+            _ => throw new ArgumentException("--hooks deve ser off, safe ou extreme.")
         };
     }
 
@@ -564,15 +625,16 @@ internal static class MinecraftCommandLine
         Console.WriteLine("  --minecraft-scientific-show --experiment <id>");
         Console.WriteLine("  --minecraft-scientific-list");
         Console.WriteLine("  --minecraft-audit --mods <path> [--output <path>] [--target 1.21.1]");
-        Console.WriteLine("  --minecraft-profile-dry-run --instance <path> --profile POTATO_COBBLEMON_4GB [--fps ...] [--output <path>]");
+        Console.WriteLine("  --minecraft-profile-dry-run --instance <path> --profile POTATO_4GB [--fps ...] [--output <path>]");
         Console.WriteLine("  --minecraft-experiment-dry-run --instance <path> --preset heap-1792 [--output <path>]");
-        Console.WriteLine("  --minecraft-apply-profile --instance <path> --profile POTATO_COBBLEMON_4GB [--fps ...] --yes");
+        Console.WriteLine("  --minecraft-apply-profile --instance <path> --profile POTATO_4GB [--fps ...] --yes");
         Console.WriteLine("  --minecraft-rollback --instance <path> --yes");
         Console.WriteLine("  --minecraft-quarantine-dry-run --mods <path> [--output <path>]");
         Console.WriteLine("  --minecraft-quarantine-apply --mods <path> --files \"a.jar;b.jar\" --yes [--server-manifest-confirmed]");
         Console.WriteLine("  --minecraft-quarantine-rollback --mods <path> --yes");
         Console.WriteLine("  --minecraft-discover-instances");
-        Console.WriteLine("  --minecraft-benchmark [--instance <path>] [--seconds 60] [--wait-seconds 30] [--output <path>]");
+        Console.WriteLine("  --minecraft-benchmark [--instance <path>] [--seconds 60] [--wait-seconds 30] [--hooks off|safe|extreme] [--output <path>]");
+        Console.WriteLine("  --minecraft-recover-session-hooks");
         Console.WriteLine("  --minecraft-operational-checklist --mods <path> [--instance <path>] [--fps 30|45|60] [--output <path>]");
         Console.WriteLine("  --minecraft-homologation-report --instance <path> [observacoes] [--benchmark-seconds 60] [--output <path>]");
         Console.WriteLine("    observacoes: --game-opened --menu-reached --menu-seconds N --world-entered --server-entered");

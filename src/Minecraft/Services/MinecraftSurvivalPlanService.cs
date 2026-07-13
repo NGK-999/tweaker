@@ -32,7 +32,7 @@ internal sealed class MinecraftSurvivalPlanService
         {
             "4 GB sao compartilhados por Windows, Java e video integrado; paginacao e stutter continuam provaveis.",
             "Mods exigidos pelo servidor nao podem ser inferidos com certeza apenas pelo JAR local.",
-            "Geracao de chunks e muitas entidades Cobblemon podem derrubar FPS minimo mesmo com o perfil.",
+            "Geracao de chunks, entidades e mods de conteudo podem derrubar o FPS minimo mesmo com o perfil.",
             "FPS nao e prometido nem medido automaticamente pelo ApexTweaker."
         };
         if (environment.PageFileAllocatedMb == 0)

@@ -18,7 +18,7 @@ internal sealed class MinecraftOperationalHomologationService
         var fpsLimit = profilePlan?.MaximumFps ?? 45;
         var modDecisions = quarantine.Candidates.Select(candidate =>
             $"{candidate.FileName}: {candidate.OperationalRecommendation}; lado={candidate.SideAssessment}; " +
-            $"servidor={candidate.ServerEntryImpact}; Cobblemon={candidate.CobblemonImpact}").ToArray();
+            $"servidor={candidate.ServerEntryImpact}; conteudo={candidate.ContentImpact}").ToArray();
         var remainingRisks = new List<string>
         {
             "A lista local nao prova quais mods o servidor exige; o manifesto do servidor continua obrigatorio.",

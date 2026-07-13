@@ -1,6 +1,6 @@
 # Contexto completo do ApexTweaker
 
-Atualizado em: 2026-07-12
+Atualizado em: 2026-07-13
 Objetivo: documento de continuidade para outro agente ou nova conversa.  
 Regra: fatos marcados como **confirmados** foram verificados no repositorio local. Itens marcados como **solicitados** vieram do historico, mas nao devem ser tratados como implementados sem auditoria de codigo e teste no Windows.
 
@@ -8,7 +8,7 @@ Regra: fatos marcados como **confirmados** foram verificados no repositorio loca
 
 - Nome: ApexTweaker.
 - Autor/empresa: Igor Silva.
-- Versao atual declarada: `3.2.1`.
+- Versao atual declarada: `3.3.0`.
 - Plataforma: Windows 10/11, com foco atual em Windows 11.
 - Framework atual: `.NET 10`, destino `net10.0-windows`.
 - Objetivo tecnico: otimizar estabilidade de frametime e 1% low, reduzir stutters e oferecer telemetria, backup e rollback.
@@ -27,7 +27,7 @@ Regra: fatos marcados como **confirmados** foram verificados no repositorio loca
 
 - Repositorio: `https://github.com/NGK-999/tweaker.git`.
 - Branch: `main`.
-- Estado local confirmado em 2026-07-13: versao `3.2.1` como patch visual sobre a `v3.2.0` publicada.
+- Estado local confirmado em 2026-07-13: versao `3.3.0`, Minecraft geral com Cobblemon opcional e hooks de sessao reversiveis.
 - Base publicada antes deste patch: `6c8c018` (`v3.0.0`).
 - O repositorio atual nao exige excecao local de `safe.directory`.
 

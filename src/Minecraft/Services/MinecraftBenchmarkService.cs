@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using System.IO;
-using System.Management;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using ApexTweaker.Minecraft.Models;
@@ -11,14 +10,19 @@ internal sealed class MinecraftBenchmarkService
 {
     private readonly MinecraftEnvironmentService environmentService = new();
     private readonly MinecraftInstanceService instanceService = new();
-    private readonly Func<Process?> processFinder;
+    private readonly Func<string?, Process?> processFinder;
 
     public MinecraftBenchmarkService()
-        : this(FindMinecraftJavaProcess)
+        : this(MinecraftProcessLocator.Find)
     {
     }
 
     internal MinecraftBenchmarkService(Func<Process?> processFinder)
+        : this(_ => processFinder())
+    {
+    }
+
+    internal MinecraftBenchmarkService(Func<string?, Process?> processFinder)
     {
         this.processFinder = processFinder;
     }
@@ -41,7 +45,7 @@ internal sealed class MinecraftBenchmarkService
         var activeMods = ReadActiveMods(instance);
         var hashesBefore = ReadConfigHashes(instance);
         var wait = processWait ?? TimeSpan.Zero;
-        using var process = await WaitForMinecraftProcessAsync(wait, cancellationToken).ConfigureAwait(false);
+        using var process = await WaitForMinecraftProcessAsync(wait, selectedPath, cancellationToken).ConfigureAwait(false);
 
         if (process is null)
         {
@@ -190,12 +194,13 @@ internal sealed class MinecraftBenchmarkService
 
     private async Task<Process?> WaitForMinecraftProcessAsync(
         TimeSpan wait,
+        string? selectedPath,
         CancellationToken cancellationToken)
     {
         var deadline = DateTimeOffset.UtcNow + wait;
         do
         {
-            var process = processFinder();
+            var process = processFinder(selectedPath);
             if (process is not null)
             {
                 return process;
@@ -209,75 +214,6 @@ internal sealed class MinecraftBenchmarkService
             await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken).ConfigureAwait(false);
         }
         while (true);
-    }
-
-    private static Process? FindMinecraftJavaProcess()
-    {
-        var processQuery = ReadMinecraftJavaProcessIds();
-        Process? selected = null;
-        var selectedWorkingSet = -1L;
-        foreach (var process in Process.GetProcesses())
-        {
-            try
-            {
-                var isJava = string.Equals(process.ProcessName, "java", StringComparison.OrdinalIgnoreCase) ||
-                             string.Equals(process.ProcessName, "javaw", StringComparison.OrdinalIgnoreCase);
-                if (!isJava || (processQuery.Succeeded && !processQuery.ProcessIds.Contains(process.Id)))
-                {
-                    process.Dispose();
-                    continue;
-                }
-
-                var workingSet = process.WorkingSet64;
-                if (workingSet > selectedWorkingSet)
-                {
-                    selected?.Dispose();
-                    selected = process;
-                    selectedWorkingSet = workingSet;
-                }
-                else
-                {
-                    process.Dispose();
-                }
-            }
-            catch
-            {
-                process.Dispose();
-            }
-        }
-
-        return selected;
-    }
-
-    private static (bool Succeeded, HashSet<int> ProcessIds) ReadMinecraftJavaProcessIds()
-    {
-        var result = new HashSet<int>();
-        try
-        {
-            using var searcher = new ManagementObjectSearcher(
-                "SELECT ProcessId, Name, CommandLine FROM Win32_Process WHERE Name='java.exe' OR Name='javaw.exe'");
-            foreach (var item in searcher.Get())
-            {
-                var commandLine = item["CommandLine"]?.ToString() ?? string.Empty;
-                if (!commandLine.Contains("minecraft", StringComparison.OrdinalIgnoreCase) &&
-                    !commandLine.Contains("fabric-loader", StringComparison.OrdinalIgnoreCase) &&
-                    !commandLine.Contains("net.fabricmc.loader", StringComparison.OrdinalIgnoreCase))
-                {
-                    continue;
-                }
-
-                if (int.TryParse(item["ProcessId"]?.ToString(), out var processId))
-                {
-                    result.Add(processId);
-                }
-            }
-        }
-        catch
-        {
-            return (false, result);
-        }
-
-        return (true, result);
     }
 
     private static IReadOnlyList<string> ReadActiveMods(MinecraftInstanceDescriptor? instance)

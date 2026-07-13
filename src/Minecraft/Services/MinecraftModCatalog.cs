@@ -7,13 +7,13 @@ internal static class MinecraftModCatalog
     private static readonly IReadOnlyList<ModRecommendation> Catalog =
     [
         new("fabric-api", "Fabric API", RecommendationLayer.EssentialSafe, false,
-            "Base exigida pelo Cobblemon e pela maior parte do ecossistema Fabric.",
+            "Base usada por grande parte do ecossistema Fabric; instale apenas quando o modpack exigir.",
             "https://modrinth.com/mod/fabric-api", []),
         new("fabric-language-kotlin", "Fabric Language Kotlin", RecommendationLayer.EssentialSafe, false,
             "Runtime Kotlin exigido por alguns addons; o Cobblemon atual ja o incorpora como JAR aninhado.",
             "https://modrinth.com/mod/fabric-language-kotlin", []),
         new("cobblemon", "Cobblemon", RecommendationLayer.EssentialSafe, false,
-            "Mod principal do pacote e provavel requisito do servidor.",
+            "Conteudo opcional detectado nesta instancia e possivel requisito do servidor.",
             "https://modrinth.com/mod/cobblemon", ["fabric-api"]),
         new("sodium", "Sodium", RecommendationLayer.EssentialSafe, false,
             "Substitui o renderizador e reduz custo de CPU e microtravamentos.",
@@ -146,7 +146,18 @@ internal static class MinecraftModCatalog
             available.UnionWith(mod.EmbeddedModIds);
         }
 
+        var usesFabric = mods.Any(mod => mod.Loader == MinecraftLoader.Fabric);
+        var hasCobblemon = available.Contains("cobblemon");
+        if (!usesFabric)
+        {
+            // This catalog is Fabric-specific; do not recommend incompatible mods to vanilla/Forge/NeoForge.
+            return [];
+        }
+
         return Catalog
+            .Where(item => !string.Equals(item.Id, "cobblemon", StringComparison.OrdinalIgnoreCase) || hasCobblemon)
+            .Where(item => !string.Equals(item.Id, "fabric-language-kotlin", StringComparison.OrdinalIgnoreCase) ||
+                           hasCobblemon || available.Contains(item.Id))
             .Select(item => item with { Installed = available.Contains(item.Id) })
             .OrderBy(item => item.Layer)
             .ThenBy(item => item.Name, StringComparer.OrdinalIgnoreCase)

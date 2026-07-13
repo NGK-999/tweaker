@@ -24,6 +24,8 @@ internal static class ApplicationPaths
 
     public static string MinecraftExperiments { get; } = Path.Combine(UserDataRoot, "MinecraftExperiments");
 
+    public static string MinecraftSessionHooks { get; } = Path.Combine(UserDataRoot, "MinecraftSessionHooks");
+
     public static string TelemetrySessions { get; } = Path.Combine(UserDataRoot, "Telemetry");
 
     public static string LegacyMinecraftBackups { get; } = Path.Combine(SystemDataRoot, "MinecraftBackups");

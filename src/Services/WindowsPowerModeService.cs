@@ -129,6 +129,65 @@ internal static class WindowsPowerModeService
         }
     }
 
+    public static bool TryApplyConfiguredPowerModes(
+        Guid acModeGuid,
+        Guid? dcModeGuid,
+        out string actualState,
+        out string diagnostic)
+    {
+        actualState = string.Empty;
+        diagnostic = string.Empty;
+
+        try
+        {
+            var requestedAcMode = acModeGuid;
+            var acSetStatus = PowerSetUserConfiguredACPowerMode(ref requestedAcMode);
+            if (acSetStatus != 0)
+            {
+                diagnostic = $"PowerSetUserConfiguredACPowerMode retornou 0x{acSetStatus:X8}.";
+                return false;
+            }
+
+            uint dcSetStatus = 0;
+            if (dcModeGuid.HasValue)
+            {
+                var requestedDcMode = dcModeGuid.Value;
+                dcSetStatus = PowerSetUserConfiguredDCPowerMode(ref requestedDcMode);
+            }
+
+            if (!TryReadConfiguredPowerModes(out var actualAcMode, out var actualDcMode, out var readDiagnostic))
+            {
+                diagnostic = readDiagnostic;
+                return false;
+            }
+
+            actualState = FormatConfiguredPowerModes(actualAcMode, actualDcMode);
+            var acMatches = actualAcMode == acModeGuid;
+            var dcMatches = !dcModeGuid.HasValue ||
+                            (actualDcMode.HasValue && actualDcMode.Value == dcModeGuid.Value);
+            diagnostic = acMatches && dcMatches
+                ? "Power Mode AC/DC restaurado e confirmado por leitura."
+                : $"Power Mode divergente apos restauracao. " +
+                  $"DC set={(dcModeGuid.HasValue ? $"0x{dcSetStatus:X8}" : "NAO SOLICITADO")}. {readDiagnostic}";
+            return acMatches && dcMatches;
+        }
+        catch (DllNotFoundException ex)
+        {
+            diagnostic = ex.Message;
+            return false;
+        }
+        catch (EntryPointNotFoundException ex)
+        {
+            diagnostic = ex.Message;
+            return false;
+        }
+        catch (Exception ex)
+        {
+            diagnostic = ex.Message;
+            return false;
+        }
+    }
+
     public static bool IsBestPerformanceConfigured(Guid acModeGuid, Guid? dcModeGuid)
     {
         return acModeGuid == BestPerformanceModeGuid &&

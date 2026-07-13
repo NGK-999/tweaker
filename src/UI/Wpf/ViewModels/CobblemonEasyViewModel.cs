@@ -81,6 +81,10 @@ internal sealed partial class EasyStepViewModel : ObservableObject
 
 internal sealed partial class CobblemonEasyViewModel : ObservableObject
 {
+    internal static IReadOnlyList<string> HookModeChoices { get; } = ["Desativado", "Seguro", "Extremo"];
+
+    internal static IReadOnlyList<string> PlayTargetChoices { get; } = ["Mundo local", "Servidor"];
+
     [ObservableProperty]
     private string selectedPath = "Nenhuma instancia selecionada.";
 
@@ -160,10 +164,19 @@ internal sealed partial class CobblemonEasyViewModel : ObservableObject
     private int selectedFps = 24;
 
     [ObservableProperty]
+    private string selectedHookMode = "Seguro";
+
+    [ObservableProperty]
+    private string selectedPlayTarget = "Servidor";
+
+    [ObservableProperty]
     private bool gameOpened;
 
     [ObservableProperty]
     private bool menuReached;
+
+    [ObservableProperty]
+    private bool worldEntered;
 
     [ObservableProperty]
     private bool serverEntered;
@@ -197,6 +210,18 @@ internal sealed partial class CobblemonEasyViewModel : ObservableObject
 
     public bool CanExport => AuditReady || IsTestPanelVisible;
 
+    public MinecraftSessionHookMode SessionHookMode => SelectedHookMode switch
+    {
+        "Extremo" => MinecraftSessionHookMode.Extreme,
+        "Seguro" => MinecraftSessionHookMode.Safe,
+        _ => MinecraftSessionHookMode.Off
+    };
+
+    public MinecraftPlayTargetKind PlayTarget =>
+        string.Equals(SelectedPlayTarget, "Servidor", StringComparison.Ordinal)
+            ? MinecraftPlayTargetKind.Server
+            : MinecraftPlayTargetKind.World;
+
     public string StateColor => OverallState switch
     {
         MinecraftEasyState.Ready or MinecraftEasyState.BackupCreated or
@@ -211,6 +236,10 @@ internal sealed partial class CobblemonEasyViewModel : ObservableObject
     partial void OnAuditReadyChanged(bool value) => OnPropertyChanged(nameof(CanExport));
 
     partial void OnIsTestPanelVisibleChanged(bool value) => OnPropertyChanged(nameof(CanExport));
+
+    partial void OnSelectedHookModeChanged(string value) => OnPropertyChanged(nameof(SessionHookMode));
+
+    partial void OnSelectedPlayTargetChanged(string value) => OnPropertyChanged(nameof(PlayTarget));
 
     public void ResetForPath(string path, bool resolved)
     {
@@ -243,7 +272,7 @@ internal sealed partial class CobblemonEasyViewModel : ObservableObject
     public void SetInstance(MinecraftEasyInstanceStatus result)
     {
         OverallState = result.State;
-        InstanceReady = result.Instance is not null && result.OptionsFound && result.ModsFound;
+        InstanceReady = result.Instance is not null && result.OptionsFound;
         if (result.Instance is not null)
         {
             SelectedPath = result.Instance.GameDirectory;
@@ -253,7 +282,7 @@ internal sealed partial class CobblemonEasyViewModel : ObservableObject
             "  |  ",
             Flag("Java 21 x64", result.JavaFound),
             Flag("options.txt", result.OptionsFound),
-            Flag("mods", result.ModsFound),
+            Flag("mods opcionais", result.ModsFound),
             Flag("config", result.ConfigFound),
             Flag("logs", result.LogsFound));
         IsPrimaryDetectCtaVisible = !InstanceReady;
@@ -291,7 +320,7 @@ internal sealed partial class CobblemonEasyViewModel : ObservableObject
         HeavyMods = summary.HeavyVisualMods.ToString();
         DuplicateMods = summary.DuplicateModIds.ToString();
         RiskCount = summary.Risks.ToString();
-        ModDetails = BuildSummary(summary);
+        ModDetails = $"Perfil: {summary.ContentProfile} | Loader: {summary.DetectedLoader}\n{BuildSummary(summary)}";
         NextAction = InstanceReady ? "Otimizar para PC Fraco" : "Selecione uma instancia completa";
         AnalyzeStep.Set(summary.Risks == 0 ? EasyStepState.Completed : EasyStepState.Attention);
         ServerStep.Set(EasyStepState.Ready);
@@ -322,8 +351,8 @@ internal sealed partial class CobblemonEasyViewModel : ObservableObject
 
     public void BeginServerPreparation() => BeginStep(
         ServerStep,
-        "Conferindo servidor",
-        "Verificando requisitos sem mover ou remover mods.");
+        "Conferindo multiplayer",
+        "Verificando requisitos do servidor sem mover ou remover mods.");
 
     public void SetServerReadiness(MinecraftEasyServerReadiness readiness)
     {
@@ -349,7 +378,9 @@ internal sealed partial class CobblemonEasyViewModel : ObservableObject
         BenchmarkProgress = 0;
         OverallState = MinecraftEasyState.TestRequired;
         OverallStatus = "Teste em andamento";
-        StatusMessage = "Abra o jogo e entre no servidor enquanto o ApexTweaker coleta RAM, CPU e logs.";
+        StatusMessage = PlayTarget == MinecraftPlayTargetKind.Server
+            ? "Abra o jogo e entre no servidor enquanto o ApexTweaker coleta RAM, CPU e logs."
+            : "Abra o jogo e entre em um mundo enquanto o ApexTweaker coleta RAM, CPU e logs.";
         BenchmarkSummary = "Procurando o processo Java. FPS continua sendo informado por voce.";
         SetCurrentStep(TestStep, EasyStepState.Running);
     }
@@ -495,10 +526,13 @@ internal sealed partial class CobblemonEasyViewModel : ObservableObject
             GameOpened,
             MenuReached,
             null,
-            false,
+            WorldEntered,
             ServerEntered,
             null,
-            GameOpened && ServerEntered && !SevereStutter && !ClosedAlone,
+            GameOpened &&
+            (PlayTarget == MinecraftPlayTargetKind.Server ? ServerEntered : WorldEntered) &&
+            !SevereStutter &&
+            !ClosedAlone,
             fps,
             null,
             SevereStutter,
@@ -578,6 +612,7 @@ internal sealed partial class CobblemonEasyViewModel : ObservableObject
     {
         GameOpened = false;
         MenuReached = false;
+        WorldEntered = false;
         ServerEntered = false;
         SevereStutter = false;
         ClosedAlone = false;

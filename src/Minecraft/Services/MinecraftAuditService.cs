@@ -20,7 +20,7 @@ internal sealed class MinecraftAuditService
     public MinecraftAuditResult Audit(
         string modsDirectory,
         string targetMinecraftVersion = "1.21.1",
-        MinecraftLoader targetLoader = MinecraftLoader.Fabric)
+        MinecraftLoader targetLoader = MinecraftLoader.Unknown)
     {
         var selectedDirectory = Path.GetFullPath(modsDirectory);
         var instanceService = new MinecraftInstanceService();
@@ -28,7 +28,10 @@ internal sealed class MinecraftAuditService
         var normalizedDirectory = selectedIsInstance
             ? selectedInstance.ModsDirectory
             : selectedDirectory;
-        var mods = scanner.ScanDirectory(normalizedDirectory).ToList();
+        var mods = Directory.Exists(normalizedDirectory)
+            ? scanner.ScanDirectory(normalizedDirectory).ToList()
+            : [];
+        targetLoader = ResolveTargetLoader(mods, targetLoader);
         var environment = environmentService.Capture();
         var issues = new List<MinecraftAuditIssue>();
         var manualActions = new List<string>();
@@ -71,7 +74,9 @@ internal sealed class MinecraftAuditService
 
         foreach (var mod in mods)
         {
-            if (mod.Loader != MinecraftLoader.Unknown && mod.Loader != targetLoader)
+            if (targetLoader != MinecraftLoader.Unknown &&
+                mod.Loader != MinecraftLoader.Unknown &&
+                mod.Loader != targetLoader)
             {
                 conflictedPaths.Add(mod.FullPath);
                 issues.Add(new MinecraftAuditIssue(
@@ -161,8 +166,8 @@ internal sealed class MinecraftAuditService
         AddExtremeProfileAdvisories(mods, issues, manualActions);
 
         var recommendations = MinecraftModCatalog.BuildRecommendations(mods);
-        var immediatelyFast = recommendations.First(item => item.Id == "immediatelyfast");
-        if (!immediatelyFast.Installed)
+        var immediatelyFast = recommendations.FirstOrDefault(item => item.Id == "immediatelyfast");
+        if (immediatelyFast is { Installed: false })
         {
             manualActions.Add("Teste ImmediatelyFast 1.6.11+1.21.1 Fabric sozinho na pasta mods; valide HUD, mapas e batalhas e remova o JAR se houver crash.");
         }
@@ -205,6 +210,24 @@ internal sealed class MinecraftAuditService
             manualActions.Distinct(StringComparer.OrdinalIgnoreCase).ToArray(),
             instanceRoot is not null,
             instanceRoot);
+    }
+
+    private static MinecraftLoader ResolveTargetLoader(
+        IReadOnlyCollection<MinecraftModDescriptor> mods,
+        MinecraftLoader requested)
+    {
+        if (requested != MinecraftLoader.Unknown)
+        {
+            return requested;
+        }
+
+        return mods
+            .Where(mod => mod.Loader != MinecraftLoader.Unknown)
+            .GroupBy(mod => mod.Loader)
+            .OrderByDescending(group => group.Count())
+            .ThenBy(group => group.Key)
+            .Select(group => group.Key)
+            .FirstOrDefault();
     }
 
     private static HashSet<string> BuildAvailableIdSet(IEnumerable<MinecraftModDescriptor> mods)

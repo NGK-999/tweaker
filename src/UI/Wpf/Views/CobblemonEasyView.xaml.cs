@@ -15,6 +15,8 @@ public partial class CobblemonEasyView : WpfUserControl
         DataContext = viewModel;
         EasyFpsComboBox.ItemsSource = new[] { 24, 30 };
         EasyFpsComboBox.SelectedItem = 24;
+        EasyHookModeComboBox.ItemsSource = CobblemonEasyViewModel.HookModeChoices;
+        EasyPlayTargetComboBox.ItemsSource = CobblemonEasyViewModel.PlayTargetChoices;
         UpdateActions();
     }
 
@@ -41,6 +43,10 @@ public partial class CobblemonEasyView : WpfUserControl
     public string SelectedPath => viewModel.SelectedPath;
 
     public string StatusLine => viewModel.StatusMessage;
+
+    internal MinecraftSessionHookMode SessionHookMode => viewModel.SessionHookMode;
+
+    internal MinecraftPlayTargetKind PlayTarget => viewModel.PlayTarget;
 
     public void SetSelectedPath(string path, bool resolved)
     {
@@ -188,9 +194,9 @@ public partial class CobblemonEasyView : WpfUserControl
     private async void TestButton_OnClick(object sender, RoutedEventArgs e)
     {
         if (MessageBox.Show(
-                "Abra o Minecraft, chegue ao menu e tente entrar no servidor.\n\n" +
+                $"Abra o Minecraft, chegue ao menu e entre no {(viewModel.PlayTarget == MinecraftPlayTargetKind.Server ? "servidor" : "mundo local")}.\n\n" +
                 "Depois clique OK. O ApexTweaker observara o processo Java por 60 segundos. FPS nao e medido automaticamente.",
-                "Testar Cobblemon",
+                "Testar Minecraft",
                 MessageBoxButton.OKCancel,
                 MessageBoxImage.Information) != MessageBoxResult.OK)
         {

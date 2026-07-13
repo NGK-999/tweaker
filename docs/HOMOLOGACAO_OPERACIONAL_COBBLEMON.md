@@ -1,6 +1,6 @@
 # Homologacao operacional Cobblemon em 4 GB
 
-Versao do fluxo: **ApexTweaker 3.2.1**
+Versao do fluxo: **ApexTweaker 3.3.0**
 Alvo: **Minecraft 1.21.1 + Fabric + Cobblemon em Windows, i3 de quarta geracao e 4 GB de RAM**
 
 ## Estado comprovado em 2026-07-12
@@ -17,6 +17,17 @@ Alvo: **Minecraft 1.21.1 + Fabric + Cobblemon em Windows, i3 de quarta geracao e
 - Nenhuma pasta `mods_quarantine_EXTREME_4GB_*` foi criada no dry-run.
 - Ainda nao existe evidencia de jogo aberto, FPS ou entrada no servidor no PC
   alvo. O estado operacional continua **NAO_TESTADO** ate essa rodada real.
+- Em 2026-07-13, a pasta original de 88 JARs nao estava mais disponivel no
+  caminho informado; por isso a v3.3.0 nao repetiu a auditoria real.
+
+Hashes locais validados da v3.3.0:
+
+| Asset | SHA-256 |
+|---|---|
+| `ApexTweaker-Portable-v3.3.0.zip` | `72b222e674f3aa830d334773bb5d22be65555e55c0b35659022d2b43707ebfde` |
+| `ApexTweaker-Setup.exe` | `4daf50470a0fd4b8f211af8b13d7b6571e81d230b43dedafcddfbc7ad3d81ab6` |
+| `ApexTweaker.exe` | `0ff9d65c6e67b3a9bb91c6cda586573d0df43c1fbd781635a905fc160ca150fa` |
+| `ApexTweaker.Native.dll` | `8e9d346f129efbbe8a28ac6d9081d086ac8130396af6b0b571dacf7a2a178b82` |
 
 Hashes publicados da base v2.2.0:
 
@@ -46,24 +57,25 @@ decisao separada e deve ser confirmada pelo proprietario.
 3. Confira o SHA-256 antes de extrair:
 
 ```powershell
-Get-FileHash "$env:USERPROFILE\Downloads\ApexTweaker-Portable-v3.2.1.zip" -Algorithm SHA256
+Get-FileHash "$env:USERPROFILE\Downloads\ApexTweaker-Portable-v3.3.0.zip" -Algorithm SHA256
 ```
 
 4. Compare o hash inteiro com o digest exibido na release autenticada.
-5. Crie `C:\ApexTweaker\v3.2.1-portable`.
+5. Crie `C:\ApexTweaker\v3.3.0-portable`.
 6. Extraia todo o ZIP nessa pasta. Nao execute diretamente de dentro do ZIP.
 7. Confirme que `ApexTweaker.exe` e `ApexTweaker.Native.dll` estao juntos.
 8. Feche Minecraft e o launcher antes de auditar ou aplicar configuracoes.
-9. Execute `ApexTweaker.exe` em modo normal. O fluxo Cobblemon nao abre UAC.
+9. Execute `ApexTweaker.exe` em modo normal. O fluxo Minecraft nao abre UAC.
 10. Aceite UAC somente se voce escolher uma mutacao protegida do Windows. Nunca
     execute Prism Launcher, Modrinth App, Java ou Minecraft como administrador.
-11. Abra a aba **Cobblemon**.
-12. Selecione `C:\Users\igor.silva\Downloads\mods\mods`.
-13. Clique **Auditar**. Esta etapa e somente leitura.
+11. Abra a aba **Minecraft Facil**.
+12. Selecione a instancia inicializada. Para auditar apenas uma pasta antiga de
+    mods, use o **Modo Avancado**.
+13. Clique **Analisar Mods**. Esta etapa e somente leitura.
 14. Confirme no resumo: 88 mods, um ID duplicado, zero dependencias ausentes e
     dois conflitos possiveis.
 15. Abra `%LOCALAPPDATA%\ApexTweaker\MinecraftReports` pelo botao de relatorios.
-16. Leia primeiro `cobblemon-audit-*.md` e depois
+16. Leia primeiro `minecraft-audit-*.md` e depois
     `minecraft-quarantine-dry-run-*.md`.
 17. No JSON, use `sha256`, `environment`, `dependencies`, `sideAssessment`,
     `serverEntryImpact` e `operationalRecommendation` como evidencia.
@@ -98,8 +110,8 @@ Java e memoria por instancia.
 ```
 
 14. A tela deve informar **Instancia valida detectada**.
-15. Se continuar bloqueada, confirme que existem simultaneamente
-    `.minecraft\options.txt` e `.minecraft\mods`.
+15. Se continuar bloqueada, confirme que existe `.minecraft\options.txt`.
+    A pasta `.minecraft\mods` e opcional para vanilla.
 
 ## Alternativa Modrinth App
 
@@ -111,7 +123,7 @@ feche. O ApexTweaker procura perfis em:
 %LOCALAPPDATA%\ModrinthApp\profiles
 ```
 
-O perfil e detectado quando a raiz real contem `options.txt` e `mods`. A memoria
+O perfil e detectado quando a raiz real contem `options.txt`; `mods` e opcional. A memoria
 do Modrinth App deve ser ajustada manualmente no proprio app; o ApexTweaker gera
 `apextweaker-java-args.txt` quando nao existe um contrato de escrita seguro.
 
@@ -134,7 +146,7 @@ Valores aplicados em `options.txt`:
 |---|---:|
 | Resolucao em janela | 1280x720 |
 | Render distance | 4 |
-| Simulation distance | 4 |
+| Simulation distance | 5 |
 | Entity distance scaling | 0.50 |
 | Particulas | Minimal |
 | Clouds | Off |
@@ -144,6 +156,9 @@ Valores aplicados em `options.txt`:
 | Entity shadows | Off |
 | VSync | Off |
 | FPS | 20, 24, 30, 45 ou 60 conforme a rodada |
+
+O controle vanilla 1.21.1 usa 5 como minimo validado para simulation distance;
+por isso o ApexTweaker nao grava 4, mesmo em perfis extremos.
 
 Se `config\iris.properties` existir, a chave reconhecida
 `enableShaders=false` e aplicada com backup. Resource packs nao sao removidos
@@ -338,7 +353,7 @@ Benchmark e registro da observacao:
 ```powershell
 dotnet ApexTweaker.dll --minecraft-benchmark `
   --instance "C:\caminho\da\instancia" `
-  --seconds 60 --wait-seconds 30
+  --seconds 60 --wait-seconds 30 --hooks safe
 
 dotnet ApexTweaker.dll --minecraft-homologation-report `
   --instance "C:\caminho\da\instancia" `

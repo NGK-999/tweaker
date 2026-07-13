@@ -140,12 +140,12 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <StackPanel>
-                            <TextBlock Style="{StaticResource MacSectionLabel}" Text="COBBLEMON F&#x00C1;CIL" />
+                            <TextBlock Style="{StaticResource MacSectionLabel}" Text="MINECRAFT F&#x00C1;CIL" />
                             <TextBlock Margin="0,6,0,0"
                                        Foreground="{StaticResource TextPrimaryBrush}"
                                        FontSize="25"
                                        FontWeight="SemiBold"
-                                       Text="Deixe o PC pronto sem entender Java ou logs."
+                                       Text="Otimize qualquer inst&#x00E2;ncia sem entender Java ou logs."
                                        TextWrapping="Wrap" />
                             <TextBlock Margin="0,8,0,0"
                                        MaxWidth="720"
@@ -269,17 +269,17 @@
                                 <TextBlock Margin="8,0,0,0" Foreground="{Binding OptimizeStep.Color}" FontSize="9" FontWeight="SemiBold" Text="{Binding OptimizeStep.StateLabel}" />
                             </DockPanel>
                             <TextBlock Margin="0,7,0,0" FontSize="16" FontWeight="SemiBold" Text="Otimizar para PC Fraco" />
-                            <TextBlock Margin="0,6,0,0" Foreground="#A5DCC1" FontSize="10" Text="Cria backup e aplica o modo Potato. Nenhum mod e alterado." TextWrapping="Wrap" />
+                            <TextBlock Margin="0,6,0,0" Foreground="#A5DCC1" FontSize="10" Text="Cria backup e aplica o perfil POTATO_4GB. Nenhum mod e alterado." TextWrapping="Wrap" />
                         </StackPanel>
                     </Button>
 
                     <Button x:Name="ServerButton" Grid.Row="1" Grid.Column="0" Style="{StaticResource EasyActionButton}" Background="{Binding ServerStep.Background}" BorderBrush="{Binding ServerStep.BorderBrush}" Click="ServerButton_OnClick">
                         <StackPanel>
                             <DockPanel LastChildFill="False">
-                                <TextBlock DockPanel.Dock="Left" Foreground="#F2A65A" FontSize="11" FontWeight="Bold" Text="4  SERVIDOR" />
+                                <TextBlock DockPanel.Dock="Left" Foreground="#F2A65A" FontSize="11" FontWeight="Bold" Text="4  MULTIPLAYER" />
                                 <TextBlock Margin="8,0,0,0" Foreground="{Binding ServerStep.Color}" FontSize="9" FontWeight="SemiBold" Text="{Binding ServerStep.StateLabel}" />
                             </DockPanel>
-                            <TextBlock Margin="0,7,0,0" FontSize="16" FontWeight="SemiBold" Text="Preparar para Servidor" />
+                            <TextBlock Margin="0,7,0,0" FontSize="16" FontWeight="SemiBold" Text="Validar Multiplayer" />
                             <TextBlock Margin="0,6,0,0" Foreground="{StaticResource TextTertiaryBrush}" FontSize="10" Text="Confere requisitos e duplicatas sem remover ou mover JARs." TextWrapping="Wrap" />
                         </StackPanel>
                     </Button>
@@ -310,7 +310,7 @@
                                 <TextBlock Margin="8,0,0,0" Foreground="{Binding FixStep.Color}" FontSize="9" FontWeight="SemiBold" Text="{Binding FixStep.StateLabel}" />
                             </DockPanel>
                             <TextBlock Margin="0,7,0,0" FontSize="16" FontWeight="SemiBold" Text="Corrigir Problemas" />
-                            <TextBlock Margin="0,6,0,0" Foreground="{StaticResource TextTertiaryBrush}" FontSize="10" Text="Traduz memoria, stutter, servidor ou crash em proximas acoes seguras." TextWrapping="Wrap" />
+                            <TextBlock Margin="0,6,0,0" Foreground="{StaticResource TextTertiaryBrush}" FontSize="10" Text="Traduz memoria, stutter, incompatibilidade ou crash em proximas acoes seguras." TextWrapping="Wrap" />
                         </StackPanel>
                     </Button>
                 </Grid>
@@ -326,20 +326,39 @@
                             <TextBlock Margin="0,6,0,0"
                                        Foreground="{StaticResource TextSecondaryBrush}"
                                        FontSize="11"
-                                       Text="Padrao: 960x540, render 2, simulacao 5, entidades 30%, 24 FPS e heap 2048 MB."
+                                       Text="Padr&#x00E3;o: 960x540, render 2, simula&#x00E7;&#x00E3;o 5, entidades 30%, 24 FPS, heap 2048 MB e hook Seguro."
                                        TextWrapping="Wrap" />
                         </StackPanel>
-                        <StackPanel Grid.Column="1" Margin="20,0,0,0" Orientation="Horizontal" VerticalAlignment="Center">
-                            <CheckBox Margin="0,0,16,0"
+                        <WrapPanel Grid.Column="1" Margin="20,0,0,0" VerticalAlignment="Center">
+                            <CheckBox Margin="0,16,16,0"
                                       VerticalAlignment="Center"
                                       Foreground="{StaticResource TextSecondaryBrush}"
                                       Content="Usar 854x480"
                                       IsChecked="{Binding UseExtremeResolution, Mode=TwoWay}" />
-                            <ComboBox x:Name="EasyFpsComboBox"
-                                      Width="86"
-                                      ItemStringFormat="{}{0} FPS"
-                                      SelectedItem="{Binding SelectedFps, Mode=TwoWay}" />
-                        </StackPanel>
+                            <StackPanel Margin="0,0,10,0">
+                                <TextBlock Style="{StaticResource MacSectionLabel}" Text="FPS" />
+                                <ComboBox x:Name="EasyFpsComboBox"
+                                          Width="86"
+                                          Margin="0,5,0,0"
+                                          ItemStringFormat="{}{0} FPS"
+                                          SelectedItem="{Binding SelectedFps, Mode=TwoWay}" />
+                            </StackPanel>
+                            <StackPanel Margin="0,0,10,0">
+                                <TextBlock Style="{StaticResource MacSectionLabel}" Text="HOOK DE SESS&#x00C3;O" />
+                                <ComboBox x:Name="EasyHookModeComboBox"
+                                          Width="112"
+                                          Margin="0,5,0,0"
+                                          SelectedItem="{Binding SelectedHookMode, Mode=TwoWay}"
+                                          ToolTip="Seguro usa somente APIs documentadas no processo Java. Extremo adiciona prioridade High e afinidade h&#x00ED;brida quando suportada." />
+                            </StackPanel>
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource MacSectionLabel}" Text="DESTINO" />
+                                <ComboBox x:Name="EasyPlayTargetComboBox"
+                                          Width="112"
+                                          Margin="0,5,0,0"
+                                          SelectedItem="{Binding SelectedPlayTarget, Mode=TwoWay}" />
+                            </StackPanel>
+                        </WrapPanel>
                     </Grid>
                 </Border>
 
@@ -402,6 +421,7 @@
                         <WrapPanel Margin="0,13,0,0">
                             <CheckBox Style="{StaticResource EasyCheck}" Content="O jogo abriu" IsChecked="{Binding GameOpened}" />
                             <CheckBox Style="{StaticResource EasyCheck}" Content="Chegou ao menu" IsChecked="{Binding MenuReached}" />
+                            <CheckBox Style="{StaticResource EasyCheck}" Content="Entrou no mundo" IsChecked="{Binding WorldEntered}" />
                             <CheckBox Style="{StaticResource EasyCheck}" Content="Entrou no servidor" IsChecked="{Binding ServerEntered}" />
                             <CheckBox Style="{StaticResource EasyCheck}" Content="Travou muito" IsChecked="{Binding SevereStutter}" />
                             <CheckBox Style="{StaticResource EasyCheck}" Content="Fechou sozinho" IsChecked="{Binding ClosedAlone}" />

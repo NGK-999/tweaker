@@ -35,7 +35,7 @@ internal sealed class MinecraftDiagnosticPackageService
         }
 
         Directory.CreateDirectory(outputRoot);
-        var packageId = $"cobblemon-diagnostic-{DateTime.UtcNow:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}";
+        var packageId = $"minecraft-diagnostic-{DateTime.UtcNow:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}";
         var staging = Path.Combine(outputRoot, packageId);
         var zipPath = Path.Combine(outputRoot, packageId + ".zip");
         Directory.CreateDirectory(staging);
@@ -48,6 +48,7 @@ internal sealed class MinecraftDiagnosticPackageService
             CopyCurrentConfiguration(staging, instance, context.ProfileApply, omitted);
             CopyBackupConfiguration(staging, context.ProfileApply, omitted);
             CopyEvidence(staging, instance, omitted);
+            CopySessionHookReport(staging, context.SessionHookReportPath, omitted);
 
             ZipFile.CreateFromDirectory(staging, zipPath, CompressionLevel.Optimal, includeBaseDirectory: false);
             using var archive = ZipFile.OpenRead(zipPath);
@@ -103,7 +104,10 @@ internal sealed class MinecraftDiagnosticPackageService
             benchmark = context.Benchmark,
             userObservation = context.Observation,
             serverReadiness = context.ServerReadiness,
-            correctionPlan = context.CorrectionPlan
+            correctionPlan = context.CorrectionPlan,
+            sessionHookReport = context.SessionHookReportPath is null
+                ? null
+                : Path.GetFileName(context.SessionHookReportPath)
         };
         File.WriteAllText(
             Path.Combine(staging, "diagnostic.json"),
@@ -111,7 +115,7 @@ internal sealed class MinecraftDiagnosticPackageService
             new UTF8Encoding(false));
 
         var markdown = new StringBuilder()
-            .AppendLine("# Diagnostico Cobblemon Facil")
+            .AppendLine("# Diagnostico Minecraft Facil")
             .AppendLine()
             .AppendLine($"- ApexTweaker: `{AppInfo.Version}`")
             .AppendLine($"- Instancia: `{instance.DisplayName}` / `{instance.Launcher}`")
@@ -128,6 +132,7 @@ internal sealed class MinecraftDiagnosticPackageService
             .AppendLine($"- FPS informado: `{context.Observation?.AverageFps?.ToString("0.0") ?? "NAO INFORMADO"}`")
             .AppendLine($"- Servidor: `{context.ServerReadiness?.Status ?? "NAO PREPARADO"}`")
             .AppendLine($"- Correcao: `{context.CorrectionPlan?.Status ?? "NAO ANALISADA"}`")
+            .AppendLine($"- Hooks de sessao: `{(context.SessionHookReportPath is null ? "NAO USADOS" : "RELATORIO INCLUIDO")}`")
             .AppendLine()
             .AppendLine("## Regras de seguranca")
             .AppendLine()
@@ -282,6 +287,29 @@ internal sealed class MinecraftDiagnosticPackageService
         {
             CopyBounded(crash.FullName, Path.Combine(crashDirectory, crash.Name), omitted);
         }
+    }
+
+    private static void CopySessionHookReport(
+        string staging,
+        string? reportPath,
+        ICollection<string> omitted)
+    {
+        if (string.IsNullOrWhiteSpace(reportPath))
+        {
+            return;
+        }
+
+        var fullPath = Path.GetFullPath(reportPath);
+        if (!File.Exists(fullPath) || !IsWithin(ApplicationPaths.MinecraftSessionHooks, fullPath))
+        {
+            omitted.Add("Relatorio de hooks ausente ou fora da raiz gerenciada.");
+            return;
+        }
+
+        CopyBounded(
+            fullPath,
+            Path.Combine(staging, "session-hooks", "session-hooks.json"),
+            omitted);
     }
 
     private static void CopyBounded(string source, string destination, ICollection<string> omitted)

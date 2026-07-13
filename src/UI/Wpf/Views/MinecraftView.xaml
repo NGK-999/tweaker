@@ -64,7 +64,7 @@
                 <Button x:Name="EasyModeTabButton"
                         MinWidth="145"
                         Style="{StaticResource MacPrimaryButton}"
-                        Content="Cobblemon F&#x00E1;cil"
+                        Content="Minecraft F&#x00E1;cil"
                         Click="EasyModeTabButton_OnClick" />
                 <Button x:Name="AdvancedModeTabButton"
                         MinWidth="145"
@@ -99,7 +99,7 @@
 
                         <StackPanel>
                             <TextBlock Style="{StaticResource MacSectionLabel}"
-                                       Text="COBBLEMON SURVIVAL LAB" />
+                                       Text="MINECRAFT PERFORMANCE LAB" />
                             <TextBlock Margin="0,7,0,0"
                                        Style="{StaticResource MacPageTitle}"
                                        FontSize="24"
@@ -383,10 +383,10 @@
                             </UniformGrid>
                             <Border Margin="0,10,0,0" Style="{StaticResource MacCardStyle}">
                                 <StackPanel>
-                                    <TextBlock Style="{StaticResource MacSectionLabel}" Text="MODPACK SURVIVAL" />
+                                    <TextBlock Style="{StaticResource MacSectionLabel}" Text="MODPACK LOW-END" />
                                     <TextBlock Margin="0,7,0,0"
                                                Foreground="{StaticResource TextSecondaryBrush}"
-                                               Text="Mantenha Cobblemon, dependencias do servidor, Fabric API/Kotlin, Sodium, Lithium, FerriteCore e EntityCulling. Teste visuais pesados somente em copia."
+                                               Text="Preserve o mod principal e as dependencias do servidor. Em Fabric, teste Sodium, Lithium, FerriteCore e EntityCulling; teste visuais pesados somente em copia."
                                                TextWrapping="Wrap" />
                                     <TextBlock Margin="0,7,0,0"
                                                Foreground="#F5B942"

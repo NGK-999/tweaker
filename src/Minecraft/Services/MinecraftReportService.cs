@@ -26,7 +26,7 @@ internal sealed class MinecraftReportService
             : Path.GetFullPath(outputDirectory);
         Directory.CreateDirectory(directory);
 
-        var baseName = $"cobblemon-audit-{result.AuditedAtUtc:yyyyMMdd-HHmmss}";
+        var baseName = $"minecraft-audit-{result.AuditedAtUtc:yyyyMMdd-HHmmss}";
         var jsonPath = Path.Combine(directory, baseName + ".json");
         var markdownPath = Path.Combine(directory, baseName + ".md");
         var textPath = Path.Combine(directory, baseName + ".txt");
@@ -197,7 +197,7 @@ internal sealed class MinecraftReportService
             .AppendLine($"- Destino proposto: `{plan.QuarantineDirectory}`")
             .AppendLine("- Arquivos movidos: `0`")
             .AppendLine()
-            .AppendLine("| Arquivo | Mod | Lado | Risco | Confirmar servidor | Motivo | Servidor | Cobblemon | Performance | Recomendacao |")
+            .AppendLine("| Arquivo | Mod | Lado | Risco | Confirmar servidor | Motivo | Servidor | Conteudo/mod principal | Performance | Recomendacao |")
             .AppendLine("|---|---|---|---|---|---|---|---|---|---|");
         foreach (var candidate in plan.Candidates)
         {
@@ -205,7 +205,7 @@ internal sealed class MinecraftReportService
                 $"| {EscapeTable(candidate.FileName)} | {EscapeTable(candidate.ModId)} {EscapeTable(candidate.Version)} | " +
                 $"{EscapeTable(candidate.SideAssessment)} | {candidate.Risk} | " +
                 $"{(candidate.RequiresServerConfirmation ? "SIM" : "NAO")} | {EscapeTable(candidate.Reason)} | " +
-                $"{EscapeTable(candidate.ServerEntryImpact)} | {EscapeTable(candidate.CobblemonImpact)} | " +
+                $"{EscapeTable(candidate.ServerEntryImpact)} | {EscapeTable(candidate.ContentImpact)} | " +
                 $"{EscapeTable(candidate.PerformanceImpact)} | {EscapeTable(candidate.OperationalRecommendation)} |");
         }
 
@@ -222,7 +222,7 @@ internal sealed class MinecraftReportService
             string.Join("\r\n", plan.Candidates.Select(candidate =>
                 $"{candidate.FileName} | {candidate.SideAssessment} | {candidate.Risk} | " +
                 $"SERVER_CONFIRMATION={candidate.RequiresServerConfirmation} | REASON={candidate.Reason} | " +
-                $"SERVER={candidate.ServerEntryImpact} | COBBLEMON={candidate.CobblemonImpact} | " +
+                $"SERVER={candidate.ServerEntryImpact} | CONTENT={candidate.ContentImpact} | " +
                 $"PERFORMANCE={candidate.PerformanceImpact} | ACTION={candidate.OperationalRecommendation}")) + "\r\n",
             Utf8WithoutBom());
         return markdownPath;
@@ -240,7 +240,7 @@ internal sealed class MinecraftReportService
         File.WriteAllText(jsonPath, JsonSerializer.Serialize(checklist, JsonOptions), Utf8WithoutBom());
 
         var builder = new StringBuilder()
-            .AppendLine("# Checklist de homologacao operacional Cobblemon")
+            .AppendLine("# Checklist de homologacao operacional Minecraft")
             .AppendLine()
             .AppendLine($"- Mods: `{checklist.ModsDirectory}`")
             .AppendLine($"- Instancia: `{checklist.InstanceRoot ?? "NAO DETECTADA"}`")
@@ -292,7 +292,7 @@ internal sealed class MinecraftReportService
 
         var observation = result.Observation;
         var builder = new StringBuilder()
-            .AppendLine("# Resultado da homologacao operacional Cobblemon")
+            .AppendLine("# Resultado da homologacao operacional Minecraft")
             .AppendLine()
             .AppendLine($"- Status: `{result.Status}`")
             .AppendLine($"- Instancia: `{result.InstanceRoot}`")
@@ -383,7 +383,7 @@ internal sealed class MinecraftReportService
     private static string BuildMarkdown(MinecraftAuditResult result)
     {
         var builder = new StringBuilder();
-        builder.AppendLine("# Auditoria Cobblemon Low-End");
+        builder.AppendLine("# Auditoria Minecraft Low-End");
         builder.AppendLine();
         builder.AppendLine($"- Data UTC: `{result.AuditedAtUtc:O}`");
         builder.AppendLine($"- Pasta: `{result.ModsDirectory}`");
@@ -469,7 +469,7 @@ internal sealed class MinecraftReportService
         builder.AppendLine();
         builder.AppendLine("1. Use o mesmo mundo, local, resolucao e distancia em todos os testes.");
         builder.AppendLine("2. Registre tempo de abertura, pico de RAM, pagefile e crash logs.");
-        builder.AppendLine("3. Meça FPS medio e 1% low com uma ferramenta externa; o ApexTweaker nao injeta codigo no Minecraft.");
+        builder.AppendLine("3. Meca FPS medio e 1% low com uma ferramenta externa; o ApexTweaker nao injeta codigo no Minecraft.");
         builder.AppendLine("4. Compare uma alteracao por vez e mantenha apenas ganhos reproduziveis.");
         builder.AppendLine();
         builder.AppendLine("> Nenhum mod foi excluido ou movido durante esta auditoria.");
@@ -480,7 +480,7 @@ internal sealed class MinecraftReportService
     private static string BuildPlainText(MinecraftAuditResult result)
     {
         var builder = new StringBuilder();
-        builder.AppendLine("APEXTWEAKER - AUDITORIA COBBLEMON LOW-END");
+        builder.AppendLine("APEXTWEAKER - AUDITORIA MINECRAFT LOW-END");
         builder.AppendLine($"Pasta: {result.ModsDirectory}");
         builder.AppendLine($"Alvo: {result.TargetMinecraftVersion} / {result.TargetLoader}");
         builder.AppendLine($"Mods: {result.Summary.TotalMods}");

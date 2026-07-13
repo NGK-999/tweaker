@@ -51,6 +51,7 @@ public partial class MainWindow : Window
     private readonly MinecraftEasyModeService minecraftEasyModeService = new();
     private readonly MinecraftDiagnosticPackageService minecraftDiagnosticPackageService = new();
     private readonly MinecraftEnvironmentService minecraftEnvironmentService = new();
+    private readonly MinecraftSessionHookService minecraftSessionHookService = new();
     private readonly EtwFrameTracker etwFrameTracker;
     private DashboardView? dashboardView;
     private ModulesView? modulesView;
@@ -71,6 +72,7 @@ public partial class MainWindow : Window
     private MinecraftOperationalObservation? latestMinecraftObservation;
     private MinecraftEasyServerReadiness? latestMinecraftServerReadiness;
     private MinecraftEasyCorrectionPlan? latestMinecraftCorrectionPlan;
+    private string? latestMinecraftSessionHookReportPath;
     private bool isTweaking;
     private bool telemetryRunning;
     private bool baselineCaptured;
@@ -83,6 +85,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        AppVersionText.Text = $"v{AppInfo.Version}";
         PrivilegeModeText.Text = ApplicationPrivilegeService.IsAdministrator
             ? "Modo administrador"
             : "Modo normal (sem UAC)";
@@ -197,16 +200,6 @@ public partial class MainWindow : Window
             minecraftView.EasyFixRequested += BuildMinecraftEasyCorrectionsAsync;
             minecraftView.EasyExportRequested += ExportMinecraftEasyDiagnosticAsync;
 
-            var defaultModsPath = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                "Downloads",
-                "mods",
-                "mods");
-            if (Directory.Exists(defaultModsPath))
-            {
-                minecraftView.SetSelectedPath(defaultModsPath);
-            }
-
             return minecraftView;
         }
     }
@@ -267,6 +260,11 @@ public partial class MainWindow : Window
         UpdateMaximizeButtonIcon();
         await ShowPageAsync(DashboardPageKey, DashboardButton, animate: false);
         LoadInitialDiagnostics();
+        var recoveredHooks = await Task.Run(minecraftSessionHookService.RecoverPending);
+        foreach (var recovery in recoveredHooks)
+        {
+            WriteLine($"Hooks de sessao: {recovery}");
+        }
     }
 
     private async void MainWindow_OnClosing(object? sender, CancelEventArgs e)
@@ -355,7 +353,7 @@ public partial class MainWindow : Window
         {
             SetStatus(ApplicationPrivilegeService.IsAdministrator
                 ? "Modo administrador: Auto-Tuning e mutacoes Windows disponiveis."
-                : "Modo normal: use Cobblemon sem UAC; mutacoes Windows pedirao elevacao.");
+                : "Modo normal: use Minecraft sem UAC; mutacoes protegidas do Windows pedirao elevacao.");
         }
     }
     private async Task ShowPageAsync(string pageKey, WpfButton navigationButton, bool animate = true)
@@ -389,7 +387,7 @@ public partial class MainWindow : Window
             DashboardPageKey => "Dashboard",
             ModulesPageKey => "M\u00F3dulos",
             TelemetryPageKey => "Telemetria",
-            MinecraftPageKey => "Cobblemon F\u00e1cil",
+            MinecraftPageKey => "Minecraft F\u00e1cil",
             UtilitiesPageKey => "Utilidades",
             _ => AppInfo.Name
         };
@@ -650,7 +648,7 @@ public partial class MainWindow : Window
         MinecraftEasyInstanceStatus? result = null;
         try
         {
-            SetStatus("Cobblemon Facil: procurando instancias e Java 21 x64...");
+            SetStatus("Minecraft Facil: procurando instancias inicializadas e Java 21 x64...");
             result = await Task.Run(() => minecraftEasyModeService.Detect(selectedPath));
             if (result.Instance is not null)
             {
@@ -719,6 +717,7 @@ public partial class MainWindow : Window
             latestMinecraftObservation = null;
             latestMinecraftServerReadiness = null;
             latestMinecraftCorrectionPlan = null;
+            latestMinecraftSessionHookReportPath = null;
         }
 
         minecraftView.SetSelectedPath(path);
@@ -740,14 +739,14 @@ public partial class MainWindow : Window
         if (!Directory.Exists(path))
         {
             System.Windows.MessageBox.Show(
-                "Selecione uma pasta existente com arquivos .jar.",
-                "Auditoria Cobblemon",
+                "Selecione uma pasta Minecraft ou uma pasta de mods existente.",
+                "Auditoria Minecraft",
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
             return;
         }
 
-        const string section = "Auditoria Cobblemon";
+        const string section = "Auditoria Minecraft";
         if (!TryBeginTweaking(section))
         {
             return;
@@ -755,7 +754,7 @@ public partial class MainWindow : Window
 
         WriteSection(section);
         WriteLine("Lendo metadados dos JARs em modo somente leitura...");
-        SetStatus("Cobblemon: auditando dependencias, duplicidades e compatibilidade...");
+        SetStatus("Minecraft: auditando dependencias, duplicidades e compatibilidade...");
 
         try
         {
@@ -788,9 +787,9 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            WriteLine($"Falha na auditoria Cobblemon: {ex.Message}");
+            WriteLine($"Falha na auditoria Minecraft: {ex.Message}");
             Minecraft.SetOperationText($"Falha na auditoria: {ex.Message}");
-            SetStatus("Auditoria Cobblemon falhou. Veja o diagnostico.");
+            SetStatus("Auditoria Minecraft falhou. Veja o diagnostico.");
         }
         finally
         {
@@ -818,8 +817,8 @@ public partial class MainWindow : Window
         }
 
         var profile = extremeResolution
-            ? MinecraftProfileKind.PotatoCobblemon4Gb480p
-            : MinecraftProfileKind.PotatoCobblemon4Gb;
+            ? MinecraftProfileKind.Potato4Gb480p
+            : MinecraftProfileKind.Potato4Gb;
         await ApplyMinecraftProfileAsync(path, profile, maximumFps is 24 or 30 ? maximumFps : 24);
     }
 
@@ -1159,21 +1158,25 @@ public partial class MainWindow : Window
             return;
         }
 
-        var megaAnswer = System.Windows.MessageBox.Show(
-            "O servidor exige o mod Mega Showdown?\n\n" +
-            "Sim: ele sera tratado como obrigatorio.\n" +
-            "Nao: ele continuara ativo, mas duplicatas serao sinalizadas.\n" +
-            "Cancelar: a exigencia permanecera desconhecida.\n\n" +
-            "Nenhum mod sera removido ou movido.",
-            "Preparar para Servidor",
-            MessageBoxButton.YesNoCancel,
-            MessageBoxImage.Question);
-        bool? serverRequiresMega = megaAnswer switch
+        bool? serverRequiresMega = null;
+        if (MinecraftEasyModeService.DetectContentProfile(audit.Mods) == MinecraftContentProfileKind.Cobblemon)
         {
-            MessageBoxResult.Yes => true,
-            MessageBoxResult.No => false,
-            _ => null
-        };
+            var megaAnswer = System.Windows.MessageBox.Show(
+                "Esta instancia usa Cobblemon. O servidor exige o mod Mega Showdown?\n\n" +
+                "Sim: ele sera tratado como obrigatorio.\n" +
+                "Nao: ele continuara ativo, mas duplicatas serao sinalizadas.\n" +
+                "Cancelar: a exigencia permanecera desconhecida.\n\n" +
+                "Nenhum mod sera removido ou movido.",
+                "Validar Multiplayer",
+                MessageBoxButton.YesNoCancel,
+                MessageBoxImage.Question);
+            serverRequiresMega = megaAnswer switch
+            {
+                MessageBoxResult.Yes => true,
+                MessageBoxResult.No => false,
+                _ => null
+            };
+        }
 
         var readiness = await Task.Run(() => minecraftEasyModeService.PrepareForServer(audit, serverRequiresMega));
         latestMinecraftServerReadiness = readiness;
@@ -1193,7 +1196,8 @@ public partial class MainWindow : Window
         var plan = minecraftEasyModeService.BuildCorrections(
             latestMinecraftBenchmarkResult,
             latestMinecraftObservation,
-            LatestMinecraftAuditMatches(selectedPath) ? latestMinecraftAuditResult : null);
+            LatestMinecraftAuditMatches(selectedPath) ? latestMinecraftAuditResult : null,
+            Minecraft.EasyPlayTarget);
         latestMinecraftCorrectionPlan = plan;
         Minecraft.SetEasyCorrections(plan);
         WriteLine($"Correcao facil: {plan.Status}. {plan.Message}");
@@ -1209,7 +1213,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        const string section = "Exportar diagnostico Cobblemon";
+        const string section = "Exportar diagnostico Minecraft";
         if (!TryBeginTweaking(section))
         {
             return;
@@ -1234,7 +1238,8 @@ public partial class MainWindow : Window
                     : null,
                 latestMinecraftObservation,
                 latestMinecraftServerReadiness,
-                latestMinecraftCorrectionPlan);
+                latestMinecraftCorrectionPlan,
+                latestMinecraftSessionHookReportPath);
             var package = await Task.Run(() => minecraftDiagnosticPackageService.Create(context));
             Minecraft.SetEasyDiagnostic(package);
             WriteLine($"Diagnostico ZIP: {package.ZipPath}");
@@ -1250,7 +1255,7 @@ public partial class MainWindow : Window
         {
             Minecraft.SetOperationText($"Diagnostico nao exportado: {ex.Message}");
             WriteLine($"Falha ao exportar diagnostico: {ex.Message}");
-            SetStatus("Cobblemon Facil: falha ao criar o pacote de diagnostico.");
+            SetStatus("Minecraft Facil: falha ao criar o pacote de diagnostico.");
         }
         finally
         {
@@ -1267,14 +1272,30 @@ public partial class MainWindow : Window
         }
 
         WriteSection(section);
-        WriteLine("Procurando o processo Java com maior consumo de memoria...");
+        WriteLine("Procurando o processo Java correspondente a instancia selecionada...");
         SetStatus("Minecraft: benchmark de 60 segundos em andamento...");
 
+        MinecraftSessionHookLease? hookLease = null;
         try
         {
             minecraftBenchmarkCancellation?.Dispose();
             minecraftBenchmarkCancellation = new CancellationTokenSource();
             Minecraft.BeginBenchmark();
+            var hookMode = Minecraft.EasySessionHookMode;
+            WriteLine($"Hooks de sessao: {hookMode}. Nenhum privilegio administrativo sera solicitado.");
+            if (hookMode != MinecraftSessionHookMode.Off)
+            {
+                hookLease = await minecraftSessionHookService.StartAsync(
+                    selectedPath,
+                    hookMode,
+                    TimeSpan.FromSeconds(15),
+                    minecraftBenchmarkCancellation.Token);
+                foreach (var action in hookLease.ApplyActions)
+                {
+                    WriteLine($"Hook {(action.Applied ? "aplicado" : "ignorado")}: {action.DisplayName}. {action.Message}");
+                }
+            }
+
             var progress = new Progress<MinecraftBenchmarkSample>(sample =>
             {
                 Minecraft.AddBenchmarkSample(sample);
@@ -1288,7 +1309,7 @@ public partial class MainWindow : Window
                 progress,
                 minecraftBenchmarkCancellation.Token,
                 selectedPath,
-                TimeSpan.FromSeconds(15));
+                hookLease is null ? TimeSpan.FromSeconds(15) : TimeSpan.Zero);
             var result = await minecraftBenchmarkTask;
             latestMinecraftBenchmarkResult = result;
             Minecraft.CompleteBenchmark(result);
@@ -1327,6 +1348,21 @@ public partial class MainWindow : Window
         }
         finally
         {
+            if (hookLease is not null)
+            {
+                hookLease.Restore();
+                foreach (var action in hookLease.RestoreActions)
+                {
+                    WriteLine($"Rollback de hook {(action.Applied ? "confirmado" : "pendente")}: {action.DisplayName}. {action.Message}");
+                }
+
+                if (hookLease.ReportPath is not null)
+                {
+                    latestMinecraftSessionHookReportPath = hookLease.ReportPath;
+                    WriteLine($"Relatorio de hooks: {hookLease.ReportPath}");
+                }
+            }
+
             minecraftBenchmarkTask = null;
             minecraftBenchmarkCancellation?.Dispose();
             minecraftBenchmarkCancellation = null;

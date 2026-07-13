@@ -181,7 +181,7 @@ internal sealed class MinecraftInstanceService
 
     private static bool HasGameMarkers(string path)
     {
-        return File.Exists(Path.Combine(path, OptionsFileName)) &&
-               Directory.Exists(Path.Combine(path, "mods"));
+        // A vanilla instance is valid after its first launch even when no mods directory exists.
+        return File.Exists(Path.Combine(path, OptionsFileName));
     }
 }
