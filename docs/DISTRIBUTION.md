@@ -8,11 +8,11 @@ Pasta: `release-v2/`
 |---------|-----------|
 | `ApexTweaker.exe` | Executavel principal, self-contained, single-file |
 | `ApexTweaker.Native.dll` | DLL nativa C++ (topologia/afinidade de CPU) |
-| `ApexTweaker-Portable-v3.2.0.zip` | Pacote portatil com os dois arquivos acima |
+| `ApexTweaker-Portable-v3.2.1.zip` | Pacote portatil com os dois arquivos acima |
 
 O cliente nao precisa instalar .NET. Target: **Windows 10/11 64-bit**.
 
-Versao atual: **3.2.0**.
+Versao atual: **3.2.1**.
 
 ## Como gerar o portatil
 

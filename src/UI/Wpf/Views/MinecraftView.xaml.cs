@@ -77,7 +77,6 @@ public partial class MinecraftView : WpfUserControl
         EasyView.FixRequested += path => EasyFixRequested?.Invoke(path) ?? Task.CompletedTask;
         EasyView.RestoreRequested += path => RollbackRequested?.Invoke(path) ?? Task.CompletedTask;
         EasyView.ExportRequested += path => EasyExportRequested?.Invoke(path) ?? Task.CompletedTask;
-        EasyView.AdvancedRequested += () => ShowAdvancedMode(true);
         wizard.CancelRequested += () => CancelBenchmarkRequested?.Invoke();
         ProfileComboBox.ItemsSource = MinecraftProfileService.AvailableProfiles
             .OrderBy(profile => profile.Kind)
@@ -104,6 +103,8 @@ public partial class MinecraftView : WpfUserControl
     }
 
     public string SelectedPath => PathTextBox.Text.Trim();
+
+    public string EasyStatusLine => EasyView.StatusLine;
 
     public void SetSelectedPath(string path)
     {

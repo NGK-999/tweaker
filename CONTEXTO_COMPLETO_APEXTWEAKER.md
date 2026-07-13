@@ -8,7 +8,7 @@ Regra: fatos marcados como **confirmados** foram verificados no repositorio loca
 
 - Nome: ApexTweaker.
 - Autor/empresa: Igor Silva.
-- Versao atual declarada: `3.2.0`.
+- Versao atual declarada: `3.2.1`.
 - Plataforma: Windows 10/11, com foco atual em Windows 11.
 - Framework atual: `.NET 10`, destino `net10.0-windows`.
 - Objetivo tecnico: otimizar estabilidade de frametime e 1% low, reduzir stutters e oferecer telemetria, backup e rollback.
@@ -27,7 +27,7 @@ Regra: fatos marcados como **confirmados** foram verificados no repositorio loca
 
 - Repositorio: `https://github.com/NGK-999/tweaker.git`.
 - Branch: `main`.
-- Estado local confirmado em 2026-07-13: versao `3.2.0` em preparacao sobre a `v3.1.0` publicada.
+- Estado local confirmado em 2026-07-13: versao `3.2.1` como patch visual sobre a `v3.2.0` publicada.
 - Base publicada antes deste patch: `6c8c018` (`v3.0.0`).
 - O repositorio atual nao exige excecao local de `safe.directory`.
 
@@ -456,3 +456,13 @@ Continue o ApexTweaker em C:\projetos\Apextweaker usando CONTEXTO_COMPLETO_APEXT
 - Restaurar Tudo usa o manifesto transacional e verifica SHA-256.
 - Exportar Diagnostico cria ZIP em `%LOCALAPPDATA%\ApexTweaker\MinecraftDiagnosticPackages`.
 - A documentacao principal da camada leiga e `docs/V3_2_COBBLEMON_ONE_CLICK.md`.
+
+## 18. UX Polish 3.2.1
+
+- O status global da pagina Cobblemon nao reutiliza mais a mensagem de Auto-Tuning do Windows.
+- O CTA inicial e `Detectar Instancia Agora`.
+- Os seis cards exibem estado proprio e destacam a etapa atual.
+- O rodape nao duplica o acesso ao modo avancado.
+- Scrollbar, espacamento final e tooltips foram ajustados para telas menores.
+- O modo facil traduz marcadores tecnicos e nao mostra hash, JSON, diff ou caminho interno do diagnostico.
+- Nenhum contrato do motor cientifico, backup, rollback ou scanner foi alterado.

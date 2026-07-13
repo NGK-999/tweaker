@@ -36,11 +36,11 @@ public partial class CobblemonEasyView : WpfUserControl
 
     public event Func<string, Task>? ExportRequested;
 
-    public event Action? AdvancedRequested;
-
     internal CobblemonEasyViewModel ViewModel => viewModel;
 
     public string SelectedPath => viewModel.SelectedPath;
+
+    public string StatusLine => viewModel.StatusMessage;
 
     public void SetSelectedPath(string path, bool resolved)
     {
@@ -115,33 +115,73 @@ public partial class CobblemonEasyView : WpfUserControl
 
     private async void DetectButton_OnClick(object sender, RoutedEventArgs e)
     {
-        if (DetectRequested is not null)
+        viewModel.BeginDetection();
+        UpdateActions();
+        try
         {
-            await DetectRequested.Invoke(viewModel.SelectedPath);
+            if (DetectRequested is not null)
+            {
+                await DetectRequested.Invoke(viewModel.SelectedPath);
+            }
+        }
+        finally
+        {
+            viewModel.EndPendingAction(viewModel.DetectStep);
+            UpdateActions();
         }
     }
 
     private async void AnalyzeButton_OnClick(object sender, RoutedEventArgs e)
     {
-        if (AnalyzeRequested is not null)
+        viewModel.BeginAnalysis();
+        UpdateActions();
+        try
         {
-            await AnalyzeRequested.Invoke(viewModel.SelectedPath);
+            if (AnalyzeRequested is not null)
+            {
+                await AnalyzeRequested.Invoke(viewModel.SelectedPath);
+            }
+        }
+        finally
+        {
+            viewModel.EndPendingAction(viewModel.AnalyzeStep);
+            UpdateActions();
         }
     }
 
     private async void OptimizeButton_OnClick(object sender, RoutedEventArgs e)
     {
-        if (OptimizeRequested is not null)
+        viewModel.BeginOptimization();
+        UpdateActions();
+        try
         {
-            await OptimizeRequested.Invoke(viewModel.SelectedPath, viewModel.UseExtremeResolution, viewModel.SelectedFps);
+            if (OptimizeRequested is not null)
+            {
+                await OptimizeRequested.Invoke(viewModel.SelectedPath, viewModel.UseExtremeResolution, viewModel.SelectedFps);
+            }
+        }
+        finally
+        {
+            viewModel.EndPendingAction(viewModel.OptimizeStep);
+            UpdateActions();
         }
     }
 
     private async void ServerButton_OnClick(object sender, RoutedEventArgs e)
     {
-        if (PrepareServerRequested is not null)
+        viewModel.BeginServerPreparation();
+        UpdateActions();
+        try
         {
-            await PrepareServerRequested.Invoke(viewModel.SelectedPath);
+            if (PrepareServerRequested is not null)
+            {
+                await PrepareServerRequested.Invoke(viewModel.SelectedPath);
+            }
+        }
+        finally
+        {
+            viewModel.EndPendingAction(viewModel.ServerStep);
+            UpdateActions();
         }
     }
 
@@ -173,9 +213,19 @@ public partial class CobblemonEasyView : WpfUserControl
 
     private async void FixButton_OnClick(object sender, RoutedEventArgs e)
     {
-        if (FixRequested is not null)
+        viewModel.BeginCorrection();
+        UpdateActions();
+        try
         {
-            await FixRequested.Invoke(viewModel.SelectedPath);
+            if (FixRequested is not null)
+            {
+                await FixRequested.Invoke(viewModel.SelectedPath);
+            }
+        }
+        finally
+        {
+            viewModel.EndPendingAction(viewModel.FixStep);
+            UpdateActions();
         }
     }
 
@@ -195,18 +245,17 @@ public partial class CobblemonEasyView : WpfUserControl
         }
     }
 
-    private void AdvancedButton_OnClick(object sender, RoutedEventArgs e) => AdvancedRequested?.Invoke();
-
     private void UpdateActions()
     {
         var available = !viewModel.IsBusy;
+        PrimaryDetectButton.IsEnabled = available;
         DetectButton.IsEnabled = available;
         AnalyzeButton.IsEnabled = available && viewModel.InstanceReady;
         OptimizeButton.IsEnabled = available && viewModel.InstanceReady && viewModel.AuditReady;
         ServerButton.IsEnabled = available && viewModel.AuditReady;
-        TestButton.IsEnabled = available && viewModel.InstanceReady;
+        TestButton.IsEnabled = available && viewModel.InstanceReady && viewModel.OptimizationApplied;
         FixButton.IsEnabled = available && viewModel.IsTestPanelVisible;
-        RestoreButton.IsEnabled = available && viewModel.InstanceReady;
-        ExportButton.IsEnabled = available && viewModel.InstanceReady;
+        RestoreButton.IsEnabled = available && viewModel.HasBackup;
+        ExportButton.IsEnabled = available && viewModel.CanExport;
     }
 }

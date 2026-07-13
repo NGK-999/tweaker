@@ -1,6 +1,6 @@
 # Homologacao operacional Cobblemon em 4 GB
 
-Versao do fluxo: **ApexTweaker 3.2.0**
+Versao do fluxo: **ApexTweaker 3.2.1**
 Alvo: **Minecraft 1.21.1 + Fabric + Cobblemon em Windows, i3 de quarta geracao e 4 GB de RAM**
 
 ## Estado comprovado em 2026-07-12
@@ -46,11 +46,11 @@ decisao separada e deve ser confirmada pelo proprietario.
 3. Confira o SHA-256 antes de extrair:
 
 ```powershell
-Get-FileHash "$env:USERPROFILE\Downloads\ApexTweaker-Portable-v3.2.0.zip" -Algorithm SHA256
+Get-FileHash "$env:USERPROFILE\Downloads\ApexTweaker-Portable-v3.2.1.zip" -Algorithm SHA256
 ```
 
 4. Compare o hash inteiro com o digest exibido na release autenticada.
-5. Crie `C:\ApexTweaker\v3.2.0-portable`.
+5. Crie `C:\ApexTweaker\v3.2.1-portable`.
 6. Extraia todo o ZIP nessa pasta. Nao execute diretamente de dentro do ZIP.
 7. Confirme que `ApexTweaker.exe` e `ApexTweaker.Native.dll` estao juntos.
 8. Feche Minecraft e o launcher antes de auditar ou aplicar configuracoes.

@@ -4,7 +4,7 @@ Utilitario Windows em .NET 10 + WPF para diagnostico de hardware, telemetria,
 otimizacoes reversiveis e preparacao segura de Minecraft/Cobblemon em hardware
 limitado.
 
-Versao: **3.2.0** | Autor: **Igor Silva**
+Versao: **3.2.1** | Autor: **Igor Silva**
 
 ## Cobblemon One-Click Mode
 
@@ -22,6 +22,7 @@ A pagina **Cobblemon Facil** abre por padrao e reduz o uso real a este fluxo:
 - laboratorio cientifico completo preservado em **Modo Avancado**.
 
 Guia: [docs/V3_2_COBBLEMON_ONE_CLICK.md](docs/V3_2_COBBLEMON_ONE_CLICK.md).
+Polimento UX: [docs/V3_2_1_UX_POLISH.md](docs/V3_2_1_UX_POLISH.md).
 
 ## Minecraft Scientific Optimization Engine
 
@@ -110,7 +111,7 @@ Artefatos oficiais:
 - [ApexTweaker.exe](https://github.com/NGK-999/tweaker/releases/latest/download/ApexTweaker.exe)
 - [ApexTweaker.Native.dll](https://github.com/NGK-999/tweaker/releases/latest/download/ApexTweaker.Native.dll)
 - [ApexTweaker-Setup.exe](https://github.com/NGK-999/tweaker/releases/latest/download/ApexTweaker-Setup.exe)
-- [ApexTweaker-Portable-v3.2.0.zip](https://github.com/NGK-999/tweaker/releases/download/v3.2.0/ApexTweaker-Portable-v3.2.0.zip)
+- [ApexTweaker-Portable-v3.2.1.zip](https://github.com/NGK-999/tweaker/releases/download/v3.2.1/ApexTweaker-Portable-v3.2.1.zip)
 
 O executavel publicado e self-contained, inicia em modo normal e nao exige .NET
 instalado. Apenas mutacoes protegidas do Windows solicitam UAC sob demanda.

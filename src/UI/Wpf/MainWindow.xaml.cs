@@ -659,12 +659,12 @@ public partial class MainWindow : Window
 
             Minecraft.SetEasyInstanceStatus(result);
             WriteLine($"Deteccao facil: {result.Status}. {result.Message}");
-            SetStatus($"Cobblemon Facil: {result.Status}.");
+            SetStatus(Minecraft.EasyStatusLine);
         }
         catch (Exception ex)
         {
             Minecraft.SetOperationText($"Deteccao nao concluida: {ex.Message}");
-            SetStatus("Cobblemon Facil: nao foi possivel detectar a instancia.");
+            SetStatus("Nao foi possivel detectar a instancia. Revise a pasta selecionada e tente novamente.");
         }
         finally
         {
@@ -784,7 +784,7 @@ public partial class MainWindow : Window
             WriteLine($"Dry-run da quarentena: {quarantineReport}");
             WriteLine($"Plano de Sobrevivencia 4 GB: {survivalReport}");
             WriteLine("Nenhum JAR foi excluido, movido ou modificado.");
-            SetStatus("Auditoria Cobblemon concluida. Revise os alertas antes de alterar o pacote.");
+            SetStatus(Minecraft.EasyStatusLine);
         }
         catch (Exception ex)
         {
@@ -923,7 +923,7 @@ public partial class MainWindow : Window
             latestMinecraftCorrectionPlan = null;
             InvalidateMinecraftScientificState("Experimento invalidado: um perfil foi aplicado fora do motor cientifico.");
             WriteLine($"Relatorio antes/depois: {result.ReportPath}");
-            SetStatus($"Minecraft: perfil {profile} aplicado e verificavel por rollback.");
+            SetStatus(Minecraft.EasyStatusLine);
         }
         catch (Exception ex)
         {
@@ -1179,7 +1179,7 @@ public partial class MainWindow : Window
         latestMinecraftServerReadiness = readiness;
         Minecraft.SetEasyServerReadiness(readiness);
         WriteLine($"Servidor: {readiness.Status}. Nenhum JAR foi alterado.");
-        SetStatus($"Cobblemon Facil: {readiness.Status}.");
+        SetStatus(Minecraft.EasyStatusLine);
     }
 
     private Task BuildMinecraftEasyCorrectionsAsync(string selectedPath)
@@ -1197,7 +1197,7 @@ public partial class MainWindow : Window
         latestMinecraftCorrectionPlan = plan;
         Minecraft.SetEasyCorrections(plan);
         WriteLine($"Correcao facil: {plan.Status}. {plan.Message}");
-        SetStatus($"Cobblemon Facil: {plan.Status}.");
+        SetStatus(Minecraft.EasyStatusLine);
         return Task.CompletedTask;
     }
 
@@ -1239,7 +1239,7 @@ public partial class MainWindow : Window
             Minecraft.SetEasyDiagnostic(package);
             WriteLine($"Diagnostico ZIP: {package.ZipPath}");
             WriteLine($"SHA-256: {package.Sha256}");
-            SetStatus("Cobblemon Facil: diagnostico ZIP criado em modo somente leitura.");
+            SetStatus(Minecraft.EasyStatusLine);
             System.Windows.MessageBox.Show(
                 $"Diagnostico criado com {package.IncludedEntries.Count} arquivo(s).\n\n{package.ZipPath}\n\nSHA-256: {package.Sha256}",
                 "Exportar Diagnostico",
@@ -1309,7 +1309,7 @@ public partial class MainWindow : Window
 
             WriteLine($"Relatorio: {reportPath}");
             Minecraft.SetOperationText($"Benchmark {result.Status}. Relatorio: {reportPath}");
-            SetStatus($"Minecraft: benchmark {result.Status}. FPS deve ser medido externamente.");
+            SetStatus(Minecraft.EasyStatusLine);
         }
         catch (OperationCanceledException)
         {
@@ -1426,7 +1426,7 @@ public partial class MainWindow : Window
             Minecraft.SetOperationalResult(result.Status, reportPath);
             WriteLine($"Homologacao operacional: {result.Status}");
             WriteLine($"Relatorio: {reportPath}");
-            SetStatus($"Minecraft: homologacao registrada como {result.Status}.");
+            SetStatus(Minecraft.EasyStatusLine);
         }
         catch (Exception ex)
         {
@@ -2070,6 +2070,7 @@ public partial class MainWindow : Window
     private async void MinecraftButton_OnClick(object sender, RoutedEventArgs e)
     {
         await ShowPageAsync(MinecraftPageKey, MinecraftButton);
+        SetStatus(Minecraft.EasyStatusLine);
     }
 
     private async void UtilitiesButton_OnClick(object sender, RoutedEventArgs e)

@@ -513,9 +513,29 @@ internal static class MinecraftSelfTest
                 "Correcao facil nao recomendou heap 1792 MB diante de OOM/paginacao.");
 
             var easyViewModel = new CobblemonEasyViewModel();
+            Assert(easyViewModel.StatusMessage == "Aguardando detec\u00E7\u00E3o da inst\u00E2ncia Minecraft." &&
+                   easyViewModel.DetectStep.State == EasyStepState.Ready && easyViewModel.DetectStep.IsCurrent &&
+                   easyViewModel.AnalyzeStep.State == EasyStepState.Blocked,
+                "Modo facil nao iniciou aguardando deteccao com as demais etapas bloqueadas.");
+            easyViewModel.BeginDetection();
+            Assert(easyViewModel.DetectStep.State == EasyStepState.Running,
+                "Card Detectar nao mostrou o estado Executando.");
             easyViewModel.SetInstance(easyInstance);
+            Assert(easyViewModel.StatusMessage == "Inst\u00E2ncia detectada. Pr\u00F3ximo passo: Analisar Mods." &&
+                   easyViewModel.DetectStep.State == EasyStepState.Completed &&
+                   easyViewModel.AnalyzeStep.State == EasyStepState.Ready && easyViewModel.AnalyzeStep.IsCurrent,
+                "Fluxo facil nao avancou de Detectar para Analisar.");
+            easyViewModel.BeginAnalysis();
             easyViewModel.SetAudit(easySummary);
+            Assert(easyViewModel.StatusMessage == "Mods analisados. Pr\u00F3ximo passo: Otimizar para PC Fraco." &&
+                   easyViewModel.OptimizeStep.State == EasyStepState.Ready && easyViewModel.OptimizeStep.IsCurrent,
+                "Fluxo facil nao avancou de Analisar para Otimizar.");
             easyViewModel.SetServerReadiness(serverReadiness);
+            easyViewModel.BeginOptimization();
+            easyViewModel.SetOptimizationApplied("backup-polish", "-Xms512M -Xmx2048M", javaAppliedAutomatically: true);
+            Assert(easyViewModel.StatusMessage == "Otimiza\u00E7\u00E3o aplicada com backup. Pr\u00F3ximo passo: Testar Jogo." &&
+                   easyViewModel.HasBackup && easyViewModel.TestStep.State == EasyStepState.Ready,
+                "Fluxo facil nao liberou teste e restauracao depois do backup.");
             easyViewModel.BeginBenchmark();
             easyViewModel.CompleteBenchmark(easyBenchmark, cancelled: false);
             easyViewModel.GameOpened = true;
@@ -524,8 +544,21 @@ internal static class MinecraftSelfTest
             easyViewModel.ClosedAlone = true;
             easyViewModel.ApproximateFps = string.Empty;
             Assert(easyViewModel.BuildObservation().AverageFps is null &&
-                   easyViewModel.OverallStatus == "Falhou",
+                   easyViewModel.StatusMessage == "Teste conclu\u00EDdo. Escolha Corrigir Problemas, Restaurar Tudo ou Exportar Diagn\u00F3stico." &&
+                   easyViewModel.TestStep.State == EasyStepState.Failed &&
+                   easyViewModel.FixStep.State == EasyStepState.Ready,
                 "Modo facil inventou FPS ou nao traduziu falha para linguagem simples.");
+            easyViewModel.SetCorrections(new MinecraftEasyCorrectionPlan(
+                MinecraftEasyState.Attention,
+                "Candidato inconclusivo",
+                "SERVER_MOD_MISMATCH",
+                ["PAGEFILE_PRESSURE"],
+                ["INSUFFICIENT_DATA"],
+                []));
+            Assert(!easyViewModel.StatusMessage.Contains("SERVER_MOD_MISMATCH", StringComparison.Ordinal) &&
+                   !easyViewModel.CorrectionDetails.Contains("PAGEFILE_PRESSURE", StringComparison.Ordinal) &&
+                   !easyViewModel.CorrectionDetails.Contains("INSUFFICIENT_DATA", StringComparison.Ordinal),
+                "Modo facil deixou nomes internos nas recomendacoes ao usuario.");
 
             var jarHashesBeforeEasyMode = Directory.EnumerateFiles(
                     Path.Combine(instanceRoot, "mods"),
@@ -566,6 +599,10 @@ internal static class MinecraftSelfTest
                 "ZIP de diagnostico nao incluiu relatorios, logs, hashes e configuracoes antes/depois.");
             Assert(diagnostic.OmittedEntries.Any(item => item.Contains("sodium-test.jar", StringComparison.Ordinal)),
                 "ZIP de diagnostico falhou em registrar um JAR temporariamente bloqueado.");
+            easyViewModel.SetDiagnostic(diagnostic);
+            Assert(!easyViewModel.StatusMessage.Contains(diagnostic.Sha256, StringComparison.OrdinalIgnoreCase) &&
+                   !easyViewModel.NextAction.Contains(diagnostic.ZipPath, StringComparison.OrdinalIgnoreCase),
+                "Modo facil exibiu hash ou caminho tecnico do diagnostico.");
             using (var diagnosticArchive = ZipFile.OpenRead(diagnostic.ZipPath))
             {
                 var diagnosticJsonEntry = diagnosticArchive.GetEntry("diagnostic.json")
