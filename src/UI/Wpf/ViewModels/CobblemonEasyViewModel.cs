@@ -119,7 +119,7 @@ internal sealed partial class CobblemonEasyViewModel : ObservableObject
     private string riskCount = "--";
 
     [ObservableProperty]
-    private string modDetails = "Clique em Analisar Mods para gerar o resumo.";
+    private string modDetails = "Os detalhes aparecerao depois de preparar o jogo.";
 
     [ObservableProperty]
     private string serverDetails = "A compatibilidade com o servidor ainda nao foi verificada.";
@@ -252,7 +252,7 @@ internal sealed partial class CobblemonEasyViewModel : ObservableObject
         IsPrimaryDetectCtaVisible = true;
         IsStatusBadgeVisible = false;
         EssentialMods = PerformanceMods = HeavyMods = DuplicateMods = RiskCount = "--";
-        ModDetails = "Clique em Analisar Mods para gerar o resumo.";
+        ModDetails = "Os detalhes aparecerao depois de preparar o jogo.";
         OverallState = MinecraftEasyState.TestRequired;
         OverallStatus = "Aguardando detec\u00E7\u00E3o";
         StatusMessage = "Aguardando detec\u00E7\u00E3o da inst\u00E2ncia Minecraft.";
@@ -290,10 +290,11 @@ internal sealed partial class CobblemonEasyViewModel : ObservableObject
         if (InstanceReady)
         {
             OverallStatus = "Inst\u00E2ncia detectada";
-            StatusMessage = "Inst\u00E2ncia detectada. Pr\u00F3ximo passo: Analisar Mods.";
-            NextAction = "Analisar Mods";
+            StatusMessage = "Inst\u00E2ncia detectada. Pr\u00F3ximo passo: Preparar para Jogar.";
+            NextAction = "Preparar para Jogar";
             DetectStep.Set(EasyStepState.Completed);
-            SetCurrentStep(AnalyzeStep, EasyStepState.Ready);
+            AnalyzeStep.Set(EasyStepState.Ready);
+            SetCurrentStep(OptimizeStep, EasyStepState.Ready);
         }
         else
         {
@@ -314,14 +315,14 @@ internal sealed partial class CobblemonEasyViewModel : ObservableObject
         AuditReady = true;
         OverallState = summary.State;
         OverallStatus = summary.Risks == 0 ? "Mods analisados" : "Mods analisados com alertas";
-        StatusMessage = "Mods analisados. Pr\u00F3ximo passo: Otimizar para PC Fraco.";
+        StatusMessage = "Verifica\u00E7\u00E3o conclu\u00EDda. Preparando configura\u00E7\u00F5es leves com backup.";
         EssentialMods = summary.EssentialMods.ToString();
         PerformanceMods = summary.PerformanceMods.ToString();
         HeavyMods = summary.HeavyVisualMods.ToString();
         DuplicateMods = summary.DuplicateModIds.ToString();
         RiskCount = summary.Risks.ToString();
         ModDetails = $"Perfil: {summary.ContentProfile} | Loader: {summary.DetectedLoader}\n{BuildSummary(summary)}";
-        NextAction = InstanceReady ? "Otimizar para PC Fraco" : "Selecione uma instancia completa";
+        NextAction = InstanceReady ? "Preparar para Jogar" : "Selecione uma instancia completa";
         AnalyzeStep.Set(summary.Risks == 0 ? EasyStepState.Completed : EasyStepState.Attention);
         ServerStep.Set(EasyStepState.Ready);
         SetCurrentStep(OptimizeStep, EasyStepState.Ready);
@@ -491,11 +492,12 @@ internal sealed partial class CobblemonEasyViewModel : ObservableObject
         OverallState = MinecraftEasyState.Restored;
         OverallStatus = "Restaurado";
         StatusMessage = "As configuracoes anteriores foram restauradas com seguranca.";
-        NextAction = "Analise novamente antes de outra otimizacao";
+        NextAction = "Prepare novamente quando estiver pronto";
         OptimizeStep.Set(EasyStepState.NotStarted);
         TestStep.Set(EasyStepState.Blocked);
         FixStep.Set(EasyStepState.Blocked);
-        SetCurrentStep(AnalyzeStep, EasyStepState.Ready);
+        AnalyzeStep.Set(EasyStepState.Ready);
+        SetCurrentStep(OptimizeStep, EasyStepState.Ready);
     }
 
     public void SetDiagnostic(MinecraftDiagnosticPackageResult package)

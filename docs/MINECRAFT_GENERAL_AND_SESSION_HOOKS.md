@@ -1,4 +1,4 @@
-# Minecraft geral e hooks de sessao - v3.3.0
+# Minecraft geral e hooks de sessao - v3.3.1
 
 ## Objetivo
 
@@ -13,7 +13,11 @@ instancia vanilla, Forge ou NeoForge.
 
 Fluxo visivel:
 
-`Detectar -> Analisar -> Otimizar -> Validar Multiplayer -> Testar -> Corrigir ou Restaurar`
+`Encontrar -> Preparar -> Testar -> Resolver ou Restaurar`
+
+O botao `Preparar para Jogar` faz a verificacao em leitura antes do backup e da
+aplicacao. Detalhes da auditoria e validacoes manuais permanecem recolhidos ou
+no modo avancado.
 
 ## Perfis
 

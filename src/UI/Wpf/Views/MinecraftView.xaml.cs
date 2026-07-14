@@ -134,6 +134,8 @@ public partial class MinecraftView : WpfUserControl
     public void SetEasyOptimizationApplied(string backupId, string javaArguments, bool javaAppliedAutomatically) =>
         EasyView.SetOptimizationApplied(backupId, javaArguments, javaAppliedAutomatically);
 
+    internal void ResumeEasyOptimization() => EasyView.ResumeOptimization();
+
     internal void SetEasyServerReadiness(MinecraftEasyServerReadiness readiness) =>
         EasyView.SetServerReadiness(readiness);
 

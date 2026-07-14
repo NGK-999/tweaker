@@ -1,6 +1,6 @@
-# Cobblemon Low-End Lab v3.3.0
+# Cobblemon Low-End Lab v3.3.1
 
-> Na v3.3.0, Cobblemon e um perfil opcional dentro da pagina Minecraft Facil.
+> Na v3.3.1, Cobblemon e um perfil opcional dentro da pagina Minecraft Rapido.
 > Instancias vanilla e outros modpacks nao recebem estas exigencias especificas.
 
 ## Objetivo

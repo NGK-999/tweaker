@@ -4,13 +4,16 @@ Utilitario Windows em .NET 10 + WPF para diagnostico de hardware, telemetria,
 otimizacoes reversiveis e preparacao segura de Minecraft geral em hardware
 limitado.
 
-Versao: **3.3.0** | Autor: **Igor Silva**
+Versao: **3.3.1** | Autor: **Igor Silva**
 
 ## Minecraft One-Click Mode
 
-A pagina **Minecraft Facil** abre por padrao e reduz o uso real a este fluxo:
+A pagina **Minecraft Rapido** abre por padrao e reduz o uso real a este fluxo:
 
-`Detectar -> Analisar -> Otimizar -> Testar -> Corrigir ou Restaurar`
+`Encontrar -> Preparar -> Testar -> Resolver ou Restaurar`
+
+`Preparar para Jogar` executa a verificacao de mods internamente, cria backup e
+aplica o perfil leve somente depois da confirmacao do usuario.
 
 - seis botoes principais e mensagens sem jargao tecnico;
 - resumo de mods sem tabela gigante;
@@ -72,7 +75,7 @@ Arquitetura da v3: [docs/ARCHITECTURE_V3.md](docs/ARCHITECTURE_V3.md).
 | **Dashboard** | Auto-Tuning, restore point e resumo de hardware |
 | **Modulos** | Tweaks individuais de energia, CPU, GPU e rede |
 | **Telemetria** | Teste A/B, frametime, metricas e console |
-| **Minecraft Facil** | Fluxo para vanilla ou modded: detectar, analisar, otimizar, testar, corrigir e restaurar; laboratorio tecnico no modo avancado |
+| **Minecraft Rapido** | Quatro botoes para vanilla ou modded: encontrar, preparar, testar e resolver; laboratorio tecnico no modo avancado |
 | **Utilidades** | Rollback mestre, desinstalacao e suporte |
 
 ## Linha de comando
@@ -123,7 +126,7 @@ Artefatos oficiais:
 - [ApexTweaker.exe](https://github.com/NGK-999/tweaker/releases/latest/download/ApexTweaker.exe)
 - [ApexTweaker.Native.dll](https://github.com/NGK-999/tweaker/releases/latest/download/ApexTweaker.Native.dll)
 - [ApexTweaker-Setup.exe](https://github.com/NGK-999/tweaker/releases/latest/download/ApexTweaker-Setup.exe)
-- `ApexTweaker-Portable-v3.3.0.zip` sera gerado pela rotina de release da v3.3.0.
+- `ApexTweaker-Portable-v3.3.1.zip` sera gerado pela rotina de release da v3.3.1.
 
 O executavel publicado e self-contained, inicia em modo normal e nao exige .NET
 instalado. Apenas mutacoes protegidas do Windows solicitam UAC sob demanda.

@@ -816,6 +816,9 @@ public partial class MainWindow : Window
             return;
         }
 
+        // A auditoria atualiza o resumo; retome o estado da acao principal antes da confirmacao.
+        Minecraft.ResumeEasyOptimization();
+
         var profile = extremeResolution
             ? MinecraftProfileKind.Potato4Gb480p
             : MinecraftProfileKind.Potato4Gb;

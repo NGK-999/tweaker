@@ -13,9 +13,9 @@
             <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
 
             <Style x:Key="EasyActionButton" TargetType="Button">
-                <Setter Property="MinHeight" Value="112" />
+                <Setter Property="MinHeight" Value="118" />
                 <Setter Property="Margin" Value="0,0,10,10" />
-                <Setter Property="Padding" Value="16" />
+                <Setter Property="Padding" Value="18" />
                 <Setter Property="HorizontalContentAlignment" Value="Stretch" />
                 <Setter Property="VerticalContentAlignment" Value="Stretch" />
                 <Setter Property="Background" Value="#132033" />
@@ -31,7 +31,7 @@
                                     Background="{TemplateBinding Background}"
                                     BorderBrush="{TemplateBinding BorderBrush}"
                                     BorderThickness="{TemplateBinding BorderThickness}"
-                                    CornerRadius="13">
+                                    CornerRadius="14">
                                 <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
                                                   VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
                             </Border>
@@ -44,21 +44,12 @@
                                     <Setter TargetName="Card" Property="Opacity" Value="0.82" />
                                 </Trigger>
                                 <Trigger Property="IsEnabled" Value="False">
-                                    <Setter TargetName="Card" Property="Opacity" Value="0.56" />
+                                    <Setter TargetName="Card" Property="Opacity" Value="0.48" />
                                 </Trigger>
                             </ControlTemplate.Triggers>
                         </ControlTemplate>
                     </Setter.Value>
                 </Setter>
-            </Style>
-
-            <Style x:Key="EasyMetric" TargetType="Border">
-                <Setter Property="Margin" Value="0,0,8,0" />
-                <Setter Property="Padding" Value="12" />
-                <Setter Property="Background" Value="#101B2B" />
-                <Setter Property="BorderBrush" Value="#263750" />
-                <Setter Property="BorderThickness" Value="1" />
-                <Setter Property="CornerRadius" Value="10" />
             </Style>
 
             <Style x:Key="EasyCheck" TargetType="CheckBox">
@@ -100,21 +91,17 @@
                                                   Value="{TemplateBinding Value}"
                                                   ViewportSize="{TemplateBinding ViewportSize}">
                                     <primitives:Track.DecreaseRepeatButton>
-                                        <RepeatButton Background="Transparent"
-                                                      BorderThickness="0"
+                                        <RepeatButton Background="Transparent" BorderThickness="0"
                                                       Command="{x:Static ScrollBar.PageUpCommand}"
-                                                      Focusable="False"
-                                                      Opacity="0" />
+                                                      Focusable="False" Opacity="0" />
                                     </primitives:Track.DecreaseRepeatButton>
                                     <primitives:Track.Thumb>
                                         <primitives:Thumb MinHeight="28" Style="{StaticResource EasyScrollThumb}" />
                                     </primitives:Track.Thumb>
                                     <primitives:Track.IncreaseRepeatButton>
-                                        <RepeatButton Background="Transparent"
-                                                      BorderThickness="0"
+                                        <RepeatButton Background="Transparent" BorderThickness="0"
                                                       Command="{x:Static ScrollBar.PageDownCommand}"
-                                                      Focusable="False"
-                                                      Opacity="0" />
+                                                      Focusable="False" Opacity="0" />
                                     </primitives:Track.IncreaseRepeatButton>
                                 </primitives:Track>
                             </Grid>
@@ -132,7 +119,7 @@
         </Grid.RowDefinitions>
 
         <ScrollViewer Margin="0,0,0,2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-            <StackPanel Margin="0,0,14,38">
+            <StackPanel Margin="0,0,14,36">
                 <Border Style="{StaticResource MacCardStyle}" BorderBrush="{Binding StateColor}">
                     <Grid>
                         <Grid.ColumnDefinitions>
@@ -140,18 +127,18 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <StackPanel>
-                            <TextBlock Style="{StaticResource MacSectionLabel}" Text="MINECRAFT F&#x00C1;CIL" />
+                            <TextBlock Style="{StaticResource MacSectionLabel}" Text="MINECRAFT R&#x00C1;PIDO" />
                             <TextBlock Margin="0,6,0,0"
                                        Foreground="{StaticResource TextPrimaryBrush}"
                                        FontSize="25"
                                        FontWeight="SemiBold"
-                                       Text="Otimize qualquer inst&#x00E2;ncia sem entender Java ou logs."
+                                       Text="Prepare o jogo em poucos cliques."
                                        TextWrapping="Wrap" />
                             <TextBlock Margin="0,8,0,0"
                                        MaxWidth="720"
                                        Foreground="{StaticResource TextSecondaryBrush}"
                                        FontSize="12"
-                                       Text="Detectar, analisar, otimizar e testar. Nada e apagado, mods nao sao movidos e toda configuracao escrita pode ser restaurada."
+                                       Text="Encontre a instala&#x00E7;&#x00E3;o, prepare com backup e teste. Mods nunca s&#x00E3;o movidos ou apagados por este modo."
                                        TextWrapping="Wrap" />
                             <TextBlock Margin="0,12,0,0"
                                        Foreground="{StaticResource TextTertiaryBrush}"
@@ -159,25 +146,19 @@
                                        Text="{Binding SelectedPath}"
                                        TextTrimming="CharacterEllipsis" />
                         </StackPanel>
-                        <StackPanel Grid.Column="1" Margin="18,0,0,0" VerticalAlignment="Top">
-                            <Button x:Name="PrimaryDetectButton"
-                                    MinWidth="190"
-                                    Style="{StaticResource MacPrimaryButton}"
-                                    Content="Detectar Inst&#x00E2;ncia Agora"
-                                    Visibility="{Binding IsPrimaryDetectCtaVisible, Converter={StaticResource BoolToVisibility}}"
-                                    Click="DetectButton_OnClick" />
-                            <Border Padding="14,9"
-                                    Background="#101B2B"
-                                    BorderBrush="{Binding StateColor}"
-                                    BorderThickness="1"
-                                    CornerRadius="18"
-                                    Visibility="{Binding IsStatusBadgeVisible, Converter={StaticResource BoolToVisibility}}">
-                                <TextBlock Foreground="{Binding StateColor}"
-                                           FontSize="11"
-                                           FontWeight="Bold"
-                                           Text="{Binding OverallStatus}" />
-                            </Border>
-                        </StackPanel>
+                        <Border Grid.Column="1"
+                                Margin="18,0,0,0"
+                                Padding="14,9"
+                                VerticalAlignment="Top"
+                                Background="#101B2B"
+                                BorderBrush="{Binding StateColor}"
+                                BorderThickness="1"
+                                CornerRadius="18">
+                            <TextBlock Foreground="{Binding StateColor}"
+                                       FontSize="11"
+                                       FontWeight="Bold"
+                                       Text="{Binding OverallStatus}" />
+                        </Border>
                     </Grid>
                 </Border>
 
@@ -194,38 +175,26 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <Border Width="34" Height="34" Background="{Binding StateColor}" CornerRadius="17">
-                            <TextBlock HorizontalAlignment="Center"
-                                       VerticalAlignment="Center"
-                                       Foreground="#08111E"
-                                       FontFamily="Segoe MDL2 Assets"
-                                       FontSize="17"
-                                       Text="&#xE946;" />
+                            <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center"
+                                       Foreground="#08111E" FontFamily="Segoe MDL2 Assets"
+                                       FontSize="17" Text="&#xE946;" />
                         </Border>
                         <StackPanel Grid.Column="1" Margin="12,0,16,0">
                             <TextBlock Foreground="{StaticResource TextPrimaryBrush}"
-                                       FontSize="14"
-                                       FontWeight="SemiBold"
-                                       Text="{Binding StatusMessage}"
-                                       TextWrapping="Wrap" />
+                                       FontSize="14" FontWeight="SemiBold"
+                                       Text="{Binding StatusMessage}" TextWrapping="Wrap" />
                             <TextBlock Margin="0,5,0,0"
                                        Foreground="{StaticResource TextTertiaryBrush}"
-                                       FontSize="11"
-                                       Text="{Binding InstanceDetails}"
-                                       TextWrapping="Wrap" />
+                                       FontSize="11" Text="{Binding InstanceDetails}" TextWrapping="Wrap" />
                         </StackPanel>
-                        <TextBlock Grid.Column="2"
-                                   VerticalAlignment="Center"
-                                   Foreground="{Binding StateColor}"
-                                   FontSize="11"
-                                   FontWeight="SemiBold"
-                                   Text="{Binding NextAction}"
-                                   TextWrapping="Wrap" />
+                        <TextBlock Grid.Column="2" MaxWidth="210" VerticalAlignment="Center"
+                                   Foreground="{Binding StateColor}" FontSize="11" FontWeight="SemiBold"
+                                   Text="{Binding NextAction}" TextWrapping="Wrap" />
                     </Grid>
                 </Border>
 
                 <Grid Margin="0,12,0,0">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
@@ -234,190 +203,136 @@
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
 
-                    <Button x:Name="DetectButton" Grid.Row="0" Grid.Column="0" Style="{StaticResource EasyActionButton}" Background="{Binding DetectStep.Background}" BorderBrush="{Binding DetectStep.BorderBrush}" Click="DetectButton_OnClick">
+                    <Button x:Name="DetectButton" Grid.Row="0" Grid.Column="0"
+                            Style="{StaticResource EasyActionButton}"
+                            Background="{Binding DetectStep.Background}"
+                            BorderBrush="{Binding DetectStep.BorderBrush}"
+                            Click="DetectButton_OnClick">
                         <StackPanel>
                             <DockPanel LastChildFill="False">
-                                <TextBlock DockPanel.Dock="Left" Foreground="#4DA3FF" FontSize="11" FontWeight="Bold" Text="1  DETECTAR" />
+                                <TextBlock DockPanel.Dock="Left" Foreground="#4DA3FF" FontSize="11" FontWeight="Bold" Text="1  ENCONTRAR" />
                                 <TextBlock Margin="8,0,0,0" Foreground="{Binding DetectStep.Color}" FontSize="9" FontWeight="SemiBold" Text="{Binding DetectStep.StateLabel}" />
                             </DockPanel>
-                            <TextBlock Margin="0,7,0,0" FontSize="16" FontWeight="SemiBold" Text="Detectar Instancia" />
-                            <TextBlock Margin="0,6,0,0" Foreground="{StaticResource TextTertiaryBrush}" FontSize="10" Text="Procura Prism, MultiMC e Modrinth ou permite selecionar a pasta." TextWrapping="Wrap" />
+                            <TextBlock Margin="0,8,0,0" FontSize="18" FontWeight="SemiBold" Text="Encontrar Minecraft" />
+                            <TextBlock Margin="0,7,0,0" Foreground="{StaticResource TextTertiaryBrush}" FontSize="11"
+                                       Text="Localiza Prism, MultiMC ou Modrinth. Voc&#x00EA; tamb&#x00E9;m pode escolher a pasta."
+                                       TextWrapping="Wrap" />
                         </StackPanel>
                     </Button>
 
-                    <Button x:Name="AnalyzeButton" Grid.Row="0" Grid.Column="1" Style="{StaticResource EasyActionButton}" Background="{Binding AnalyzeStep.Background}" BorderBrush="{Binding AnalyzeStep.BorderBrush}" Click="AnalyzeButton_OnClick">
-                        <StackPanel>
-                            <DockPanel LastChildFill="False">
-                                <TextBlock DockPanel.Dock="Left" Foreground="#67D89B" FontSize="11" FontWeight="Bold" Text="2  ANALISAR" />
-                                <TextBlock Margin="8,0,0,0" Foreground="{Binding AnalyzeStep.Color}" FontSize="9" FontWeight="SemiBold" Text="{Binding AnalyzeStep.StateLabel}" />
-                            </DockPanel>
-                            <TextBlock Margin="0,7,0,0" FontSize="16" FontWeight="SemiBold" Text="Analisar Mods" />
-                            <TextBlock Margin="0,6,0,0" Foreground="{StaticResource TextTertiaryBrush}" FontSize="10" Text="Resume essenciais, performance, peso visual, duplicatas e riscos." TextWrapping="Wrap" />
-                        </StackPanel>
-                    </Button>
-
-                    <Button x:Name="OptimizeButton"
-                            Grid.Row="0"
-                            Grid.Column="2"
+                    <Button x:Name="OptimizeButton" Grid.Row="0" Grid.Column="1"
                             Style="{StaticResource EasyActionButton}"
                             Background="{Binding OptimizeStep.Background}"
                             BorderBrush="{Binding OptimizeStep.BorderBrush}"
                             Click="OptimizeButton_OnClick">
                         <StackPanel>
                             <DockPanel LastChildFill="False">
-                                <TextBlock DockPanel.Dock="Left" Foreground="#67D89B" FontSize="11" FontWeight="Bold" Text="3  PRINCIPAL" />
+                                <TextBlock DockPanel.Dock="Left" Foreground="#67D89B" FontSize="11" FontWeight="Bold" Text="2  PREPARAR" />
                                 <TextBlock Margin="8,0,0,0" Foreground="{Binding OptimizeStep.Color}" FontSize="9" FontWeight="SemiBold" Text="{Binding OptimizeStep.StateLabel}" />
                             </DockPanel>
-                            <TextBlock Margin="0,7,0,0" FontSize="16" FontWeight="SemiBold" Text="Otimizar para PC Fraco" />
-                            <TextBlock Margin="0,6,0,0" Foreground="#A5DCC1" FontSize="10" Text="Cria backup e aplica o perfil POTATO_4GB. Nenhum mod e alterado." TextWrapping="Wrap" />
+                            <TextBlock Margin="0,8,0,0" FontSize="18" FontWeight="SemiBold" Text="Preparar para Jogar" />
+                            <TextBlock Margin="0,7,0,0" Foreground="#A5DCC1" FontSize="11"
+                                       Text="Verifica os mods, cria backup e aplica configura&#x00E7;&#x00F5;es leves. Nenhum mod &#x00E9; alterado."
+                                       TextWrapping="Wrap" />
                         </StackPanel>
                     </Button>
 
-                    <Button x:Name="ServerButton" Grid.Row="1" Grid.Column="0" Style="{StaticResource EasyActionButton}" Background="{Binding ServerStep.Background}" BorderBrush="{Binding ServerStep.BorderBrush}" Click="ServerButton_OnClick">
+                    <Button x:Name="TestButton" Grid.Row="1" Grid.Column="0"
+                            Style="{StaticResource EasyActionButton}"
+                            Background="{Binding TestStep.Background}"
+                            BorderBrush="{Binding TestStep.BorderBrush}"
+                            Click="TestButton_OnClick">
                         <StackPanel>
                             <DockPanel LastChildFill="False">
-                                <TextBlock DockPanel.Dock="Left" Foreground="#F2A65A" FontSize="11" FontWeight="Bold" Text="4  MULTIPLAYER" />
-                                <TextBlock Margin="8,0,0,0" Foreground="{Binding ServerStep.Color}" FontSize="9" FontWeight="SemiBold" Text="{Binding ServerStep.StateLabel}" />
-                            </DockPanel>
-                            <TextBlock Margin="0,7,0,0" FontSize="16" FontWeight="SemiBold" Text="Validar Multiplayer" />
-                            <TextBlock Margin="0,6,0,0" Foreground="{StaticResource TextTertiaryBrush}" FontSize="10" Text="Confere requisitos e duplicatas sem remover ou mover JARs." TextWrapping="Wrap" />
-                        </StackPanel>
-                    </Button>
-
-                    <Button x:Name="TestButton" Grid.Row="1" Grid.Column="1" Style="{StaticResource EasyActionButton}" Background="{Binding TestStep.Background}" BorderBrush="{Binding TestStep.BorderBrush}" Click="TestButton_OnClick">
-                        <StackPanel>
-                            <DockPanel LastChildFill="False">
-                                <TextBlock DockPanel.Dock="Left" Foreground="#4DA3FF" FontSize="11" FontWeight="Bold" Text="5  TESTAR" />
+                                <TextBlock DockPanel.Dock="Left" Foreground="#4DA3FF" FontSize="11" FontWeight="Bold" Text="3  TESTAR" />
                                 <TextBlock Margin="8,0,0,0" Foreground="{Binding TestStep.Color}" FontSize="9" FontWeight="SemiBold" Text="{Binding TestStep.StateLabel}" />
                             </DockPanel>
-                            <TextBlock Margin="0,7,0,0" FontSize="16" FontWeight="SemiBold" Text="Testar Jogo" />
-                            <TextBlock Margin="0,6,0,0" Foreground="{StaticResource TextTertiaryBrush}" FontSize="10" Text="Mede 60 segundos, coleta logs e depois faz perguntas simples." TextWrapping="Wrap" />
+                            <TextBlock Margin="0,8,0,0" FontSize="18" FontWeight="SemiBold" Text="Testar o Jogo" />
+                            <TextBlock Margin="0,7,0,0" Foreground="{StaticResource TextTertiaryBrush}" FontSize="11"
+                                       Text="Abra o Minecraft. O ApexTweaker observa mem&#x00F3;ria e travamentos por 60 segundos."
+                                       TextWrapping="Wrap" />
                         </StackPanel>
                     </Button>
 
-                    <Button x:Name="FixButton"
-                            Grid.Row="1"
-                            Grid.Column="2"
+                    <Button x:Name="FixButton" Grid.Row="1" Grid.Column="1"
                             Style="{StaticResource EasyActionButton}"
                             Background="{Binding FixStep.Background}"
                             BorderBrush="{Binding FixStep.BorderBrush}"
-                            ToolTip="Dispon&#x00ED;vel ap&#x00F3;s testar o jogo."
+                            ToolTip="Dispon&#x00ED;vel depois de testar o jogo."
                             ToolTipService.ShowOnDisabled="True"
                             Click="FixButton_OnClick">
                         <StackPanel>
                             <DockPanel LastChildFill="False">
-                                <TextBlock DockPanel.Dock="Left" Foreground="#F5B942" FontSize="11" FontWeight="Bold" Text="6  CORRIGIR" />
+                                <TextBlock DockPanel.Dock="Left" Foreground="#F5B942" FontSize="11" FontWeight="Bold" Text="4  RESOLVER" />
                                 <TextBlock Margin="8,0,0,0" Foreground="{Binding FixStep.Color}" FontSize="9" FontWeight="SemiBold" Text="{Binding FixStep.StateLabel}" />
                             </DockPanel>
-                            <TextBlock Margin="0,7,0,0" FontSize="16" FontWeight="SemiBold" Text="Corrigir Problemas" />
-                            <TextBlock Margin="0,6,0,0" Foreground="{StaticResource TextTertiaryBrush}" FontSize="10" Text="Traduz memoria, stutter, incompatibilidade ou crash em proximas acoes seguras." TextWrapping="Wrap" />
+                            <TextBlock Margin="0,8,0,0" FontSize="18" FontWeight="SemiBold" Text="Resolver Problemas" />
+                            <TextBlock Margin="0,7,0,0" Foreground="{StaticResource TextTertiaryBrush}" FontSize="11"
+                                       Text="Traduz crash, falta de mem&#x00F3;ria ou travamentos em uma pr&#x00F3;xima a&#x00E7;&#x00E3;o segura."
+                                       TextWrapping="Wrap" />
                         </StackPanel>
                     </Button>
                 </Grid>
 
-                <Border Margin="0,2,0,0" Style="{StaticResource MacCardStyle}">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
+                <Expander Margin="0,2,0,0" Header="Ajustes opcionais">
+                    <Border Margin="0,9,0,0" Style="{StaticResource MacCardStyle}">
                         <StackPanel>
-                            <TextBlock Style="{StaticResource MacSectionLabel}" Text="CONFIGURACAO AUTOMATICA" />
-                            <TextBlock Margin="0,6,0,0"
-                                       Foreground="{StaticResource TextSecondaryBrush}"
-                                       FontSize="11"
-                                       Text="Padr&#x00E3;o: 960x540, render 2, simula&#x00E7;&#x00E3;o 5, entidades 30%, 24 FPS, heap 2048 MB e hook Seguro."
+                            <TextBlock Foreground="{StaticResource TextSecondaryBrush}" FontSize="11"
+                                       Text="O padr&#x00E3;o &#x00E9; recomendado para PCs fracos. Altere somente se precisar."
                                        TextWrapping="Wrap" />
+                            <WrapPanel Margin="0,12,0,0">
+                                <CheckBox Margin="0,16,18,0" VerticalAlignment="Center"
+                                          Foreground="{StaticResource TextSecondaryBrush}"
+                                          Content="Resolu&#x00E7;&#x00E3;o m&#x00ED;nima (854x480)"
+                                          IsChecked="{Binding UseExtremeResolution, Mode=TwoWay}" />
+                                <StackPanel Margin="0,0,12,0">
+                                    <TextBlock Style="{StaticResource MacSectionLabel}" Text="LIMITE DE FPS" />
+                                    <ComboBox x:Name="EasyFpsComboBox" Width="100" Margin="0,5,0,0"
+                                              ItemStringFormat="{}{0} FPS"
+                                              SelectedItem="{Binding SelectedFps, Mode=TwoWay}" />
+                                </StackPanel>
+                                <StackPanel Margin="0,0,12,0">
+                                    <TextBlock Style="{StaticResource MacSectionLabel}" Text="MODO DA SESS&#x00C3;O" />
+                                    <ComboBox x:Name="EasyHookModeComboBox" Width="120" Margin="0,5,0,0"
+                                              SelectedItem="{Binding SelectedHookMode, Mode=TwoWay}"
+                                              ToolTip="Seguro usa apenas APIs documentadas. Extremo deve ser testado isoladamente." />
+                                </StackPanel>
+                                <StackPanel>
+                                    <TextBlock Style="{StaticResource MacSectionLabel}" Text="ONDE VAI JOGAR" />
+                                    <ComboBox x:Name="EasyPlayTargetComboBox" Width="120" Margin="0,5,0,0"
+                                              SelectedItem="{Binding SelectedPlayTarget, Mode=TwoWay}" />
+                                </StackPanel>
+                            </WrapPanel>
                         </StackPanel>
-                        <WrapPanel Grid.Column="1" Margin="20,0,0,0" VerticalAlignment="Center">
-                            <CheckBox Margin="0,16,16,0"
-                                      VerticalAlignment="Center"
-                                      Foreground="{StaticResource TextSecondaryBrush}"
-                                      Content="Usar 854x480"
-                                      IsChecked="{Binding UseExtremeResolution, Mode=TwoWay}" />
-                            <StackPanel Margin="0,0,10,0">
-                                <TextBlock Style="{StaticResource MacSectionLabel}" Text="FPS" />
-                                <ComboBox x:Name="EasyFpsComboBox"
-                                          Width="86"
-                                          Margin="0,5,0,0"
-                                          ItemStringFormat="{}{0} FPS"
-                                          SelectedItem="{Binding SelectedFps, Mode=TwoWay}" />
-                            </StackPanel>
-                            <StackPanel Margin="0,0,10,0">
-                                <TextBlock Style="{StaticResource MacSectionLabel}" Text="HOOK DE SESS&#x00C3;O" />
-                                <ComboBox x:Name="EasyHookModeComboBox"
-                                          Width="112"
-                                          Margin="0,5,0,0"
-                                          SelectedItem="{Binding SelectedHookMode, Mode=TwoWay}"
-                                          ToolTip="Seguro usa somente APIs documentadas no processo Java. Extremo adiciona prioridade High e afinidade h&#x00ED;brida quando suportada." />
-                            </StackPanel>
-                            <StackPanel>
-                                <TextBlock Style="{StaticResource MacSectionLabel}" Text="DESTINO" />
-                                <ComboBox x:Name="EasyPlayTargetComboBox"
-                                          Width="112"
-                                          Margin="0,5,0,0"
-                                          SelectedItem="{Binding SelectedPlayTarget, Mode=TwoWay}" />
-                            </StackPanel>
-                        </WrapPanel>
-                    </Grid>
-                </Border>
+                    </Border>
+                </Expander>
 
-                <Border Margin="0,12,0,0" Style="{StaticResource MacCardStyle}">
-                    <StackPanel>
-                        <TextBlock Style="{StaticResource MacSectionLabel}" Text="RESUMO DOS MODS" />
-                        <UniformGrid Margin="0,10,0,0" Columns="5">
-                            <Border Style="{StaticResource EasyMetric}"><StackPanel><TextBlock Style="{StaticResource MacSectionLabel}" Text="ESSENCIAIS" /><TextBlock Margin="0,5,0,0" Style="{StaticResource MacMetricValue}" Text="{Binding EssentialMods}" /></StackPanel></Border>
-                            <Border Style="{StaticResource EasyMetric}"><StackPanel><TextBlock Style="{StaticResource MacSectionLabel}" Text="PERFORMANCE" /><TextBlock Margin="0,5,0,0" Style="{StaticResource MacMetricValue}" Text="{Binding PerformanceMods}" /></StackPanel></Border>
-                            <Border Style="{StaticResource EasyMetric}"><StackPanel><TextBlock Style="{StaticResource MacSectionLabel}" Text="PESADOS" /><TextBlock Margin="0,5,0,0" Style="{StaticResource MacMetricValue}" Text="{Binding HeavyMods}" /></StackPanel></Border>
-                            <Border Style="{StaticResource EasyMetric}"><StackPanel><TextBlock Style="{StaticResource MacSectionLabel}" Text="DUPLICATAS" /><TextBlock Margin="0,5,0,0" Style="{StaticResource MacMetricValue}" Text="{Binding DuplicateMods}" /></StackPanel></Border>
-                            <Border Style="{StaticResource EasyMetric}" Margin="0"><StackPanel><TextBlock Style="{StaticResource MacSectionLabel}" Text="RISCOS" /><TextBlock Margin="0,5,0,0" Style="{StaticResource MacMetricValue}" Text="{Binding RiskCount}" /></StackPanel></Border>
-                        </UniformGrid>
-
-                        <Expander Margin="0,10,0,0" Header="Ver detalhes do resumo">
-                            <TextBlock Margin="0,8,0,0"
-                                       Foreground="{StaticResource TextSecondaryBrush}"
-                                       FontSize="11"
-                                       Text="{Binding ModDetails}"
-                                       TextWrapping="Wrap" />
-                        </Expander>
-                        <Expander Margin="0,7,0,0" Header="Compatibilidade com servidor">
-                            <TextBlock Margin="0,8,0,0"
-                                       Foreground="{StaticResource TextSecondaryBrush}"
-                                       FontSize="11"
-                                       Text="{Binding ServerDetails}"
-                                       TextWrapping="Wrap" />
-                        </Expander>
-                        <Expander Margin="0,7,0,0" Header="Recomendacoes depois do teste">
-                            <TextBlock Margin="0,8,0,0"
-                                       Foreground="{StaticResource TextSecondaryBrush}"
-                                       FontSize="11"
-                                       Text="{Binding CorrectionDetails}"
-                                       TextWrapping="Wrap" />
-                        </Expander>
-                    </StackPanel>
-                </Border>
+                <Expander Margin="0,10,0,0" Header="Ver detalhes da verifica&#x00E7;&#x00E3;o">
+                    <Border Margin="0,9,0,0" Style="{StaticResource MacCardStyle}">
+                        <StackPanel>
+                            <TextBlock Foreground="{StaticResource TextSecondaryBrush}" FontSize="11"
+                                       Text="{Binding ModDetails}" TextWrapping="Wrap" />
+                            <TextBlock Margin="0,10,0,0" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11"
+                                       Text="{Binding ServerDetails}" TextWrapping="Wrap" />
+                            <TextBlock Margin="0,10,0,0" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11"
+                                       Text="{Binding CorrectionDetails}" TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Border>
+                </Expander>
 
                 <Border Margin="0,12,0,0"
                         Style="{StaticResource MacCardStyle}"
                         Visibility="{Binding IsTestPanelVisible, Converter={StaticResource BoolToVisibility}}">
                     <StackPanel>
-                        <TextBlock Style="{StaticResource MacSectionLabel}" Text="TESTE DO JOGO" />
-                        <TextBlock Margin="0,6,0,0"
-                                   Foreground="{StaticResource TextPrimaryBrush}"
-                                   FontSize="15"
-                                   FontWeight="SemiBold"
-                                   Text="Responda somente o que voce observou." />
-                        <ProgressBar Height="5"
-                                     Margin="0,12,0,0"
-                                     Maximum="100"
+                        <TextBlock Style="{StaticResource MacSectionLabel}" Text="COMO FOI O TESTE?" />
+                        <TextBlock Margin="0,6,0,0" Foreground="{StaticResource TextPrimaryBrush}"
+                                   FontSize="15" FontWeight="SemiBold"
+                                   Text="Marque somente o que voc&#x00EA; observou." />
+                        <ProgressBar Height="5" Margin="0,12,0,0" Maximum="100"
                                      Value="{Binding BenchmarkProgress, Mode=OneWay}"
-                                     Foreground="#4DA3FF"
-                                     Background="#17253A" />
-                        <TextBlock Margin="0,7,0,0"
-                                   Foreground="{StaticResource TextTertiaryBrush}"
-                                   FontSize="10"
-                                   Text="{Binding BenchmarkSummary}"
-                                   TextWrapping="Wrap" />
+                                     Foreground="#4DA3FF" Background="#17253A" />
+                        <TextBlock Margin="0,7,0,0" Foreground="{StaticResource TextTertiaryBrush}"
+                                   FontSize="10" Text="{Binding BenchmarkSummary}" TextWrapping="Wrap" />
                         <WrapPanel Margin="0,13,0,0">
                             <CheckBox Style="{StaticResource EasyCheck}" Content="O jogo abriu" IsChecked="{Binding GameOpened}" />
                             <CheckBox Style="{StaticResource EasyCheck}" Content="Chegou ao menu" IsChecked="{Binding MenuReached}" />
@@ -433,65 +348,42 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <TextBox Height="36"
-                                     Padding="10,6"
-                                     Background="#101B2B"
-                                     Foreground="{StaticResource TextPrimaryBrush}"
-                                     BorderBrush="#2B3D58"
+                            <TextBox Height="36" Padding="10,6" Background="#101B2B"
+                                     Foreground="{StaticResource TextPrimaryBrush}" BorderBrush="#2B3D58"
                                      Text="{Binding ApproximateFps, UpdateSourceTrigger=PropertyChanged}"
-                                     ToolTip="FPS aproximado, se voce observou pelo F3. Deixe vazio se nao souber." />
-                            <TextBox Grid.Column="1"
-                                     Height="36"
-                                     Margin="10,0,10,0"
-                                     Padding="10,6"
-                                     Background="#101B2B"
-                                     Foreground="{StaticResource TextPrimaryBrush}"
+                                     ToolTip="FPS aproximado visto no F3. Deixe vazio se n&#x00E3;o souber." />
+                            <TextBox Grid.Column="1" Height="36" Margin="10,0,10,0" Padding="10,6"
+                                     Background="#101B2B" Foreground="{StaticResource TextPrimaryBrush}"
                                      BorderBrush="#2B3D58"
                                      Text="{Binding UserNotes, UpdateSourceTrigger=PropertyChanged}"
-                                     ToolTip="Observacao curta ou mensagem de erro." />
-                            <Button Grid.Column="2"
-                                    Style="{StaticResource MacPrimaryButton}"
-                                    Content="Salvar respostas"
-                                    Click="SaveTestButton_OnClick" />
+                                     ToolTip="Observa&#x00E7;&#x00E3;o curta ou mensagem de erro." />
+                            <Button Grid.Column="2" Style="{StaticResource MacPrimaryButton}"
+                                    Content="Salvar respostas" Click="SaveTestButton_OnClick" />
                         </Grid>
                     </StackPanel>
                 </Border>
             </StackPanel>
         </ScrollViewer>
 
-        <Border Grid.Row="1"
-                Margin="0,8,6,0"
-                Padding="12"
-                Background="#0D1726"
-                BorderBrush="#263750"
-                BorderThickness="1"
-                CornerRadius="12">
+        <Border Grid.Row="1" Margin="0,8,6,0" Padding="12"
+                Background="#0D1726" BorderBrush="#263750" BorderThickness="1" CornerRadius="12">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <Button x:Name="RestoreButton"
-                        Style="{StaticResource MacDestructiveButton}"
-                        Content="Restaurar Tudo"
-                        ToolTip="Dispon&#x00ED;vel ap&#x00F3;s criar um backup."
-                        ToolTipService.ShowOnDisabled="True"
-                        Click="RestoreButton_OnClick" />
-                <TextBlock Grid.Column="1"
-                           Margin="14,0"
-                           VerticalAlignment="Center"
-                           Foreground="{StaticResource TextTertiaryBrush}"
-                           FontSize="10"
-                           Text="Restaura apenas alteracoes gerenciadas pelo ultimo backup. JARs permanecem intactos."
+                <Button x:Name="RestoreButton" Style="{StaticResource MacDestructiveButton}"
+                        Content="Restaurar" ToolTip="Dispon&#x00ED;vel depois de criar um backup."
+                        ToolTipService.ShowOnDisabled="True" Click="RestoreButton_OnClick" />
+                <TextBlock Grid.Column="1" Margin="14,0" VerticalAlignment="Center"
+                           Foreground="{StaticResource TextTertiaryBrush}" FontSize="10"
+                           Text="Volta &#x00E0;s configura&#x00E7;&#x00F5;es anteriores. Seus mods permanecem intactos."
                            TextWrapping="Wrap" />
-                <Button x:Name="ExportButton"
-                        Grid.Column="2"
-                        Style="{StaticResource MacSecondaryButton}"
-                        Content="Exportar Diagnostico"
-                        ToolTip="Dispon&#x00ED;vel ap&#x00F3;s executar an&#x00E1;lise ou teste."
-                        ToolTipService.ShowOnDisabled="True"
-                        Click="ExportButton_OnClick" />
+                <Button x:Name="ExportButton" Grid.Column="2" Style="{StaticResource MacSecondaryButton}"
+                        Content="Exportar diagn&#x00F3;stico"
+                        ToolTip="Dispon&#x00ED;vel depois de preparar ou testar."
+                        ToolTipService.ShowOnDisabled="True" Click="ExportButton_OnClick" />
             </Grid>
         </Border>
     </Grid>

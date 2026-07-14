@@ -1,6 +1,6 @@
 # Primeiro teste seguro em 4 GB
 
-Versao: **ApexTweaker 3.3.0**
+Versao: **ApexTweaker 3.3.1**
 
 Este roteiro prepara o primeiro teste real no Intel Core i3 de quarta geracao,
 4 GB de RAM e Intel HD. O objetivo e abrir o jogo, entrar no servidor e obter
@@ -19,8 +19,8 @@ Windows continuam em `C:\ProgramData\ApexTweaker\Backups`.
 
 ## Preparacao
 
-1. Baixe `ApexTweaker-Portable-v3.3.0.zip` da release autenticada.
-2. Confira o SHA-256 publicado e extraia em `C:\ApexTweaker\v3.3.0-portable`.
+1. Baixe `ApexTweaker-Portable-v3.3.1.zip` da release autenticada.
+2. Confira o SHA-256 publicado e extraia em `C:\ApexTweaker\v3.3.1-portable`.
 3. Confirme que `ApexTweaker.exe` e `ApexTweaker.Native.dll` estao juntos.
 4. No Prism Launcher, crie `Cobblemon-1.21.1-EXTREME-4GB`.
 5. Selecione Minecraft `1.21.1`, Fabric e Java `21` x64.

@@ -587,15 +587,15 @@ internal static class MinecraftSelfTest
             Assert(easyViewModel.DetectStep.State == EasyStepState.Running,
                 "Card Detectar nao mostrou o estado Executando.");
             easyViewModel.SetInstance(easyInstance);
-            Assert(easyViewModel.StatusMessage == "Inst\u00E2ncia detectada. Pr\u00F3ximo passo: Analisar Mods." &&
+            Assert(easyViewModel.StatusMessage == "Inst\u00E2ncia detectada. Pr\u00F3ximo passo: Preparar para Jogar." &&
                    easyViewModel.DetectStep.State == EasyStepState.Completed &&
-                   easyViewModel.AnalyzeStep.State == EasyStepState.Ready && easyViewModel.AnalyzeStep.IsCurrent,
-                "Fluxo facil nao avancou de Detectar para Analisar.");
+                   easyViewModel.OptimizeStep.State == EasyStepState.Ready && easyViewModel.OptimizeStep.IsCurrent,
+                "Fluxo facil nao avancou de Encontrar para Preparar.");
             easyViewModel.BeginAnalysis();
             easyViewModel.SetAudit(easySummary);
-            Assert(easyViewModel.StatusMessage == "Mods analisados. Pr\u00F3ximo passo: Otimizar para PC Fraco." &&
+            Assert(easyViewModel.StatusMessage == "Verifica\u00E7\u00E3o conclu\u00EDda. Preparando configura\u00E7\u00F5es leves com backup." &&
                    easyViewModel.OptimizeStep.State == EasyStepState.Ready && easyViewModel.OptimizeStep.IsCurrent,
-                "Fluxo facil nao avancou de Analisar para Otimizar.");
+                "Verificacao interna nao devolveu o fluxo para Preparar.");
             easyViewModel.SetServerReadiness(serverReadiness);
             easyViewModel.BeginOptimization();
             easyViewModel.SetOptimizationApplied("backup-polish", "-Xms512M -Xmx2048M", javaAppliedAutomatically: true);

@@ -72,6 +72,12 @@ public partial class CobblemonEasyView : WpfUserControl
         UpdateActions();
     }
 
+    internal void ResumeOptimization()
+    {
+        viewModel.BeginOptimization();
+        UpdateActions();
+    }
+
     internal void SetServerReadiness(MinecraftEasyServerReadiness readiness)
     {
         viewModel.SetServerReadiness(readiness);
@@ -254,11 +260,8 @@ public partial class CobblemonEasyView : WpfUserControl
     private void UpdateActions()
     {
         var available = !viewModel.IsBusy;
-        PrimaryDetectButton.IsEnabled = available;
         DetectButton.IsEnabled = available;
-        AnalyzeButton.IsEnabled = available && viewModel.InstanceReady;
-        OptimizeButton.IsEnabled = available && viewModel.InstanceReady && viewModel.AuditReady;
-        ServerButton.IsEnabled = available && viewModel.AuditReady;
+        OptimizeButton.IsEnabled = available && viewModel.InstanceReady;
         TestButton.IsEnabled = available && viewModel.InstanceReady && viewModel.OptimizationApplied;
         FixButton.IsEnabled = available && viewModel.IsTestPanelVisible;
         RestoreButton.IsEnabled = available && viewModel.HasBackup;

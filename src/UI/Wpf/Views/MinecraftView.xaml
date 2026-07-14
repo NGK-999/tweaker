@@ -64,7 +64,7 @@
                 <Button x:Name="EasyModeTabButton"
                         MinWidth="145"
                         Style="{StaticResource MacPrimaryButton}"
-                        Content="Minecraft F&#x00E1;cil"
+                        Content="Minecraft R&#x00E1;pido"
                         Click="EasyModeTabButton_OnClick" />
                 <Button x:Name="AdvancedModeTabButton"
                         MinWidth="145"
