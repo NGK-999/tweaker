@@ -21,8 +21,8 @@
     </Window.Resources>
 
     <Border x:Name="RootCard"
-            Background="{StaticResource CardBgBrush}"
-            BorderBrush="{StaticResource CardBorderBrush}"
+            Background="{DynamicResource CardBgBrush}"
+            BorderBrush="{DynamicResource CardBorderBrush}"
             BorderThickness="0.5"
             CornerRadius="16"
             Padding="28,24"
@@ -34,17 +34,17 @@
         </Border.RenderTransform>
         <StackPanel VerticalAlignment="Center">
             <TextBlock Text="ApexTweaker"
-                       Foreground="{StaticResource TextPrimaryBrush}"
+                       Foreground="{DynamicResource TextPrimaryBrush}"
                        FontSize="20"
                        FontWeight="SemiBold" />
             <TextBlock Margin="0,6,0,18"
-                       Foreground="{StaticResource TextSecondaryBrush}"
+                       Foreground="{DynamicResource TextSecondaryBrush}"
                        FontSize="13"
                        Text="Preparando diagn&#x00F3;stico..." />
             <ProgressBar Height="4"
                          IsIndeterminate="True"
-                         Foreground="{StaticResource AccentBrush}"
-                         Background="{StaticResource CardElevatedBrush}"
+                         Foreground="{DynamicResource AccentBrush}"
+                         Background="{DynamicResource CardElevatedBrush}"
                          BorderThickness="0" />
         </StackPanel>
     </Border>

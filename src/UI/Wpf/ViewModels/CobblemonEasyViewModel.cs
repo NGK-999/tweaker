@@ -152,6 +152,12 @@ internal sealed partial class CobblemonEasyViewModel : ObservableObject
     private bool isTestPanelVisible;
 
     [ObservableProperty]
+    private bool isBenchmarkComplete;
+
+    [ObservableProperty]
+    private bool isObservationSaved;
+
+    [ObservableProperty]
     private bool isPrimaryDetectCtaVisible = true;
 
     [ObservableProperty]
@@ -222,6 +228,28 @@ internal sealed partial class CobblemonEasyViewModel : ObservableObject
             ? MinecraftPlayTargetKind.Server
             : MinecraftPlayTargetKind.World;
 
+    public string DestinationQuestion => PlayTarget == MinecraftPlayTargetKind.Server
+        ? "Conseguiu entrar no servidor"
+        : "Conseguiu entrar no mundo";
+
+    public bool ReachedDestination
+    {
+        get => PlayTarget == MinecraftPlayTargetKind.Server ? ServerEntered : WorldEntered;
+        set
+        {
+            if (PlayTarget == MinecraftPlayTargetKind.Server)
+            {
+                ServerEntered = value;
+            }
+            else
+            {
+                WorldEntered = value;
+            }
+
+            OnPropertyChanged();
+        }
+    }
+
     public string StateColor => OverallState switch
     {
         MinecraftEasyState.Ready or MinecraftEasyState.BackupCreated or
@@ -239,7 +267,18 @@ internal sealed partial class CobblemonEasyViewModel : ObservableObject
 
     partial void OnSelectedHookModeChanged(string value) => OnPropertyChanged(nameof(SessionHookMode));
 
-    partial void OnSelectedPlayTargetChanged(string value) => OnPropertyChanged(nameof(PlayTarget));
+    partial void OnSelectedPlayTargetChanged(string value)
+    {
+        WorldEntered = false;
+        ServerEntered = false;
+        OnPropertyChanged(nameof(PlayTarget));
+        OnPropertyChanged(nameof(DestinationQuestion));
+        OnPropertyChanged(nameof(ReachedDestination));
+    }
+
+    partial void OnWorldEnteredChanged(bool value) => OnPropertyChanged(nameof(ReachedDestination));
+
+    partial void OnServerEnteredChanged(bool value) => OnPropertyChanged(nameof(ReachedDestination));
 
     public void ResetForPath(string path, bool resolved)
     {
@@ -375,6 +414,7 @@ internal sealed partial class CobblemonEasyViewModel : ObservableObject
 
     public void BeginBenchmark()
     {
+        ResetAnswers();
         IsTestPanelVisible = true;
         BenchmarkProgress = 0;
         OverallState = MinecraftEasyState.TestRequired;
@@ -395,6 +435,8 @@ internal sealed partial class CobblemonEasyViewModel : ObservableObject
 
     public void CompleteBenchmark(MinecraftBenchmarkResult? result, bool cancelled)
     {
+        IsBenchmarkComplete = !cancelled;
+        IsObservationSaved = false;
         BenchmarkProgress = cancelled ? BenchmarkProgress : 100;
         OverallState = cancelled
             ? MinecraftEasyState.Inconclusive
@@ -429,6 +471,7 @@ internal sealed partial class CobblemonEasyViewModel : ObservableObject
 
     public void SetOperationalResult(OperationalHomologationStatus status)
     {
+        IsObservationSaved = true;
         OverallState = status switch
         {
             OperationalHomologationStatus.Approved => MinecraftEasyState.Ready,
@@ -487,6 +530,8 @@ internal sealed partial class CobblemonEasyViewModel : ObservableObject
 
     public void SetRestored(string backupId)
     {
+        ResetAnswers();
+        IsTestPanelVisible = false;
         OptimizationApplied = false;
         HasBackup = false;
         OverallState = MinecraftEasyState.Restored;
@@ -612,6 +657,8 @@ internal sealed partial class CobblemonEasyViewModel : ObservableObject
 
     private void ResetAnswers()
     {
+        IsBenchmarkComplete = false;
+        IsObservationSaved = false;
         GameOpened = false;
         MenuReached = false;
         WorldEntered = false;

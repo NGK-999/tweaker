@@ -3,9 +3,11 @@ using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Windows.Media;
 using ApexTweaker.Minecraft.Models;
 using ApexTweaker.Minecraft.Services;
 using ApexTweaker.Services;
+using ApexTweaker.UI.Wpf.Theming;
 using ApexTweaker.UI.Wpf.ViewModels;
 using ApexTweaker.UI.Wpf.Views;
 
@@ -583,6 +585,15 @@ internal static class MinecraftSelfTest
                    easyViewModel.DetectStep.State == EasyStepState.Ready && easyViewModel.DetectStep.IsCurrent &&
                    easyViewModel.AnalyzeStep.State == EasyStepState.Blocked,
                 "Modo facil nao iniciou aguardando deteccao com as demais etapas bloqueadas.");
+            easyViewModel.ReachedDestination = true;
+            Assert(easyViewModel.ServerEntered && !easyViewModel.WorldEntered,
+                "Destino simplificado nao registrou entrada no servidor.");
+            easyViewModel.SelectedPlayTarget = "Mundo local";
+            easyViewModel.ReachedDestination = true;
+            Assert(easyViewModel.WorldEntered && !easyViewModel.ServerEntered &&
+                   easyViewModel.DestinationQuestion.Contains("mundo", StringComparison.OrdinalIgnoreCase),
+                "Destino simplificado nao alternou para mundo local.");
+            easyViewModel.SelectedPlayTarget = "Servidor";
             easyViewModel.BeginDetection();
             Assert(easyViewModel.DetectStep.State == EasyStepState.Running,
                 "Card Detectar nao mostrou o estado Executando.");
@@ -604,6 +615,8 @@ internal static class MinecraftSelfTest
                 "Fluxo facil nao liberou teste e restauracao depois do backup.");
             easyViewModel.BeginBenchmark();
             easyViewModel.CompleteBenchmark(easyBenchmark, cancelled: false);
+            Assert(easyViewModel.IsBenchmarkComplete && !easyViewModel.IsObservationSaved,
+                "Fluxo facil nao pediu confirmacao humana depois do benchmark.");
             easyViewModel.GameOpened = true;
             easyViewModel.MenuReached = true;
             easyViewModel.ServerEntered = false;
@@ -614,6 +627,9 @@ internal static class MinecraftSelfTest
                    easyViewModel.TestStep.State == EasyStepState.Failed &&
                    easyViewModel.FixStep.State == EasyStepState.Ready,
                 "Modo facil inventou FPS ou nao traduziu falha para linguagem simples.");
+            easyViewModel.SetOperationalResult(OperationalHomologationStatus.Failed);
+            Assert(easyViewModel.IsObservationSaved,
+                "Fluxo facil nao marcou o resultado humano como concluido.");
             easyViewModel.SetCorrections(new MinecraftEasyCorrectionPlan(
                 MinecraftEasyState.Attention,
                 "Candidato inconclusivo",
@@ -1040,7 +1056,34 @@ internal static class MinecraftSelfTest
             var view = new MinecraftView();
             view.SetSelectedPath(modsDirectory);
             Assert(view.SelectedPath == modsDirectory, "A view Minecraft nao carregou o caminho selecionado.");
+            var easyControl = new CobblemonEasyView();
+            Assert(easyControl.PrimaryActionLabel == "Encontrar Minecraft",
+                "Modo facil nao iniciou com um unico CTA para encontrar Minecraft.");
+            easyControl.SetInstanceStatus(easyInstance);
+            Assert(easyControl.PrimaryActionLabel == "Preparar para jogar",
+                "CTA unico nao avancou para preparar a instancia.");
+            easyControl.SetOptimizationApplied("backup-cta", "-Xms512M -Xmx2048M", javaAppliedAutomatically: true);
+            Assert(easyControl.PrimaryActionLabel == "Iniciar teste de 60 segundos",
+                "CTA unico nao avancou para o teste.");
+            easyControl.BeginBenchmark();
+            easyControl.CompleteBenchmark(easyBenchmark, cancelled: false);
+            Assert(easyControl.PrimaryActionLabel == "Responder como foi o teste",
+                "CTA unico nao pediu a confirmacao humana do teste.");
+            easyControl.SetOperationalResult(OperationalHomologationStatus.Failed);
+            Assert(easyControl.PrimaryActionLabel == "Resolver problemas",
+                "CTA unico nao avancou para resolver problemas.");
             messages.Add("PASS: XAML da pagina Minecraft carrega em thread STA.");
+
+            var dashboard = new DashboardView();
+            AppThemeManager.Apply(dashboard, AppThemeMode.Light);
+            var lightBackground = (SolidColorBrush)dashboard.FindResource("ContentBgBrush");
+            Assert(lightBackground.Color == ParseColor(AppThemeManager.GetHex("ContentBgColor", AppThemeMode.Light)),
+                "Tema claro nao atualizou os recursos visuais do Dashboard.");
+            AppThemeManager.Apply(view, AppThemeMode.Dark);
+            var darkBackground = (SolidColorBrush)view.FindResource("ContentBgBrush");
+            Assert(darkBackground.Color == ParseColor(AppThemeManager.GetHex("ContentBgColor", AppThemeMode.Dark)),
+                "Tema escuro nao foi restaurado na view Minecraft.");
+            messages.Add("PASS: temas claro/escuro atualizam Dashboard e Minecraft sem recriar controles.");
 
             messages.Add("SELF_TEST_OK");
             return messages;
@@ -1070,6 +1113,9 @@ internal static class MinecraftSelfTest
 
         writer.Write($"{{\"schemaVersion\":1,\"id\":\"{id}\",\"name\":\"{id}\",\"version\":\"{version}\",\"environment\":\"*\",\"depends\":{dependencyJson}}}");
     }
+
+    private static Color ParseColor(string value) =>
+        (Color)ColorConverter.ConvertFromString(value)!;
 
     private static MinecraftBenchmarkResult CreateSyntheticBenchmark(
         MinecraftEnvironmentSnapshot environment,

@@ -16,6 +16,7 @@ using Microsoft.Win32;
 using ApexTweaker.Minecraft.Models;
 using ApexTweaker.Minecraft.Services;
 using ApexTweaker.UI.Wpf.Animations;
+using ApexTweaker.UI.Wpf.Theming;
 using ApexTweaker.UI.Wpf.Views;
 using ApexTweaker;
 using ApexTweaker.Models;
@@ -89,6 +90,7 @@ public partial class MainWindow : Window
         PrivilegeModeText.Text = ApplicationPrivilegeService.IsAdministrator
             ? "Modo administrador"
             : "Modo normal (sem UAC)";
+        UpdateThemeButton();
 
         etwFrameTracker = new EtwFrameTracker(hardwareTelemetryService);
 
@@ -369,6 +371,7 @@ public partial class MainWindow : Window
         }
 
         var page = factory();
+        AppThemeManager.Apply(page, AppThemeManager.Current);
 
         if (string.Equals(activePageKey, pageKey, StringComparison.OrdinalIgnoreCase))
         {
@@ -387,13 +390,13 @@ public partial class MainWindow : Window
             DashboardPageKey => "Dashboard",
             ModulesPageKey => "M\u00F3dulos",
             TelemetryPageKey => "Telemetria",
-            MinecraftPageKey => "Minecraft F\u00e1cil",
+            MinecraftPageKey => "Minecraft R\u00e1pido",
             UtilitiesPageKey => "Utilidades",
             _ => AppInfo.Name
         };
         HeaderSubtitleText.Text = pageKey switch
         {
-            MinecraftPageKey => "Detectar, analisar, otimizar, testar e restaurar sem complexidade",
+            MinecraftPageKey => "Encontrar, preparar, testar e restaurar sem complexidade",
             TelemetryPageKey => "Frametime, sensores e comparacao antes/depois",
             ModulesPageKey => "Ajustes individuais com snapshot e verificacao",
             UtilitiesPageKey => "Rollback, suporte e manutencao",
@@ -2115,6 +2118,22 @@ public partial class MainWindow : Window
     private async void UtilitiesButton_OnClick(object sender, RoutedEventArgs e)
     {
         await ShowPageAsync(UtilitiesPageKey, UtilitiesButton);
+    }
+
+    private void ThemeButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        AppThemeManager.Toggle(this);
+        UpdateThemeButton();
+        SetStatus(AppThemeManager.Current == AppThemeMode.Light
+            ? "Tema claro ativado."
+            : "Tema escuro ativado.");
+    }
+
+    private void UpdateThemeButton()
+    {
+        ThemeButton.Content = AppThemeManager.Current == AppThemeMode.Dark
+            ? "\u2600  Tema claro"
+            : "\u263E  Tema escuro";
     }
 
     private void MinimizeButton_OnClick(object sender, RoutedEventArgs e)

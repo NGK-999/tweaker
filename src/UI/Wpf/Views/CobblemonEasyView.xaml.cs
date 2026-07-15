@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Automation;
 using ApexTweaker.Minecraft.Models;
 using ApexTweaker.UI.Wpf.ViewModels;
 using WpfUserControl = System.Windows.Controls.UserControl;
@@ -7,7 +8,17 @@ namespace ApexTweaker.UI.Wpf.Views;
 
 public partial class CobblemonEasyView : WpfUserControl
 {
+    private enum EasyPrimaryAction
+    {
+        Detect,
+        Optimize,
+        Test,
+        ReviewTest,
+        Fix
+    }
+
     private readonly CobblemonEasyViewModel viewModel = new();
+    private EasyPrimaryAction primaryAction;
 
     public CobblemonEasyView()
     {
@@ -43,6 +54,8 @@ public partial class CobblemonEasyView : WpfUserControl
     public string SelectedPath => viewModel.SelectedPath;
 
     public string StatusLine => viewModel.StatusMessage;
+
+    internal string PrimaryActionLabel => PrimaryActionButton.Content?.ToString() ?? string.Empty;
 
     internal MinecraftSessionHookMode SessionHookMode => viewModel.SessionHookMode;
 
@@ -125,7 +138,30 @@ public partial class CobblemonEasyView : WpfUserControl
         UpdateActions();
     }
 
-    private async void DetectButton_OnClick(object sender, RoutedEventArgs e)
+    private async void PrimaryActionButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        switch (primaryAction)
+        {
+            case EasyPrimaryAction.Detect:
+                await DetectAsync();
+                break;
+            case EasyPrimaryAction.Optimize:
+                await OptimizeAsync();
+                break;
+            case EasyPrimaryAction.Test:
+                await TestAsync();
+                break;
+            case EasyPrimaryAction.ReviewTest:
+                TestResultPanel.BringIntoView();
+                GameOpenedCheckBox.Focus();
+                break;
+            case EasyPrimaryAction.Fix:
+                await FixAsync();
+                break;
+        }
+    }
+
+    private async Task DetectAsync()
     {
         viewModel.BeginDetection();
         UpdateActions();
@@ -161,7 +197,7 @@ public partial class CobblemonEasyView : WpfUserControl
         }
     }
 
-    private async void OptimizeButton_OnClick(object sender, RoutedEventArgs e)
+    private async Task OptimizeAsync()
     {
         viewModel.BeginOptimization();
         UpdateActions();
@@ -197,7 +233,7 @@ public partial class CobblemonEasyView : WpfUserControl
         }
     }
 
-    private async void TestButton_OnClick(object sender, RoutedEventArgs e)
+    private async Task TestAsync()
     {
         if (MessageBox.Show(
                 $"Abra o Minecraft, chegue ao menu e entre no {(viewModel.PlayTarget == MinecraftPlayTargetKind.Server ? "servidor" : "mundo local")}.\n\n" +
@@ -217,13 +253,18 @@ public partial class CobblemonEasyView : WpfUserControl
 
     private async void SaveTestButton_OnClick(object sender, RoutedEventArgs e)
     {
+        if (viewModel.IsBusy || !viewModel.IsBenchmarkComplete || viewModel.IsObservationSaved)
+        {
+            return;
+        }
+
         if (SaveTestRequested is not null)
         {
             await SaveTestRequested.Invoke(viewModel.SelectedPath, viewModel.BuildObservation());
         }
     }
 
-    private async void FixButton_OnClick(object sender, RoutedEventArgs e)
+    private async Task FixAsync()
     {
         viewModel.BeginCorrection();
         UpdateActions();
@@ -260,11 +301,43 @@ public partial class CobblemonEasyView : WpfUserControl
     private void UpdateActions()
     {
         var available = !viewModel.IsBusy;
-        DetectButton.IsEnabled = available;
-        OptimizeButton.IsEnabled = available && viewModel.InstanceReady;
-        TestButton.IsEnabled = available && viewModel.InstanceReady && viewModel.OptimizationApplied;
-        FixButton.IsEnabled = available && viewModel.IsTestPanelVisible;
+        primaryAction = ResolvePrimaryAction();
+        var primaryLabel = primaryAction switch
+        {
+            EasyPrimaryAction.Detect => "Encontrar Minecraft",
+            EasyPrimaryAction.Optimize => "Preparar para jogar",
+            EasyPrimaryAction.Test => "Iniciar teste de 60 segundos",
+            EasyPrimaryAction.ReviewTest => "Responder como foi o teste",
+            _ => "Resolver problemas"
+        };
+
+        PrimaryActionButton.Content = primaryLabel;
+        PrimaryActionButton.IsEnabled = available;
+        AutomationProperties.SetName(PrimaryActionButton, primaryLabel);
+        SaveTestButton.IsEnabled = available && viewModel.IsBenchmarkComplete && !viewModel.IsObservationSaved;
         RestoreButton.IsEnabled = available && viewModel.HasBackup;
         ExportButton.IsEnabled = available && viewModel.CanExport;
+    }
+
+    private EasyPrimaryAction ResolvePrimaryAction()
+    {
+        if (!viewModel.InstanceReady)
+        {
+            return EasyPrimaryAction.Detect;
+        }
+
+        if (!viewModel.OptimizationApplied)
+        {
+            return EasyPrimaryAction.Optimize;
+        }
+
+        if (!viewModel.IsBenchmarkComplete)
+        {
+            return EasyPrimaryAction.Test;
+        }
+
+        return viewModel.IsObservationSaved
+            ? EasyPrimaryAction.Fix
+            : EasyPrimaryAction.ReviewTest;
     }
 }

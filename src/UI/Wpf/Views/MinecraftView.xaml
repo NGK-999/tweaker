@@ -3,7 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:controls="clr-namespace:ApexTweaker.UI.Wpf.Controls"
              xmlns:views="clr-namespace:ApexTweaker.UI.Wpf.Views"
-             Background="Transparent"
+             Background="{DynamicResource ContentBgBrush}"
              FontFamily="Segoe UI Variable Display, Segoe UI, Arial">
     <UserControl.Resources>
         <ResourceDictionary>
@@ -13,35 +13,35 @@
 
             <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
 
-            <Style x:Key="WizardTextBox" TargetType="TextBox">
+            <Style x:Key="WizardTextBox" TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
                 <Setter Property="MinHeight" Value="38" />
                 <Setter Property="Padding" Value="12,7" />
-                <Setter Property="Background" Value="{StaticResource CardElevatedBrush}" />
-                <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
-                <Setter Property="CaretBrush" Value="{StaticResource AccentBrush}" />
-                <Setter Property="BorderBrush" Value="{StaticResource CardBorderBrush}" />
+                <Setter Property="Background" Value="{DynamicResource CardElevatedBrush}" />
+                <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+                <Setter Property="CaretBrush" Value="{DynamicResource AccentBrush}" />
+                <Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}" />
                 <Setter Property="BorderThickness" Value="1" />
                 <Setter Property="FontSize" Value="13" />
                 <Setter Property="VerticalContentAlignment" Value="Center" />
             </Style>
 
             <Style x:Key="MetricCard" TargetType="Border">
-                <Setter Property="Background" Value="{StaticResource CardElevatedBrush}" />
-                <Setter Property="BorderBrush" Value="{StaticResource CardBorderBrush}" />
+                <Setter Property="Background" Value="{DynamicResource CardElevatedBrush}" />
+                <Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}" />
                 <Setter Property="BorderThickness" Value="1" />
                 <Setter Property="CornerRadius" Value="12" />
                 <Setter Property="Padding" Value="14" />
                 <Setter Property="Margin" Value="0,0,8,0" />
             </Style>
 
-            <Style x:Key="WizardChoice" TargetType="RadioButton">
-                <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+            <Style x:Key="WizardChoice" TargetType="RadioButton" BasedOn="{StaticResource {x:Type RadioButton}}">
+                <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
                 <Setter Property="FontSize" Value="13" />
                 <Setter Property="Margin" Value="0,0,18,8" />
             </Style>
 
-            <Style x:Key="TechnicalCheckBox" TargetType="CheckBox">
-                <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+            <Style x:Key="TechnicalCheckBox" TargetType="CheckBox" BasedOn="{StaticResource {x:Type CheckBox}}">
+                <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
                 <Setter Property="Margin" Value="0,0,16,8" />
             </Style>
         </ResourceDictionary>
@@ -56,8 +56,8 @@
         <Border Margin="0,0,6,10"
                 Padding="5"
                 HorizontalAlignment="Left"
-                Background="#0D1726"
-                BorderBrush="#263750"
+                Background="{DynamicResource PanelBgBrush}"
+                BorderBrush="{DynamicResource PanelBorderBrush}"
                 BorderThickness="1"
                 CornerRadius="11">
             <StackPanel Orientation="Horizontal">
@@ -115,11 +115,11 @@
                                     Margin="20,0,0,0"
                                     VerticalAlignment="Center">
                             <Border Padding="12,7"
-                                    Background="#152C24"
-                                    BorderBrush="#3EAA77"
+                                    Background="{DynamicResource SuccessSurfaceBrush}"
+                                    BorderBrush="{DynamicResource SuccessBrush}"
                                     BorderThickness="1"
                                     CornerRadius="16">
-                                <TextBlock Foreground="#67D89B"
+                                <TextBlock Foreground="{DynamicResource SuccessBrush}"
                                            FontSize="11"
                                            FontWeight="Bold"
                                            Text="{Binding ModeLabel}" />
@@ -143,7 +143,7 @@
                             <StackPanel>
                                 <TextBlock Style="{StaticResource MacSectionLabel}" Text="ROTEIRO DO EXPERIMENTO" />
                                 <TextBlock Margin="0,5,0,0"
-                                           Foreground="{StaticResource TextPrimaryBrush}"
+                                           Foreground="{DynamicResource TextPrimaryBrush}"
                                            FontSize="15"
                                            FontWeight="SemiBold"
                                            Text="{Binding CurrentStep.Title}" />
@@ -160,8 +160,8 @@
                                      Margin="0,12,0,0"
                                      Maximum="100"
                                      Value="{Binding OverallProgress, Mode=OneWay}"
-                                     Foreground="{StaticResource AccentBrush}"
-                                     Background="{StaticResource CardElevatedBrush}" />
+                                     Foreground="{DynamicResource AccentBrush}"
+                                     Background="{DynamicResource CardElevatedBrush}" />
 
                         <ItemsControl Margin="0,12,0,0" ItemsSource="{Binding Steps}">
                             <ItemsControl.ItemsPanel>
@@ -173,7 +173,7 @@
                                 <DataTemplate>
                                     <Border Margin="0,0,7,7"
                                             Padding="9"
-                                            Background="{StaticResource CardElevatedBrush}"
+                                            Background="{DynamicResource CardElevatedBrush}"
                                             BorderBrush="{Binding StateColor}"
                                             BorderThickness="1"
                                             CornerRadius="9">
@@ -189,18 +189,18 @@
                                                     CornerRadius="11">
                                                 <TextBlock HorizontalAlignment="Center"
                                                            VerticalAlignment="Center"
-                                                           Foreground="#09111D"
+                                                           Foreground="{DynamicResource ChartBgBrush}"
                                                            FontSize="10"
                                                            FontWeight="Bold"
                                                            Text="{Binding Number}" />
                                             </Border>
                                             <StackPanel Grid.Column="1">
-                                                <TextBlock Foreground="{StaticResource TextPrimaryBrush}"
+                                                <TextBlock Foreground="{DynamicResource TextPrimaryBrush}"
                                                            FontSize="11"
                                                            FontWeight="SemiBold"
                                                            Text="{Binding Title}" />
                                                 <TextBlock Margin="0,3,0,0"
-                                                           Foreground="{StaticResource TextTertiaryBrush}"
+                                                           Foreground="{DynamicResource TextTertiaryBrush}"
                                                            FontSize="9"
                                                            Text="{Binding Detail}"
                                                            TextTrimming="CharacterEllipsis" />
@@ -215,8 +215,8 @@
 
                 <Border Margin="0,12,0,0"
                         Padding="18"
-                        Background="#101B2B"
-                        BorderBrush="#2D3E58"
+                        Background="{DynamicResource PanelBgBrush}"
+                        BorderBrush="{DynamicResource PanelBorderBrush}"
                         BorderThickness="1"
                         CornerRadius="14">
                     <Grid>
@@ -228,17 +228,17 @@
                                    Height="42"
                                    HorizontalAlignment="Center"
                                    VerticalAlignment="Top"
-                                   Foreground="{StaticResource AccentBrush}"
+                                   Foreground="{DynamicResource AccentBrush}"
                                    FontFamily="Segoe MDL2 Assets"
                                    FontSize="24"
                                    Text="&#xE9D9;" />
                         <StackPanel Grid.Column="1" Margin="12,0,0,0">
-                            <TextBlock Foreground="{StaticResource TextPrimaryBrush}"
+                            <TextBlock Foreground="{DynamicResource TextPrimaryBrush}"
                                        FontSize="17"
                                        FontWeight="SemiBold"
                                        Text="{Binding CurrentStep.Title}" />
                             <TextBlock Margin="0,6,0,0"
-                                       Foreground="{StaticResource TextSecondaryBrush}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
                                        FontSize="12"
                                        Text="{Binding CurrentStep.Description}"
                                        TextWrapping="Wrap" />
@@ -271,7 +271,7 @@
                                 <StackPanel Margin="0,0,18,0">
                                     <TextBlock Style="{StaticResource MacSectionLabel}" Text="REALIDADE DO HARDWARE" />
                                     <TextBlock Margin="0,8,0,0"
-                                               Foreground="{StaticResource TextPrimaryBrush}"
+                                               Foreground="{DynamicResource TextPrimaryBrush}"
                                                FontSize="19"
                                                FontWeight="SemiBold"
                                                Text="4 GB e Intel HD sao um caso limite." />
@@ -282,10 +282,10 @@
                                 </StackPanel>
                                 <StackPanel Grid.Column="1">
                                     <TextBlock Style="{StaticResource MacSectionLabel}" Text="GARANTIAS" />
-                                    <TextBlock Margin="0,8,0,0" Foreground="#67D89B" Text="• Mods nunca sao excluidos." />
-                                    <TextBlock Margin="0,7,0,0" Foreground="#67D89B" Text="• Escritas usam backup e SHA-256." />
-                                    <TextBlock Margin="0,7,0,0" Foreground="#67D89B" Text="• FPS ausente continua ausente." />
-                                    <TextBlock Margin="0,7,0,0" Foreground="#67D89B" Text="• Somente KEEP permanece aplicado." />
+                                    <TextBlock Margin="0,8,0,0" Foreground="{DynamicResource SuccessBrush}" Text="• Mods nunca sao excluidos." />
+                                    <TextBlock Margin="0,7,0,0" Foreground="{DynamicResource SuccessBrush}" Text="• Escritas usam backup e SHA-256." />
+                                    <TextBlock Margin="0,7,0,0" Foreground="{DynamicResource SuccessBrush}" Text="• FPS ausente continua ausente." />
+                                    <TextBlock Margin="0,7,0,0" Foreground="{DynamicResource SuccessBrush}" Text="• Somente KEEP permanece aplicado." />
                                 </StackPanel>
                             </Grid>
                         </Border>
@@ -314,15 +314,15 @@
                                 </Grid>
                                 <TextBlock x:Name="InstanceStateText"
                                            Margin="0,10,0,0"
-                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
                                            FontSize="12"
                                            Text="Selecione uma instancia com options.txt e pasta mods."
                                            TextWrapping="Wrap" />
                                 <Border Margin="0,12,0,0"
                                         Padding="12"
-                                        Background="{StaticResource CardElevatedBrush}"
+                                        Background="{DynamicResource CardElevatedBrush}"
                                         CornerRadius="10">
-                                    <TextBlock Foreground="{StaticResource TextTertiaryBrush}"
+                                    <TextBlock Foreground="{DynamicResource TextTertiaryBrush}"
                                                Text="O detector reconhece Prism, MultiMC, Modrinth, CurseForge e pastas customizadas. Abra o jogo uma vez antes para gerar options.txt e configs."
                                                TextWrapping="Wrap" />
                                 </Border>
@@ -356,9 +356,9 @@
                                          Grid.Column="1"
                                          Height="180"
                                          Padding="8"
-                                         Background="{StaticResource CardElevatedBrush}"
-                                         BorderBrush="{StaticResource CardBorderBrush}"
-                                         Foreground="{StaticResource TextSecondaryBrush}"
+                                         Background="{DynamicResource CardElevatedBrush}"
+                                         BorderBrush="{DynamicResource CardBorderBrush}"
+                                         Foreground="{DynamicResource TextSecondaryBrush}"
                                          FontSize="11"
                                          ScrollViewer.VerticalScrollBarVisibility="Auto" />
                             </Grid>
@@ -385,11 +385,11 @@
                                 <StackPanel>
                                     <TextBlock Style="{StaticResource MacSectionLabel}" Text="MODPACK LOW-END" />
                                     <TextBlock Margin="0,7,0,0"
-                                               Foreground="{StaticResource TextSecondaryBrush}"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"
                                                Text="Preserve o mod principal e as dependencias do servidor. Em Fabric, teste Sodium, Lithium, FerriteCore e EntityCulling; teste visuais pesados somente em copia."
                                                TextWrapping="Wrap" />
                                     <TextBlock Margin="0,7,0,0"
-                                               Foreground="#F5B942"
+                                               Foreground="{DynamicResource WarningBrush}"
                                                Text="Nenhum JAR sera movido sem selecao e duas confirmacoes quando houver risco de servidor."
                                                TextWrapping="Wrap" />
                                 </StackPanel>
@@ -410,19 +410,19 @@
                                               Height="40"
                                               Margin="0,9,0,0"
                                               Padding="10,5"
-                                              Background="{StaticResource CardElevatedBrush}"
-                                              Foreground="{StaticResource TextPrimaryBrush}"
+                                              Background="{DynamicResource CardElevatedBrush}"
+                                              Foreground="{DynamicResource TextPrimaryBrush}"
                                               DisplayMemberPath="DisplayName" />
                                     <TextBlock Margin="0,11,0,4" Style="{StaticResource MacSectionLabel}" Text="FPS DA RODADA" />
                                     <ComboBox x:Name="FpsComboBox"
                                               Height="38"
                                               Padding="10,5"
-                                              Background="{StaticResource CardElevatedBrush}"
-                                              Foreground="{StaticResource TextPrimaryBrush}" />
+                                              Background="{DynamicResource CardElevatedBrush}"
+                                              Foreground="{DynamicResource TextPrimaryBrush}" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="1" Margin="14,0,0,0">
                                     <CheckBox x:Name="CustomExperimentCheckBox"
-                                              Foreground="{StaticResource TextPrimaryBrush}"
+                                              Foreground="{DynamicResource TextPrimaryBrush}"
                                               FontWeight="SemiBold"
                                               Content="Usar hipotese isolada"
                                               Checked="CustomExperimentCheckBox_OnChanged"
@@ -431,8 +431,8 @@
                                               Height="40"
                                               Margin="0,9,0,0"
                                               Padding="10,5"
-                                              Background="{StaticResource CardElevatedBrush}"
-                                              Foreground="{StaticResource TextPrimaryBrush}"
+                                              Background="{DynamicResource CardElevatedBrush}"
+                                              Foreground="{DynamicResource TextPrimaryBrush}"
                                               DisplayMemberPath="DisplayName" />
                                     <WrapPanel Margin="0,12,0,0">
                                         <Button x:Name="PreviewProfileButton"
@@ -462,12 +462,12 @@
                                 <StackPanel>
                                     <TextBlock Style="{StaticResource MacSectionLabel}" Text="BASELINE LIMPO" />
                                     <TextBlock Margin="0,7,0,0"
-                                               Foreground="{StaticResource TextPrimaryBrush}"
+                                               Foreground="{DynamicResource TextPrimaryBrush}"
                                                FontSize="18"
                                                FontWeight="SemiBold"
                                                Text="Meca antes de aplicar qualquer candidato." />
                                     <TextBlock Margin="0,8,0,0"
-                                               Foreground="{StaticResource TextSecondaryBrush}"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"
                                                Text="Abra o servidor, use a mesma rota e execute o benchmark. Informe FPS apenas se voce realmente observou por F3, PresentMon ou ferramenta equivalente."
                                                TextWrapping="Wrap" />
                                 </StackPanel>
@@ -487,18 +487,18 @@
                             <StackPanel>
                                 <TextBlock Style="{StaticResource MacSectionLabel}" Text="APLICACAO DO CANDIDATO" />
                                 <TextBlock Margin="0,7,0,0"
-                                           Foreground="{StaticResource TextPrimaryBrush}"
+                                           Foreground="{DynamicResource TextPrimaryBrush}"
                                            FontSize="18"
                                            FontWeight="SemiBold"
                                            Text="Revise arquivos, antes/depois e hipotese." />
                                 <TextBlock x:Name="ScientificStatusText"
                                            Margin="0,9,0,0"
-                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
                                            Text="Nenhum experimento ativo. O diagnostico e sempre dry-run."
                                            TextWrapping="Wrap" />
                                 <TextBlock x:Name="OperationText"
                                            Margin="0,10,0,0"
-                                           Foreground="#F5B942"
+                                           Foreground="{DynamicResource WarningBrush}"
                                            Text="Nenhuma alteracao planejada."
                                            TextWrapping="Wrap" />
                             </StackPanel>
@@ -510,12 +510,12 @@
                             <StackPanel>
                                 <TextBlock Style="{StaticResource MacSectionLabel}" Text="BENCHMARK POS-ALTERACAO" />
                                 <TextBlock Margin="0,7,0,0"
-                                           Foreground="{StaticResource TextPrimaryBrush}"
+                                           Foreground="{DynamicResource TextPrimaryBrush}"
                                            FontSize="18"
                                            FontWeight="SemiBold"
                                            Text="Repita exatamente a mesma cena." />
                                 <TextBlock Margin="0,8,0,0"
-                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
                                            Text="Mesmo servidor, rota, resolucao, duracao e processos abertos. Mudancas externas rebaixam o resultado para RETEST."
                                            TextWrapping="Wrap" />
                             </StackPanel>
@@ -532,21 +532,21 @@
                                 <StackPanel Margin="0,0,14,0">
                                     <TextBlock Style="{StaticResource MacSectionLabel}" Text="COMPARACAO" />
                                     <TextBlock Margin="0,8,0,0"
-                                               Foreground="{StaticResource TextPrimaryBrush}"
+                                               Foreground="{DynamicResource TextPrimaryBrush}"
                                                FontSize="18"
                                                FontWeight="SemiBold"
                                                Text="{Binding ComparisonSummary}" />
                                     <TextBlock Margin="0,8,0,0"
-                                               Foreground="{StaticResource TextSecondaryBrush}"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"
                                                Text="Fatos automaticos, FPS manual, inferencias e itens indisponiveis permanecem visualmente separados no relatorio."
                                                TextWrapping="Wrap" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="1" Margin="14,0,0,0">
                                     <TextBlock Style="{StaticResource MacSectionLabel}" Text="DECISOES POSSIVEIS" />
-                                    <TextBlock Margin="0,8,0,0" Foreground="#67D89B" Text="KEEP  melhora comprovada" />
-                                    <TextBlock Margin="0,6,0,0" Foreground="#64B5F6" Text="REVERT  regressao ou falha" />
-                                    <TextBlock Margin="0,6,0,0" Foreground="#F5B942" Text="RETEST  rodada contaminada" />
-                                    <TextBlock Margin="0,6,0,0" Foreground="#F5B942" Text="INSUFFICIENT  dados insuficientes" />
+                                    <TextBlock Margin="0,8,0,0" Foreground="{DynamicResource SuccessBrush}" Text="KEEP  melhora comprovada" />
+                                    <TextBlock Margin="0,6,0,0" Foreground="{DynamicResource AccentBrush}" Text="REVERT  regressao ou falha" />
+                                    <TextBlock Margin="0,6,0,0" Foreground="{DynamicResource WarningBrush}" Text="RETEST  rodada contaminada" />
+                                    <TextBlock Margin="0,6,0,0" Foreground="{DynamicResource WarningBrush}" Text="INSUFFICIENT  dados insuficientes" />
                                 </StackPanel>
                             </Grid>
                         </Border>
@@ -562,12 +562,12 @@
                                 <StackPanel>
                                     <TextBlock Style="{StaticResource MacSectionLabel}" Text="FINALIZACAO" />
                                     <TextBlock Margin="0,7,0,0"
-                                               Foreground="{StaticResource TextPrimaryBrush}"
+                                               Foreground="{DynamicResource TextPrimaryBrush}"
                                                FontSize="18"
                                                FontWeight="SemiBold"
                                                Text="Mantenha somente o que melhorou." />
                                     <TextBlock Margin="0,8,0,0"
-                                               Foreground="{StaticResource TextSecondaryBrush}"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"
                                                Text="Exporte o relatorio, preserve latest.log/crash-reports e use rollback se o servidor, HUD ou Pokemon apresentarem regressao."
                                                TextWrapping="Wrap" />
                                 </StackPanel>
@@ -598,12 +598,12 @@
                                 <StackPanel>
                                     <TextBlock Style="{StaticResource MacSectionLabel}" Text="BENCHMARK AO VIVO" />
                                     <TextBlock Margin="0,5,0,0"
-                                               Foreground="{StaticResource TextPrimaryBrush}"
+                                               Foreground="{DynamicResource TextPrimaryBrush}"
                                                FontWeight="SemiBold"
                                                Text="{Binding OperationStatus}" />
                                 </StackPanel>
                                 <TextBlock Grid.Column="1"
-                                           Foreground="{StaticResource TextTertiaryBrush}"
+                                           Foreground="{DynamicResource TextTertiaryBrush}"
                                            Text="CPU  •  Java  •  RAM livre" />
                             </Grid>
                             <controls:LightweightBenchmarkChart Height="150"
@@ -613,8 +613,8 @@
                                          Margin="0,8,0,0"
                                          Maximum="100"
                                          Value="{Binding BenchmarkProgress}"
-                                         Foreground="{StaticResource AccentBrush}"
-                                         Background="{StaticResource CardElevatedBrush}" />
+                                         Foreground="{DynamicResource AccentBrush}"
+                                         Background="{DynamicResource CardElevatedBrush}" />
                         </StackPanel>
                         <StackPanel Grid.Column="1" Margin="14,0,0,0">
                             <TextBlock Style="{StaticResource MacSectionLabel}" Text="CONTROLES" />
@@ -629,7 +629,7 @@
                                     Content="Cancelar com seguranca"
                                     Click="CancelBenchmarkButton_OnClick" />
                             <TextBlock Margin="0,10,0,0"
-                                       Foreground="#F5B942"
+                                       Foreground="{DynamicResource WarningBrush}"
                                        FontSize="11"
                                        Text="FPS e 1% low nao sao capturados automaticamente."
                                        TextWrapping="Wrap" />
@@ -639,12 +639,12 @@
 
                 <Expander Margin="0,12,0,0"
                           IsExpanded="{Binding IsAdvancedMode, Mode=TwoWay}"
-                          Foreground="{StaticResource TextPrimaryBrush}">
+                          Foreground="{DynamicResource TextPrimaryBrush}">
                     <Expander.Header>
                         <StackPanel Orientation="Horizontal">
                             <TextBlock FontWeight="SemiBold" Text="Area tecnica avancada" />
                             <TextBlock Margin="10,0,0,0"
-                                       Foreground="{StaticResource TextTertiaryBrush}"
+                                       Foreground="{DynamicResource TextTertiaryBrush}"
                                        Text="diffs, quarentena, hashes, observacoes e JVM" />
                         </StackPanel>
                     </Expander.Header>
@@ -664,7 +664,7 @@
                                             Content="Aplicar dry-run confirmado"
                                             Click="ApplyProfileButton_OnClick" />
                                     <TextBlock Margin="0,9,0,0"
-                                               Foreground="{StaticResource TextTertiaryBrush}"
+                                               Foreground="{DynamicResource TextTertiaryBrush}"
                                                Text="O fluxo cientifico e preferivel. Aplicacao direta ainda cria backup e relatorio."
                                                TextWrapping="Wrap" />
                                     <TextBox x:Name="JavaArgumentsTextBox"
@@ -680,13 +680,13 @@
                                     <TextBlock Style="{StaticResource MacSectionLabel}" Text="PLANO DE SOBREVIVENCIA" />
                                     <TextBlock x:Name="SurvivalVerdictText"
                                                Margin="0,7,0,0"
-                                               Foreground="#F5B942"
+                                               Foreground="{DynamicResource WarningBrush}"
                                                FontSize="15"
                                                FontWeight="SemiBold"
                                                Text="Nao calculado" />
                                     <TextBlock x:Name="SurvivalDetailsText"
                                                Margin="0,7,0,0"
-                                               Foreground="{StaticResource TextSecondaryBrush}"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"
                                                Text="Execute a auditoria."
                                                TextWrapping="Wrap" />
                                 </StackPanel>
@@ -699,16 +699,16 @@
                                 <ListBox x:Name="QuarantineList"
                                          Height="150"
                                          Margin="0,9,0,0"
-                                         Background="{StaticResource CardElevatedBrush}"
-                                         BorderBrush="{StaticResource CardBorderBrush}"
-                                         Foreground="{StaticResource TextSecondaryBrush}"
+                                         Background="{DynamicResource CardElevatedBrush}"
+                                         BorderBrush="{DynamicResource CardBorderBrush}"
+                                         Foreground="{DynamicResource TextSecondaryBrush}"
                                          SelectionMode="Extended"
                                          SelectionChanged="QuarantineList_OnSelectionChanged">
                                     <ListBox.ItemTemplate>
                                         <DataTemplate>
                                             <StackPanel Margin="4">
-                                                <TextBlock Foreground="{StaticResource TextPrimaryBrush}" FontWeight="SemiBold" Text="{Binding FileName}" />
-                                                <TextBlock Foreground="{StaticResource TextTertiaryBrush}" FontSize="10" Text="{Binding OperationalRecommendation}" TextWrapping="Wrap" />
+                                                <TextBlock Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" Text="{Binding FileName}" />
+                                                <TextBlock Foreground="{DynamicResource TextTertiaryBrush}" FontSize="10" Text="{Binding OperationalRecommendation}" TextWrapping="Wrap" />
                                             </StackPanel>
                                         </DataTemplate>
                                     </ListBox.ItemTemplate>
@@ -770,7 +770,7 @@
                                 </WrapPanel>
                                 <TextBlock x:Name="OperationalStatusText"
                                            Margin="0,9,0,0"
-                                           Foreground="{StaticResource TextTertiaryBrush}"
+                                           Foreground="{DynamicResource TextTertiaryBrush}"
                                            Text="Dados vazios permanecem NAO_MEDIDOS."
                                            TextWrapping="Wrap" />
                             </StackPanel>
@@ -785,11 +785,11 @@
                                     </ItemsControl.ItemsPanel>
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
-                                            <Border Margin="0,0,8,8" Padding="9,6" Background="{StaticResource CardElevatedBrush}" CornerRadius="10">
+                                            <Border Margin="0,0,8,8" Padding="9,6" Background="{DynamicResource CardElevatedBrush}" CornerRadius="10">
                                                 <StackPanel Orientation="Horizontal">
                                                     <Ellipse Width="8" Height="8" VerticalAlignment="Center" Fill="{Binding Color}" />
-                                                    <TextBlock Margin="6,0,0,0" Foreground="{StaticResource TextPrimaryBrush}" FontWeight="SemiBold" Text="{Binding Label}" />
-                                                    <TextBlock Margin="6,0,0,0" Foreground="{StaticResource TextTertiaryBrush}" Text="{Binding Meaning}" />
+                                                    <TextBlock Margin="6,0,0,0" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" Text="{Binding Label}" />
+                                                    <TextBlock Margin="6,0,0,0" Foreground="{DynamicResource TextTertiaryBrush}" Text="{Binding Meaning}" />
                                                 </StackPanel>
                                             </Border>
                                         </DataTemplate>
@@ -805,8 +805,8 @@
         <Border Grid.Row="1"
                 Margin="0,8,14,0"
                 Padding="12"
-                Background="{StaticResource SidebarBgBrush}"
-                BorderBrush="{StaticResource SeparatorBrush}"
+                Background="{DynamicResource SidebarBgBrush}"
+                BorderBrush="{DynamicResource SeparatorBrush}"
                 BorderThickness="1"
                 CornerRadius="12">
             <Grid>
@@ -821,7 +821,7 @@
                         Command="{Binding BackCommand}" />
                 <StackPanel Grid.Column="1" Margin="12,0" VerticalAlignment="Center">
                     <TextBlock HorizontalAlignment="Center"
-                               Foreground="{StaticResource TextTertiaryBrush}"
+                               Foreground="{DynamicResource TextTertiaryBrush}"
                                FontSize="10"
                                Text="ALTERACAO GERENCIADA" />
                     <Button x:Name="RollbackButton"

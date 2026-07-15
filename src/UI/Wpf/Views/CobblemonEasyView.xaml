@@ -2,7 +2,7 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:primitives="clr-namespace:System.Windows.Controls.Primitives;assembly=PresentationFramework"
-             Background="Transparent"
+             Background="{DynamicResource ContentBgBrush}"
              FontFamily="Segoe UI Variable Display, Segoe UI, Arial">
     <UserControl.Resources>
         <ResourceDictionary>
@@ -12,54 +12,30 @@
 
             <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
 
-            <Style x:Key="EasyActionButton" TargetType="Button">
-                <Setter Property="MinHeight" Value="118" />
-                <Setter Property="Margin" Value="0,0,10,10" />
-                <Setter Property="Padding" Value="18" />
-                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-                <Setter Property="VerticalContentAlignment" Value="Stretch" />
-                <Setter Property="Background" Value="#132033" />
-                <Setter Property="BorderBrush" Value="#2B3D58" />
+            <Style x:Key="EasyStepIndicator" TargetType="Border">
+                <Setter Property="MinHeight" Value="70" />
+                <Setter Property="Margin" Value="0,0,8,0" />
+                <Setter Property="Padding" Value="12" />
+                <Setter Property="Background" Value="{DynamicResource CardBgBrush}" />
+                <Setter Property="BorderBrush" Value="{DynamicResource PanelBorderBrush}" />
                 <Setter Property="BorderThickness" Value="1" />
-                <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
-                <Setter Property="Cursor" Value="Hand" />
-                <Setter Property="Template">
-                    <Setter.Value>
-                        <ControlTemplate TargetType="Button">
-                            <Border x:Name="Card"
-                                    Padding="{TemplateBinding Padding}"
-                                    Background="{TemplateBinding Background}"
-                                    BorderBrush="{TemplateBinding BorderBrush}"
-                                    BorderThickness="{TemplateBinding BorderThickness}"
-                                    CornerRadius="14">
-                                <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
-                                                  VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
-                            </Border>
-                            <ControlTemplate.Triggers>
-                                <Trigger Property="IsMouseOver" Value="True">
-                                    <Setter TargetName="Card" Property="Background" Value="#192A42" />
-                                    <Setter TargetName="Card" Property="BorderBrush" Value="#4DA3FF" />
-                                </Trigger>
-                                <Trigger Property="IsPressed" Value="True">
-                                    <Setter TargetName="Card" Property="Opacity" Value="0.82" />
-                                </Trigger>
-                                <Trigger Property="IsEnabled" Value="False">
-                                    <Setter TargetName="Card" Property="Opacity" Value="0.48" />
-                                </Trigger>
-                            </ControlTemplate.Triggers>
-                        </ControlTemplate>
-                    </Setter.Value>
-                </Setter>
+                <Setter Property="CornerRadius" Value="10" />
+                <Style.Triggers>
+                    <Trigger Property="Tag" Value="True">
+                        <Setter Property="Background" Value="{DynamicResource InfoSurfaceBrush}" />
+                        <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                    </Trigger>
+                </Style.Triggers>
             </Style>
 
-            <Style x:Key="EasyCheck" TargetType="CheckBox">
+            <Style x:Key="EasyCheck" TargetType="CheckBox" BasedOn="{StaticResource {x:Type CheckBox}}">
                 <Setter Property="Margin" Value="0,0,16,9" />
-                <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+                <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
                 <Setter Property="FontSize" Value="12" />
             </Style>
 
             <Style TargetType="Expander">
-                <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+                <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
             </Style>
 
             <Style x:Key="EasyScrollThumb" TargetType="{x:Type primitives:Thumb}">
@@ -67,8 +43,8 @@
                     <Setter.Value>
                         <ControlTemplate TargetType="{x:Type primitives:Thumb}">
                             <Border Margin="2,1"
-                                    Background="#3A4D67"
-                                    BorderBrush="#506681"
+                                    Background="{DynamicResource CardBorderBrush}"
+                                    BorderBrush="{DynamicResource TextTertiaryBrush}"
                                     BorderThickness="1"
                                     CornerRadius="4" />
                         </ControlTemplate>
@@ -78,7 +54,7 @@
 
             <Style TargetType="{x:Type ScrollBar}">
                 <Setter Property="Width" Value="10" />
-                <Setter Property="Background" Value="#0B1421" />
+                <Setter Property="Background" Value="{DynamicResource ChartBgBrush}" />
                 <Setter Property="Template">
                     <Setter.Value>
                         <ControlTemplate TargetType="{x:Type ScrollBar}">
@@ -129,20 +105,20 @@
                         <StackPanel>
                             <TextBlock Style="{StaticResource MacSectionLabel}" Text="MINECRAFT R&#x00C1;PIDO" />
                             <TextBlock Margin="0,6,0,0"
-                                       Foreground="{StaticResource TextPrimaryBrush}"
+                                       Foreground="{DynamicResource TextPrimaryBrush}"
                                        FontSize="25"
                                        FontWeight="SemiBold"
                                        Text="Prepare o jogo em poucos cliques."
                                        TextWrapping="Wrap" />
                             <TextBlock Margin="0,8,0,0"
                                        MaxWidth="720"
-                                       Foreground="{StaticResource TextSecondaryBrush}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
                                        FontSize="12"
                                        Text="Encontre a instala&#x00E7;&#x00E3;o, prepare com backup e teste. Mods nunca s&#x00E3;o movidos ou apagados por este modo."
                                        TextWrapping="Wrap" />
                             <TextBlock Margin="0,12,0,0"
-                                       Foreground="{StaticResource TextTertiaryBrush}"
-                                       FontSize="10"
+                                       Foreground="{DynamicResource TextTertiaryBrush}"
+                                       FontSize="12"
                                        Text="{Binding SelectedPath}"
                                        TextTrimming="CharacterEllipsis" />
                         </StackPanel>
@@ -150,12 +126,12 @@
                                 Margin="18,0,0,0"
                                 Padding="14,9"
                                 VerticalAlignment="Top"
-                                Background="#101B2B"
+                                Background="{DynamicResource PanelBgBrush}"
                                 BorderBrush="{Binding StateColor}"
                                 BorderThickness="1"
                                 CornerRadius="18">
                             <TextBlock Foreground="{Binding StateColor}"
-                                       FontSize="11"
+                                       FontSize="12"
                                        FontWeight="Bold"
                                        Text="{Binding OverallStatus}" />
                         </Border>
@@ -163,126 +139,93 @@
                 </Border>
 
                 <Border Margin="0,12,0,0"
-                        Padding="15"
-                        Background="#101B2B"
-                        BorderBrush="#2A3A52"
+                        Padding="16"
+                        Background="{DynamicResource PanelBgBrush}"
+                        BorderBrush="{DynamicResource PanelBorderBrush}"
                         BorderThickness="1"
                         CornerRadius="12">
                     <Grid>
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="250" />
                         </Grid.ColumnDefinitions>
-                        <Border Width="34" Height="34" Background="{Binding StateColor}" CornerRadius="17">
-                            <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center"
-                                       Foreground="#08111E" FontFamily="Segoe MDL2 Assets"
-                                       FontSize="17" Text="&#xE946;" />
-                        </Border>
-                        <StackPanel Grid.Column="1" Margin="12,0,16,0">
-                            <TextBlock Foreground="{StaticResource TextPrimaryBrush}"
-                                       FontSize="14" FontWeight="SemiBold"
-                                       Text="{Binding StatusMessage}" TextWrapping="Wrap" />
-                            <TextBlock Margin="0,5,0,0"
-                                       Foreground="{StaticResource TextTertiaryBrush}"
-                                       FontSize="11" Text="{Binding InstanceDetails}" TextWrapping="Wrap" />
+                        <StackPanel Margin="0,0,20,0">
+                            <StackPanel Orientation="Horizontal">
+                                <Border Width="34" Height="34" Background="{Binding StateColor}" CornerRadius="17">
+                                    <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center"
+                                               Foreground="{DynamicResource OnAccentTextBrush}" FontFamily="Segoe MDL2 Assets"
+                                               FontSize="17" Text="&#xE946;" />
+                                </Border>
+                                <TextBlock Margin="12,0,0,0"
+                                           VerticalAlignment="Center"
+                                           Foreground="{DynamicResource TextPrimaryBrush}"
+                                           FontSize="15"
+                                           FontWeight="SemiBold"
+                                           Text="{Binding StatusMessage}"
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+                            <TextBlock Margin="46,7,0,0"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       FontSize="12"
+                                       Text="{Binding InstanceDetails}"
+                                       TextWrapping="Wrap" />
+                            <TextBlock Margin="46,6,0,0"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       FontSize="12"
+                                       FontWeight="SemiBold"
+                                       Text="{Binding SelectedPlayTarget, StringFormat=Destino do teste: {0}}" />
                         </StackPanel>
-                        <TextBlock Grid.Column="2" MaxWidth="210" VerticalAlignment="Center"
-                                   Foreground="{Binding StateColor}" FontSize="11" FontWeight="SemiBold"
-                                   Text="{Binding NextAction}" TextWrapping="Wrap" />
+                        <Button x:Name="PrimaryActionButton"
+                                Grid.Column="1"
+                                Width="250"
+                                Height="48"
+                                VerticalAlignment="Center"
+                                Style="{StaticResource MacPrimaryButton}"
+                                AutomationProperties.Name="Executar a pr&#x00F3;xima etapa do Minecraft"
+                                Click="PrimaryActionButton_OnClick" />
                     </Grid>
                 </Border>
 
-                <Grid Margin="0,12,0,0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                    </Grid.RowDefinitions>
-
-                    <Button x:Name="DetectButton" Grid.Row="0" Grid.Column="0"
-                            Style="{StaticResource EasyActionButton}"
-                            Background="{Binding DetectStep.Background}"
-                            BorderBrush="{Binding DetectStep.BorderBrush}"
-                            Click="DetectButton_OnClick">
+                <UniformGrid Margin="0,12,0,0" Columns="4">
+                    <Border Style="{StaticResource EasyStepIndicator}"
+                            Tag="{Binding DetectStep.IsCurrent}">
                         <StackPanel>
-                            <DockPanel LastChildFill="False">
-                                <TextBlock DockPanel.Dock="Left" Foreground="#4DA3FF" FontSize="11" FontWeight="Bold" Text="1  ENCONTRAR" />
-                                <TextBlock Margin="8,0,0,0" Foreground="{Binding DetectStep.Color}" FontSize="9" FontWeight="SemiBold" Text="{Binding DetectStep.StateLabel}" />
-                            </DockPanel>
-                            <TextBlock Margin="0,8,0,0" FontSize="18" FontWeight="SemiBold" Text="Encontrar Minecraft" />
-                            <TextBlock Margin="0,7,0,0" Foreground="{StaticResource TextTertiaryBrush}" FontSize="11"
-                                       Text="Localiza Prism, MultiMC ou Modrinth. Voc&#x00EA; tamb&#x00E9;m pode escolher a pasta."
-                                       TextWrapping="Wrap" />
+                            <TextBlock Foreground="{DynamicResource TextPrimaryBrush}" FontSize="13" FontWeight="SemiBold" Text="1  Encontrar" />
+                            <TextBlock Margin="0,6,0,0" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" Text="{Binding DetectStep.StateLabel}" TextTrimming="CharacterEllipsis" />
                         </StackPanel>
-                    </Button>
-
-                    <Button x:Name="OptimizeButton" Grid.Row="0" Grid.Column="1"
-                            Style="{StaticResource EasyActionButton}"
-                            Background="{Binding OptimizeStep.Background}"
-                            BorderBrush="{Binding OptimizeStep.BorderBrush}"
-                            Click="OptimizeButton_OnClick">
+                    </Border>
+                    <Border Style="{StaticResource EasyStepIndicator}"
+                            Tag="{Binding OptimizeStep.IsCurrent}">
                         <StackPanel>
-                            <DockPanel LastChildFill="False">
-                                <TextBlock DockPanel.Dock="Left" Foreground="#67D89B" FontSize="11" FontWeight="Bold" Text="2  PREPARAR" />
-                                <TextBlock Margin="8,0,0,0" Foreground="{Binding OptimizeStep.Color}" FontSize="9" FontWeight="SemiBold" Text="{Binding OptimizeStep.StateLabel}" />
-                            </DockPanel>
-                            <TextBlock Margin="0,8,0,0" FontSize="18" FontWeight="SemiBold" Text="Preparar para Jogar" />
-                            <TextBlock Margin="0,7,0,0" Foreground="#A5DCC1" FontSize="11"
-                                       Text="Verifica os mods, cria backup e aplica configura&#x00E7;&#x00F5;es leves. Nenhum mod &#x00E9; alterado."
-                                       TextWrapping="Wrap" />
+                            <TextBlock Foreground="{DynamicResource TextPrimaryBrush}" FontSize="13" FontWeight="SemiBold" Text="2  Preparar" />
+                            <TextBlock Margin="0,6,0,0" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" Text="{Binding OptimizeStep.StateLabel}" TextTrimming="CharacterEllipsis" />
                         </StackPanel>
-                    </Button>
-
-                    <Button x:Name="TestButton" Grid.Row="1" Grid.Column="0"
-                            Style="{StaticResource EasyActionButton}"
-                            Background="{Binding TestStep.Background}"
-                            BorderBrush="{Binding TestStep.BorderBrush}"
-                            Click="TestButton_OnClick">
+                    </Border>
+                    <Border Style="{StaticResource EasyStepIndicator}"
+                            Tag="{Binding TestStep.IsCurrent}">
                         <StackPanel>
-                            <DockPanel LastChildFill="False">
-                                <TextBlock DockPanel.Dock="Left" Foreground="#4DA3FF" FontSize="11" FontWeight="Bold" Text="3  TESTAR" />
-                                <TextBlock Margin="8,0,0,0" Foreground="{Binding TestStep.Color}" FontSize="9" FontWeight="SemiBold" Text="{Binding TestStep.StateLabel}" />
-                            </DockPanel>
-                            <TextBlock Margin="0,8,0,0" FontSize="18" FontWeight="SemiBold" Text="Testar o Jogo" />
-                            <TextBlock Margin="0,7,0,0" Foreground="{StaticResource TextTertiaryBrush}" FontSize="11"
-                                       Text="Abra o Minecraft. O ApexTweaker observa mem&#x00F3;ria e travamentos por 60 segundos."
-                                       TextWrapping="Wrap" />
+                            <TextBlock Foreground="{DynamicResource TextPrimaryBrush}" FontSize="13" FontWeight="SemiBold" Text="3  Testar" />
+                            <TextBlock Margin="0,6,0,0" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" Text="{Binding TestStep.StateLabel}" TextTrimming="CharacterEllipsis" />
                         </StackPanel>
-                    </Button>
-
-                    <Button x:Name="FixButton" Grid.Row="1" Grid.Column="1"
-                            Style="{StaticResource EasyActionButton}"
-                            Background="{Binding FixStep.Background}"
-                            BorderBrush="{Binding FixStep.BorderBrush}"
-                            ToolTip="Dispon&#x00ED;vel depois de testar o jogo."
-                            ToolTipService.ShowOnDisabled="True"
-                            Click="FixButton_OnClick">
+                    </Border>
+                    <Border Margin="0" Style="{StaticResource EasyStepIndicator}"
+                            Tag="{Binding FixStep.IsCurrent}">
                         <StackPanel>
-                            <DockPanel LastChildFill="False">
-                                <TextBlock DockPanel.Dock="Left" Foreground="#F5B942" FontSize="11" FontWeight="Bold" Text="4  RESOLVER" />
-                                <TextBlock Margin="8,0,0,0" Foreground="{Binding FixStep.Color}" FontSize="9" FontWeight="SemiBold" Text="{Binding FixStep.StateLabel}" />
-                            </DockPanel>
-                            <TextBlock Margin="0,8,0,0" FontSize="18" FontWeight="SemiBold" Text="Resolver Problemas" />
-                            <TextBlock Margin="0,7,0,0" Foreground="{StaticResource TextTertiaryBrush}" FontSize="11"
-                                       Text="Traduz crash, falta de mem&#x00F3;ria ou travamentos em uma pr&#x00F3;xima a&#x00E7;&#x00E3;o segura."
-                                       TextWrapping="Wrap" />
+                            <TextBlock Foreground="{DynamicResource TextPrimaryBrush}" FontSize="13" FontWeight="SemiBold" Text="4  Resolver" />
+                            <TextBlock Margin="0,6,0,0" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" Text="{Binding FixStep.StateLabel}" TextTrimming="CharacterEllipsis" />
                         </StackPanel>
-                    </Button>
-                </Grid>
+                    </Border>
+                </UniformGrid>
 
                 <Expander Margin="0,2,0,0" Header="Ajustes opcionais">
                     <Border Margin="0,9,0,0" Style="{StaticResource MacCardStyle}">
                         <StackPanel>
-                            <TextBlock Foreground="{StaticResource TextSecondaryBrush}" FontSize="11"
+                            <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11"
                                        Text="O padr&#x00E3;o &#x00E9; recomendado para PCs fracos. Altere somente se precisar."
                                        TextWrapping="Wrap" />
                             <WrapPanel Margin="0,12,0,0">
                                 <CheckBox Margin="0,16,18,0" VerticalAlignment="Center"
-                                          Foreground="{StaticResource TextSecondaryBrush}"
+                                          Foreground="{DynamicResource TextSecondaryBrush}"
                                           Content="Resolu&#x00E7;&#x00E3;o m&#x00ED;nima (854x480)"
                                           IsChecked="{Binding UseExtremeResolution, Mode=TwoWay}" />
                                 <StackPanel Margin="0,0,12,0">
@@ -310,63 +253,91 @@
                 <Expander Margin="0,10,0,0" Header="Ver detalhes da verifica&#x00E7;&#x00E3;o">
                     <Border Margin="0,9,0,0" Style="{StaticResource MacCardStyle}">
                         <StackPanel>
-                            <TextBlock Foreground="{StaticResource TextSecondaryBrush}" FontSize="11"
+                            <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11"
                                        Text="{Binding ModDetails}" TextWrapping="Wrap" />
-                            <TextBlock Margin="0,10,0,0" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11"
+                            <TextBlock Margin="0,10,0,0" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11"
                                        Text="{Binding ServerDetails}" TextWrapping="Wrap" />
-                            <TextBlock Margin="0,10,0,0" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11"
+                            <TextBlock Margin="0,10,0,0" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11"
                                        Text="{Binding CorrectionDetails}" TextWrapping="Wrap" />
                         </StackPanel>
                     </Border>
                 </Expander>
 
-                <Border Margin="0,12,0,0"
+                <Border x:Name="TestResultPanel"
+                        Margin="0,12,0,0"
                         Style="{StaticResource MacCardStyle}"
                         Visibility="{Binding IsTestPanelVisible, Converter={StaticResource BoolToVisibility}}">
                     <StackPanel>
                         <TextBlock Style="{StaticResource MacSectionLabel}" Text="COMO FOI O TESTE?" />
-                        <TextBlock Margin="0,6,0,0" Foreground="{StaticResource TextPrimaryBrush}"
+                        <TextBlock Margin="0,6,0,0" Foreground="{DynamicResource TextPrimaryBrush}"
                                    FontSize="15" FontWeight="SemiBold"
                                    Text="Marque somente o que voc&#x00EA; observou." />
                         <ProgressBar Height="5" Margin="0,12,0,0" Maximum="100"
                                      Value="{Binding BenchmarkProgress, Mode=OneWay}"
-                                     Foreground="#4DA3FF" Background="#17253A" />
-                        <TextBlock Margin="0,7,0,0" Foreground="{StaticResource TextTertiaryBrush}"
-                                   FontSize="10" Text="{Binding BenchmarkSummary}" TextWrapping="Wrap" />
+                                     Foreground="{DynamicResource AccentBrush}" Background="{DynamicResource ControlDisabledBrush}" />
+                        <TextBlock Margin="0,7,0,0" Foreground="{DynamicResource TextSecondaryBrush}"
+                                   FontSize="12" Text="{Binding BenchmarkSummary}" TextWrapping="Wrap" />
                         <WrapPanel Margin="0,13,0,0">
-                            <CheckBox Style="{StaticResource EasyCheck}" Content="O jogo abriu" IsChecked="{Binding GameOpened}" />
-                            <CheckBox Style="{StaticResource EasyCheck}" Content="Chegou ao menu" IsChecked="{Binding MenuReached}" />
-                            <CheckBox Style="{StaticResource EasyCheck}" Content="Entrou no mundo" IsChecked="{Binding WorldEntered}" />
-                            <CheckBox Style="{StaticResource EasyCheck}" Content="Entrou no servidor" IsChecked="{Binding ServerEntered}" />
-                            <CheckBox Style="{StaticResource EasyCheck}" Content="Travou muito" IsChecked="{Binding SevereStutter}" />
-                            <CheckBox Style="{StaticResource EasyCheck}" Content="Fechou sozinho" IsChecked="{Binding ClosedAlone}" />
-                            <CheckBox Style="{StaticResource EasyCheck}" Content="Apareceu erro de mod" IsChecked="{Binding ModError}" />
+                            <CheckBox x:Name="GameOpenedCheckBox"
+                                      Style="{StaticResource EasyCheck}"
+                                      AutomationProperties.Name="O jogo abriu"
+                                      Content="O jogo abriu"
+                                      IsChecked="{Binding GameOpened}" />
+                            <CheckBox Style="{StaticResource EasyCheck}"
+                                      AutomationProperties.Name="{Binding DestinationQuestion}"
+                                      Content="{Binding DestinationQuestion}"
+                                      IsChecked="{Binding ReachedDestination}" />
+                            <CheckBox Style="{StaticResource EasyCheck}"
+                                      AutomationProperties.Name="O jogo travou muito"
+                                      Content="Travou muito"
+                                      IsChecked="{Binding SevereStutter}" />
                         </WrapPanel>
-                        <Grid Margin="0,4,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="150" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <TextBox Height="36" Padding="10,6" Background="#101B2B"
-                                     Foreground="{StaticResource TextPrimaryBrush}" BorderBrush="#2B3D58"
-                                     Text="{Binding ApproximateFps, UpdateSourceTrigger=PropertyChanged}"
-                                     ToolTip="FPS aproximado visto no F3. Deixe vazio se n&#x00E3;o souber." />
-                            <TextBox Grid.Column="1" Height="36" Margin="10,0,10,0" Padding="10,6"
-                                     Background="#101B2B" Foreground="{StaticResource TextPrimaryBrush}"
-                                     BorderBrush="#2B3D58"
-                                     Text="{Binding UserNotes, UpdateSourceTrigger=PropertyChanged}"
-                                     ToolTip="Observa&#x00E7;&#x00E3;o curta ou mensagem de erro." />
-                            <Button Grid.Column="2" Style="{StaticResource MacPrimaryButton}"
-                                    Content="Salvar respostas" Click="SaveTestButton_OnClick" />
-                        </Grid>
+                        <Expander Margin="0,4,0,0" Header="Adicionar detalhes do problema">
+                            <StackPanel Margin="0,10,0,0">
+                                <WrapPanel>
+                                    <CheckBox Style="{StaticResource EasyCheck}" Content="Chegou ao menu" IsChecked="{Binding MenuReached}" />
+                                    <CheckBox Style="{StaticResource EasyCheck}" Content="Fechou sozinho" IsChecked="{Binding ClosedAlone}" />
+                                    <CheckBox Style="{StaticResource EasyCheck}" Content="Apareceu erro de mod" IsChecked="{Binding ModError}" />
+                                </WrapPanel>
+                                <WrapPanel Margin="0,4,0,0">
+                                    <StackPanel Width="180" Margin="0,0,12,10">
+                                        <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" Text="FPS aproximado (opcional)" />
+                                        <TextBox Height="36" Margin="0,5,0,0" Padding="10,6"
+                                                 AutomationProperties.Name="FPS aproximado opcional"
+                                                 AutomationProperties.HelpText="Informe o FPS visto no F3 ou deixe vazio."
+                                                 Background="{DynamicResource PanelBgBrush}"
+                                                 Foreground="{DynamicResource TextPrimaryBrush}"
+                                                 BorderBrush="{DynamicResource PanelBorderBrush}"
+                                                 Text="{Binding ApproximateFps, UpdateSourceTrigger=PropertyChanged}" />
+                                    </StackPanel>
+                                    <StackPanel Width="360" Margin="0,0,0,10">
+                                        <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" Text="Observa&#x00E7;&#x00E3;o ou erro (opcional)" />
+                                        <TextBox Height="36" Margin="0,5,0,0" Padding="10,6"
+                                                 AutomationProperties.Name="Observa&#x00E7;&#x00E3;o ou erro opcional"
+                                                 AutomationProperties.HelpText="Descreva brevemente um travamento ou mensagem de erro."
+                                                 Background="{DynamicResource PanelBgBrush}"
+                                                 Foreground="{DynamicResource TextPrimaryBrush}"
+                                                 BorderBrush="{DynamicResource PanelBorderBrush}"
+                                                 Text="{Binding UserNotes, UpdateSourceTrigger=PropertyChanged}" />
+                                    </StackPanel>
+                                </WrapPanel>
+                            </StackPanel>
+                        </Expander>
+                        <Button x:Name="SaveTestButton"
+                                MinWidth="180"
+                                Margin="0,12,0,0"
+                                HorizontalAlignment="Right"
+                                Style="{StaticResource MacPrimaryButton}"
+                                Content="Concluir teste"
+                                AutomationProperties.Name="Concluir teste do Minecraft"
+                                Click="SaveTestButton_OnClick" />
                     </StackPanel>
                 </Border>
             </StackPanel>
         </ScrollViewer>
 
         <Border Grid.Row="1" Margin="0,8,6,0" Padding="12"
-                Background="#0D1726" BorderBrush="#263750" BorderThickness="1" CornerRadius="12">
+                Background="{DynamicResource PanelBgBrush}" BorderBrush="{DynamicResource PanelBorderBrush}" BorderThickness="1" CornerRadius="12">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
@@ -377,7 +348,7 @@
                         Content="Restaurar" ToolTip="Dispon&#x00ED;vel depois de criar um backup."
                         ToolTipService.ShowOnDisabled="True" Click="RestoreButton_OnClick" />
                 <TextBlock Grid.Column="1" Margin="14,0" VerticalAlignment="Center"
-                           Foreground="{StaticResource TextTertiaryBrush}" FontSize="10"
+                           Foreground="{DynamicResource TextTertiaryBrush}" FontSize="10"
                            Text="Volta &#x00E0;s configura&#x00E7;&#x00F5;es anteriores. Seus mods permanecem intactos."
                            TextWrapping="Wrap" />
                 <Button x:Name="ExportButton" Grid.Column="2" Style="{StaticResource MacSecondaryButton}"

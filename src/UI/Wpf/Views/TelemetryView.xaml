@@ -1,7 +1,7 @@
 <UserControl x:Class="ApexTweaker.UI.Wpf.Views.TelemetryView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             Background="Transparent"
+             Background="{DynamicResource ContentBgBrush}"
              FontFamily="Segoe UI Variable Display, Segoe UI, Arial">
     <UserControl.Resources>
         <ResourceDictionary>
@@ -37,8 +37,8 @@
                                Style="{StaticResource MacSectionTitle}"
                                Text="Gr&#x00E1;fico em tempo real" />
                     <Border Margin="0,16,0,0"
-                            Background="{StaticResource ChartBgBrush}"
-                            BorderBrush="{StaticResource CardBorderBrush}"
+                            Background="{DynamicResource ChartBgBrush}"
+                            BorderBrush="{DynamicResource CardBorderBrush}"
                             BorderThickness="0.5"
                             CornerRadius="12"
                             Padding="14">
@@ -47,13 +47,13 @@
                                     Height="220"
                                     SizeChanged="ChartCanvas_OnSizeChanged">
                                 <Polyline x:Name="FpsPolyline"
-                                          Stroke="#0A84FF"
+                                          Stroke="{DynamicResource AccentBrush}"
                                           StrokeThickness="2.5"
                                           StrokeLineJoin="Round"
                                           StrokeStartLineCap="Round"
                                           StrokeEndLineCap="Round" />
                                 <Polyline x:Name="OnePercentPolyline"
-                                          Stroke="#30D158"
+                                          Stroke="{DynamicResource SuccessBrush}"
                                           StrokeThickness="2.5"
                                           StrokeLineJoin="Round"
                                           StrokeStartLineCap="Round"
@@ -62,7 +62,7 @@
                             <TextBlock x:Name="ChartPlaceholderText"
                                        HorizontalAlignment="Center"
                                        VerticalAlignment="Center"
-                                       Foreground="{StaticResource TextTertiaryBrush}"
+                                       Foreground="{DynamicResource TextTertiaryBrush}"
                                        FontSize="14"
                                        Text="Aguardando in&#x00ED;cio do jogo..." />
                         </Grid>
@@ -113,8 +113,8 @@
                                    Style="{StaticResource MacSectionTitle}"
                                    Text="Console" />
                         <Border Margin="0,14,0,0"
-                                Background="{StaticResource ChartBgBrush}"
-                                BorderBrush="{StaticResource CardBorderBrush}"
+                                Background="{DynamicResource ChartBgBrush}"
+                                BorderBrush="{DynamicResource CardBorderBrush}"
                                 BorderThickness="0.5"
                                 CornerRadius="10"
                                 Padding="4">
@@ -123,7 +123,7 @@
                                      BorderThickness="0"
                                      FontFamily="{StaticResource MacMonoFont}"
                                      FontSize="12"
-                                     Foreground="{StaticResource TextPrimaryBrush}"
+                                     Foreground="{DynamicResource TextPrimaryBrush}"
                                      Focusable="False"
                                      HorizontalContentAlignment="Stretch"
                                      ScrollViewer.HorizontalScrollBarVisibility="Disabled"

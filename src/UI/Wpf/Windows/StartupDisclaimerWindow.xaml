@@ -10,6 +10,7 @@
         FontFamily="Segoe UI Variable Display, Segoe UI, Arial"
         WindowStyle="None"
         ShowInTaskbar="False"
+        KeyboardNavigation.TabNavigation="Cycle"
         AllowsTransparency="True">
     <Window.Resources>
         <ResourceDictionary>
@@ -20,8 +21,8 @@
     </Window.Resources>
 
     <Border Margin="12"
-            Background="{StaticResource CardBgBrush}"
-            BorderBrush="{StaticResource CardBorderBrush}"
+            Background="{DynamicResource CardBgBrush}"
+            BorderBrush="{DynamicResource CardBorderBrush}"
             BorderThickness="0.5"
             CornerRadius="16"
             Padding="28"
@@ -45,7 +46,7 @@
             <StackPanel Grid.Row="2">
                 <CheckBox x:Name="AcceptCheckBox"
                           Margin="0,0,0,18"
-                          Foreground="{StaticResource TextPrimaryBrush}"
+                          Foreground="{DynamicResource TextPrimaryBrush}"
                           FontSize="13"
                           Content="Eu compreendo os riscos e assumo total responsabilidade."
                           Checked="AcceptCheckBox_OnChecked"
@@ -57,6 +58,8 @@
                             Margin="0,0,10,0"
                             Style="{StaticResource MacSecondaryButton}"
                             Content="Cancelar"
+                            IsCancel="True"
+                            AutomationProperties.Name="Cancelar e fechar o ApexTweaker"
                             Click="CancelButton_OnClick" />
                     <Button x:Name="ConfirmButton"
                             Width="110"
@@ -64,6 +67,8 @@
                             Style="{StaticResource MacPrimaryButton}"
                             Content="Continuar"
                             IsEnabled="False"
+                            IsDefault="True"
+                            AutomationProperties.Name="Aceitar aviso e continuar"
                             Click="ConfirmButton_OnClick" />
                 </StackPanel>
             </StackPanel>
