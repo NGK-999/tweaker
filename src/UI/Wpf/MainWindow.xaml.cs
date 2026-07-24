@@ -306,20 +306,33 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void MainWindow_OnClosing(object? sender, CancelEventArgs e)
+    private void MainWindow_OnClosing(object? sender, CancelEventArgs e)
     {
         if (shutdownReady)
         {
             return;
         }
 
+        // Always cancel the first close so we can tear down ETW/telemetry safely.
+        // If teardown already started and hung, a second close forces process exit.
         e.Cancel = true;
         if (closingRequested)
         {
+            ForceApplicationExit();
             return;
         }
 
         closingRequested = true;
+        try
+        {
+            // Immediate feedback: window vanishes even if teardown takes a moment.
+            Hide();
+        }
+        catch
+        {
+            // Ignore hide failures during broken chrome states.
+        }
+
         IsEnabled = false;
         _ = ShutdownAndCloseAsync();
     }
@@ -328,21 +341,73 @@ public partial class MainWindow : Window
     {
         try
         {
-            await ShutdownBackgroundServicesAsync().ConfigureAwait(true);
+            var teardown = ShutdownBackgroundServicesAsync();
+            var completed = await Task.WhenAny(teardown, Task.Delay(2000)).ConfigureAwait(true);
+            if (ReferenceEquals(completed, teardown))
+            {
+                await teardown.ConfigureAwait(true);
+            }
         }
         catch
         {
             // Closing must never be blocked by telemetry teardown.
         }
 
-        DisposeRuntimeResources();
+        try
+        {
+            DisposeRuntimeResources();
+        }
+        catch
+        {
+            // Best-effort dispose; force-exit below if Close fails.
+        }
+
         shutdownReady = true;
 
-        await Dispatcher.InvokeAsync(() =>
+        try
         {
-            Closing -= MainWindow_OnClosing;
-            Close();
-        }, DispatcherPriority.Normal);
+            await Dispatcher.InvokeAsync(() =>
+            {
+                Closing -= MainWindow_OnClosing;
+                try
+                {
+                    Close();
+                }
+                catch
+                {
+                    ForceApplicationExit();
+                }
+            }, DispatcherPriority.Send).Task.ConfigureAwait(true);
+        }
+        catch
+        {
+            ForceApplicationExit();
+            return;
+        }
+
+        // Ensure the host process ends (dotnet run / stuck ETW sessions).
+        ForceApplicationExit();
+    }
+
+    private static void ForceApplicationExit()
+    {
+        try
+        {
+            System.Windows.Application.Current?.Shutdown(0);
+        }
+        catch
+        {
+            // ignored
+        }
+
+        try
+        {
+            Environment.Exit(0);
+        }
+        catch
+        {
+            // ignored
+        }
     }
 
     private void DisposeRuntimeResources()
@@ -2093,7 +2158,12 @@ public partial class MainWindow : Window
         {
             try
             {
-                await minecraftBenchmarkTask;
+                var wait = minecraftBenchmarkTask;
+                var completed = await Task.WhenAny(wait, Task.Delay(1500)).ConfigureAwait(false);
+                if (ReferenceEquals(completed, wait))
+                {
+                    await wait.ConfigureAwait(false);
+                }
             }
             catch (OperationCanceledException)
             {
@@ -2107,7 +2177,19 @@ public partial class MainWindow : Window
 
         if (telemetryRunning)
         {
-            await StopTelemetryAsync();
+            try
+            {
+                var stop = StopTelemetryAsync();
+                var completed = await Task.WhenAny(stop, Task.Delay(1500)).ConfigureAwait(false);
+                if (ReferenceEquals(completed, stop))
+                {
+                    await stop.ConfigureAwait(false);
+                }
+            }
+            catch
+            {
+                // Telemetry stop must not block shutdown.
+            }
         }
     }
 
@@ -2489,6 +2571,13 @@ public partial class MainWindow : Window
 
     private void CloseButton_OnClick(object sender, RoutedEventArgs e)
     {
+        // Prefer the normal Closing path; if already stuck mid-shutdown, force exit.
+        if (closingRequested && !shutdownReady)
+        {
+            ForceApplicationExit();
+            return;
+        }
+
         Close();
     }
 
