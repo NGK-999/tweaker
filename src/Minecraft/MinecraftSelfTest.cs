@@ -4,6 +4,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Windows.Media;
+using ApexTweaker.Application.Optimizations;
 using ApexTweaker.Minecraft.Models;
 using ApexTweaker.Minecraft.Services;
 using ApexTweaker.Services;
@@ -22,6 +23,8 @@ internal static class MinecraftSelfTest
 
         try
         {
+            messages.AddRange(WindowsOptimizationSelfTest.Run());
+
             Assert(!ApplicationPrivilegeService.RequiresAdministrator(ApplicationOperation.HardwareDiagnostics) &&
                    !ApplicationPrivilegeService.RequiresAdministrator(ApplicationOperation.MinecraftFiles) &&
                    !ApplicationPrivilegeService.RequiresAdministrator(ApplicationOperation.MinecraftBenchmark) &&

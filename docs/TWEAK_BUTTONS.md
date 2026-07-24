@@ -30,6 +30,33 @@ Backup automatico e criado antes de qualquer otimizacao iniciada pela UI. Nao ha
 | GPU Windows | `ApplyGpuWindowsProfile()` |
 | GPU regedit | `ApplyGpuDriverRegistryProfile()` |
 | Background | `ApplyBackgroundTweaks()` |
+| UI noise | `ApplyUiNoiseTweaks()` |
+| Memory | `ApplyMemoryTweaks()` |
+| Rede avancada | `ApplyAdvancedNetworkTweaks()` |
+| Debloat | `ApplyConditionalDebloat(usage)` |
+| Timer resolution | `ApplyTimerResolutionTweak()` (confirmacao Advanced) |
+
+### Catalogo
+
+| Acao | Backend |
+|------|---------|
+| Analisar preset | `WindowsOptimizationService.Analyze` |
+| BIOS checklist | `BiosChecklistCatalog` (sem flash) |
+
+### Utilidades
+
+| Botao | Funcao |
+|-------|--------|
+| **Limpar temp** | `MarketUtilitiesService.CleanTemporaryFiles` |
+| **TRIM SSD** | `MarketUtilitiesService.TrimSolidStateVolumes` |
+| **Reparar SFC/DISM** | `MarketUtilitiesService.PlanOrRunSystemFileRepair` (confirmacao) |
+| **Storage Sense off** | `MarketUtilitiesService.DisableStorageSense` |
+| **Reverter** | `MasterRollbackService.ExecuteAsync()` — rollback LIFO dos snapshots pendentes |
+| **Desinstalar e Sair** | Restaura ultimo estado, limpa `ProgramData\ApexTweaker`, encerra |
+| **Sobre** | Versao, creditos, caminho de backups |
+| **Suporte Riot** | Abre URL oficial de suporte do VALORANT |
+
+Self-test de cobertura: `dotnet run -- --market-coverage-self-test`
 
 ### Telemetria
 
@@ -42,30 +69,17 @@ Backup automatico e criado antes de qualquer otimizacao iniciada pela UI. Nao ha
 
 Sessoes salvas em `%LOCALAPPDATA%\ApexTweaker\Telemetry` (`Sessao_Baseline.json`, `Sessao_Optimized.json`).
 
-### Cobblemon
+### Cobblemon / Minecraft
 
 | Acao | Backend |
 |------|---------|
 | Auditar pasta | `MinecraftAuditService` + `ModJarScanner` |
 | Gerar relatorios | `MinecraftReportService` |
-| Previsualizar perfil | `MinecraftProfileService.PlanProfile()` |
-| Aplicar perfil | `MinecraftProfileService.ApplyProfile()` |
-| Restaurar perfil | `MinecraftProfileService.RollbackLatest()` |
-| Mover selecionados | `MinecraftQuarantineService.Apply()` |
-| Desfazer quarentena | `MinecraftQuarantineService.RollbackLatest()` |
-| Benchmark 60 s | `MinecraftBenchmarkService.CaptureAsync()` |
+| Previsualizar / aplicar / restaurar perfil | `MinecraftProfileService` |
+| Quarentena | `MinecraftQuarantineService` |
+| Benchmark | `MinecraftBenchmarkService.CaptureAsync()` |
 
-Essa aba nunca preseleciona nem exclui JARs. Movimentacao exige selecao e
-confirmacao explicitas. Consulte `docs/COBBLEMON_LOW_END.md`.
-
-### Utilidades
-
-| Botao | Funcao |
-|-------|--------|
-| **Reverter** | `MasterRollbackService.ExecuteAsync()` — rollback LIFO dos snapshots pendentes |
-| **Desinstalar e Sair** | Restaura ultimo estado, limpa `ProgramData\ApexTweaker`, encerra |
-| **Sobre** | Versao, creditos, caminho de backups |
-| **Suporte Riot** | Abre URL oficial de suporte do VALORANT |
+Consulte `docs/COBBLEMON_LOW_END.md`.
 
 ---
 

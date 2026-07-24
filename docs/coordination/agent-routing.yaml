@@ -1,0 +1,346 @@
+# Agent routing — capacidades descobertas + política
+# Projeto: ApexTweaker (WPF/.NET in-process — sem API HTTP)
+# Gerado: 2026-07-24 pelo orquestrador Cursor
+# Status: rascunho para revisão humana — não aplica mutações Windows
+
+version: 1
+discovery:
+  generated_at: "2026-07-24"
+  machine: windows-10.0.26200
+  notes:
+    - "Nao ha API HTTP; contratos sao C# (Models/Contracts) + fachadas in-process."
+    - "Mutacoes Windows (GPO/Registro/BCD/servicos) sao sempre proibidas nas execucoes dos agentes."
+    - "Working tree pode estar dirty com WIP Codex; require_clean_worktree=false ate estabilizar."
+    - "Cursor CLI nao estava no PATH deste shell; orquestracao ocorre via chat Cursor + CLIs Codex/Claude."
+
+capabilities:
+  cursor_orchestrator:
+    available: true
+    mode: "chat-in-ide"
+    role: "architecture, contracts, routing, review, integration"
+    default_effort: high
+    code_edit_policy: "minimal — docs/contracts/ownership/integration only unless approved"
+
+  codex:
+    available: true
+    version: "0.139.0"
+    update_available: "0.145.0"
+    binary: "codex (WinGet Links)"
+    default_model: "gpt-5.6-terra"
+    default_effort: medium
+    config_path: "%USERPROFILE%\\.codex\\config.toml"
+    invoke:
+      interactive: "codex -m <model> -c model_reasoning_effort=\"<effort>\" \"<prompt>\""
+      non_interactive: "codex exec -m <model> -c model_reasoning_effort=\"<effort>\" -s workspace-write \"<prompt>\""
+    models_available:
+      - slug: gpt-5.6-sol
+        default_effort: low
+        efforts: [low, medium, high, xhigh, max, ultra]
+        use_for: "tarefas mecanicas / listagens / lint mecanico"
+      - slug: gpt-5.6-terra
+        default_effort: medium
+        efforts: [low, medium, high, xhigh, max, ultra]
+        use_for: "backend padrao ApexTweaker (recomendado)"
+      - slug: gpt-5.6-luna
+        default_effort: medium
+        efforts: [low, medium, high, xhigh, max]
+        use_for: "alternativa terra"
+      - slug: gpt-5.5
+        default_effort: medium
+        efforts: [low, medium, high, xhigh]
+      - slug: gpt-5.4
+        default_effort: medium
+        efforts: [low, medium, high, xhigh]
+      - slug: gpt-5.4-mini
+        default_effort: medium
+        efforts: [low, medium, high, xhigh]
+        use_for: "fallback barato"
+      - slug: codex-auto-review
+        visibility: hide
+        efforts: [low, medium, high, xhigh]
+        use_for: "review automatico (se habilitado)"
+    sandboxes: [read-only, workspace-write, danger-full-access]
+    prohibited_flags:
+      - "--dangerously-bypass-approvals-and-sandbox"
+    project_trusted: true  # [projects.'c:\projetos\apextweaker'] trust_level=trusted
+
+  claude_code:
+    available: true
+    version: "2.1.218"
+    invoke_print: "claude -p --model <model> --effort <effort> --permission-mode <mode> \"<prompt>\""
+    models_available:
+      aliases: [sonnet, opus, haiku, fable, best, "sonnet[1m]", "opus[1m]", "fable[1m]", opusplan, default]
+      ids:
+        - claude-opus-4-8
+        - claude-fable-5
+        - claude-sonnet-5
+        - claude-haiku-4-5-20251001
+    efforts: [low, medium, high, xhigh, max]
+    permission_modes: [acceptEdits, auto, bypassPermissions, manual, dontAsk, plan]
+    recommended_permission_mode: acceptEdits
+    prohibited_flags:
+      - "--dangerously-skip-permissions"
+    notes:
+      - "opusplan: planejamento forte + execucao Sonnet — util para FE complexo"
+      - "ANTHROPIC_BASE_URL local quebrado foi removido em 2026-07-24; nao reintroduzir proxy morto"
+
+skills_roots_observed:
+  existing_user_skills:
+    - "%USERPROFILE%\\.codex\\skills\\ (impeccable, find-skills, ...)"
+    - "%USERPROFILE%\\.agents\\skills\\ (computer-use, find-skills, orca-cli, orchestration)"
+    - "%USERPROFILE%\\.claude\\skills\\ (context7-mcp, graphify, retune-visual-changes, ...)"
+  project_skills:
+    - path: ".agents/skills/"
+      exists: false
+      planned: true
+    - path: ".claude/skills/"
+      exists: false
+      planned: true
+
+defaults:
+  require_clean_worktree: false
+  require_handoff: true
+  require_tests: true
+  allow_admin_commands: false
+  allow_windows_mutation: false
+  allow_danger_bypass: false
+  prefer_worktree: true
+  worktrees:
+    backend: "../Apextweaker-codex"
+    frontend: "../Apextweaker-claude"
+  verification_commands_default:
+    - "dotnet build ApexTweaker.sln -c Release"
+    - "dotnet run --project ApexTweaker.csproj -- --demo-self-test"
+    - "dotnet run --project ApexTweaker.csproj -- --minecraft-self-test"
+  reviewer_default: cursor-orchestrator
+
+# ---------------------------------------------------------------------------
+# Rotas por tipo de tarefa (ApexTweaker)
+# ---------------------------------------------------------------------------
+routes:
+  - id: architecture
+    task_type: architecture
+    executor: cursor-orchestrator
+    model: current-strongest-in-cursor
+    effort: high
+    plan_mode: true
+    skills: [architecture-audit, api-contract-review]
+    worktree: null
+    permissions: read-mostly
+    verification: []
+    reason: "Contratos e fronteiras FE/BE in-process; nao reescrever codigo em massa."
+
+  - id: contract-change
+    task_type: contract-change
+    executor: cursor-orchestrator
+    effort: high
+    plan_mode: true
+    skills: [api-contract-review]
+    permissions: workspace-write
+    allowed_paths:
+      - "src/Models/**"
+      - "src/ApexTweaker.Contracts/**"
+      - "docs/contracts/**"
+    reason: "Somente orquestrador altera contratos compartilhados."
+
+  - id: backend-mechanical
+    task_type: backend-mechanical
+    executor: codex
+    model: gpt-5.6-sol
+    effort: low
+    fallback:
+      model: gpt-5.4-mini
+      effort: low
+    skills: [test-and-verify]
+    worktree: backend
+    permissions: workspace-write
+    sandbox: workspace-write
+    examples: ["listar simbolos", "corrigir usings", "rodar build", "formatar"]
+    reason: "Tarefa mecanica; esforco alto desperdiça custo/contexto."
+
+  - id: backend-structural-refactor
+    task_type: backend-structural-refactor
+    executor: codex
+    model: gpt-5.6-terra
+    effort: medium
+    fallback:
+      model: gpt-5.6-luna
+      effort: medium
+    skills: [backend-module-refactor, test-and-verify, git-handoff]
+    worktree: backend
+    permissions: workspace-write
+    sandbox: workspace-write
+    prohibited_paths:
+      - "src/UI/**"
+      - "src/ApexTweaker.Contracts/**"
+    reason: "Mover/extrair services sem tocar contratos."
+
+  - id: windows-optimization-analysis
+    task_type: windows-optimization-analysis
+    executor: codex
+    model: gpt-5.6-terra
+    effort: high
+    skills:
+      - windows-optimization-safety
+      - test-and-verify
+      - git-handoff
+    worktree: backend
+    permissions: workspace-write
+    sandbox: workspace-write
+    plan_mode: false
+    prohibited:
+      - registry-write
+      - gpo-apply
+      - lgpo-apply
+      - bcdedit
+      - service-modification
+      - defender-modification
+      - windows-update-disable
+    allowed_focus:
+      - "WindowsOptimization catalog/inventory/recommendation Analyze-only"
+    verification:
+      - "dotnet build ApexTweaker.sln -c Release"
+      - "dotnet run --project ApexTweaker.csproj -- --demo-self-test"
+    reason: "Regras GPO/uso exigem raciocinio alto, mas apply real e proibido."
+
+  - id: windows-safety-critical
+    task_type: windows-safety-critical
+    executor: codex
+    model: gpt-5.6-terra
+    effort: xhigh
+    fallback:
+      model: gpt-5.6-terra
+      effort: max
+    skills:
+      - windows-optimization-safety
+      - test-and-verify
+      - integration-review
+    worktree: backend
+    permissions: workspace-write
+    sandbox: workspace-write
+    second_reviewer: cursor-orchestrator
+    prohibited:
+      - registry-write
+      - gpo-apply
+      - lgpo-apply
+      - bcdedit
+      - service-modification
+      - defender-modification
+      - vbs-disable-auto
+      - firewall-disable
+    reason: "Backup/rollback/LGPO design — maximo cuidado; ainda sem mutar a maquina de dev."
+
+  - id: frontend-mechanical
+    task_type: frontend-mechanical
+    executor: claude
+    model: haiku
+    effort: low
+    fallback:
+      model: sonnet
+      effort: low
+    skills: [frontend-verification]
+    worktree: frontend
+    permissions: workspace-write
+    permission_mode: acceptEdits
+    reason: "Ajustes XAML/imports triviais."
+
+  - id: frontend-refactor
+    task_type: frontend-refactor
+    executor: claude
+    model: sonnet
+    effort: medium
+    skills:
+      - frontend-architecture
+      - component-extraction
+      - design-system-consistency
+      - frontend-verification
+    worktree: frontend
+    permissions: workspace-write
+    permission_mode: acceptEdits
+    prohibited_paths:
+      - "src/Services/**"
+      - "src/ApexTweaker.Application/**"
+      - "src/ApexTweaker.Windows/**"
+      - "src/ApexTweaker.Contracts/**"
+    reason: "UI WPF alinhada ao tema existente; sem inventar API client HTTP."
+
+  - id: frontend-complex-planning
+    task_type: frontend-complex-planning
+    executor: claude
+    model: opusplan
+    effort: high
+    fallback:
+      model: opus
+      effort: high
+    skills:
+      - frontend-architecture
+      - design-system-consistency
+    worktree: frontend
+    permission_mode: plan
+    reason: "Fluxo completo de presets gamer / estados de risco — planejar antes de codar."
+
+  - id: frontend-risk-ux
+    task_type: frontend-risk-ux
+    executor: claude
+    model: sonnet
+    effort: high
+    skills:
+      - frontend-architecture
+      - accessibility-review
+      - frontend-verification
+    worktree: frontend
+    reason: "Representar Recommended/Blocked/RequiresConfirmation sem prometer FPS magico."
+
+  - id: integration-review
+    task_type: integration-review
+    executor: cursor-orchestrator
+    effort: high
+    skills:
+      - integration-review
+      - api-contract-review
+      - test-and-verify
+    permissions: workspace-write
+    verification:
+      - "dotnet build ApexTweaker.sln -c Release"
+      - "dotnet run --project ApexTweaker.csproj -- --demo-self-test"
+      - "dotnet run --project ApexTweaker.csproj -- --minecraft-self-test"
+    reason: "So integrar com ownership ok + testes + contratos consistentes."
+
+  - id: security-review
+    task_type: security-review
+    executor: codex
+    model: gpt-5.6-terra
+    effort: xhigh
+    second_reviewer: cursor-orchestrator
+    skills: [windows-optimization-safety, integration-review]
+    sandbox: read-only
+    permissions: read-mostly
+    reason: "Revisao somente leitura de riscos Windows/segurança."
+
+# Mapeamento das tarefas atuais do plano mestre
+task_bindings:
+  L0_docs: architecture
+  L1_windows_opt_catalog: windows-optimization-analysis
+  L2_frontend_placeholder: frontend-refactor
+  L2_SHELL_minecraft_option_a: frontend-refactor
+  L4_facade: backend-structural-refactor
+  L5_ui_bind_facade: frontend-risk-ux
+  L6_lgpo_design: windows-safety-critical
+  L7_integration: integration-review
+
+decision_template: |
+  ROUTING DECISION
+  Task:
+  Executor:
+  Model:
+  Effort:
+  Skills:
+  Worktree:
+  Permissions/Sandbox:
+  PlanMode:
+  Reason:
+  Expected outputs:
+  Verification:
+  Fallback:
+  Reviewer:
+  Prohibited:

@@ -43,7 +43,7 @@ public partial class ModulesView : WpfUserControl
             .OfType<WpfButton>()
             .Concat(PeripheralButtonsPanel.Children.OfType<WpfButton>())
             .Concat(GpuButtonsPanel.Children.OfType<WpfButton>())
+            .Concat(MarketButtonsPanel.Children.OfType<WpfButton>())
             .ToArray();
     }
 }
-

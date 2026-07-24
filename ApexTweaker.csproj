@@ -50,6 +50,15 @@
     <PackageReference Include="System.Management" Version="10.0.2" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Remove="src\ApexTweaker.Contracts\**\*.cs" />
+    <Compile Remove="src\ApexTweaker.Application\**\*.cs" />
+    <Compile Remove="src\ApexTweaker.Windows\**\*.cs" />
+    <ProjectReference Include="src\ApexTweaker.Application\ApexTweaker.Application.csproj" />
+    <ProjectReference Include="src\ApexTweaker.Contracts\ApexTweaker.Contracts.csproj" />
+    <ProjectReference Include="src\ApexTweaker.Windows\ApexTweaker.Windows.csproj" />
+  </ItemGroup>
+
   <Target Name="BuildNativeDll" BeforeTargets="BeforeBuild">
     <Error Condition="!Exists('$(NativeProjectPath)')" Text="Projeto nativo nao encontrado em '$(NativeProjectPath)'." />
     <Error Condition="!Exists('$(VsWherePath)')" Text="vswhere.exe nao encontrado em '$(VsWherePath)'. Instale o Visual Studio Build Tools com suporte a C++." />

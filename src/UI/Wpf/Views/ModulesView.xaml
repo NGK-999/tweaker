@@ -48,6 +48,17 @@
                     <Button Style="{StaticResource MacModuleButton}" Tag="GPU regedit" Content="GPU regedit" Click="ModuleButton_OnClick" />
                     <Button Style="{StaticResource MacModuleButton}" Tag="Background" Content="Background" Click="ModuleButton_OnClick" />
                 </WrapPanel>
+
+                <TextBlock Margin="0,16,0,10"
+                           Style="{StaticResource MacSectionTitle}"
+                           Text="Mercado (modo A)" />
+                <WrapPanel x:Name="MarketButtonsPanel">
+                    <Button Style="{StaticResource MacModuleButton}" Tag="UI noise" Content="UI noise" Click="ModuleButton_OnClick" />
+                    <Button Style="{StaticResource MacModuleButton}" Tag="Memory" Content="Memory" Click="ModuleButton_OnClick" />
+                    <Button Style="{StaticResource MacModuleButton}" Tag="Rede avancada" Content="Rede avancada" Click="ModuleButton_OnClick" />
+                    <Button Style="{StaticResource MacModuleButton}" Tag="Debloat" Content="Debloat" Click="ModuleButton_OnClick" />
+                    <Button Style="{StaticResource MacModuleButton}" Tag="Timer resolution" Content="Timer resolution" Click="ModuleButton_OnClick" />
+                </WrapPanel>
             </StackPanel>
         </Border>
     </ScrollViewer>

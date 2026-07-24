@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using System.Windows;
 using ApexTweaker.Minecraft;
 using ApexTweaker.UI.Wpf;
@@ -12,6 +13,12 @@ internal static class Program
     private static void Main(string[] args)
     {
         _ = ApplicationPaths.MigrateLegacyMinecraftData();
+
+        if (args.Any(a => string.Equals(a, "--market-coverage-self-test", StringComparison.OrdinalIgnoreCase)))
+        {
+            Environment.ExitCode = MarketCoverageSelfTest.Run();
+            return;
+        }
 
         if (MinecraftCommandLine.TryRun(args, out var exitCode))
         {

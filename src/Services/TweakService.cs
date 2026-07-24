@@ -614,6 +614,86 @@ internal sealed class TweakService
         return RunMutationPipeline("GPU regedit", () => ExecuteGpuPlan(gpuOptimizationService.BuildDriverRegistryPlan()));
     }
 
+    public IReadOnlyList<string> ApplyUiNoiseTweaks()
+    {
+        return RunMutationPipeline("UI noise", () =>
+        {
+            var log = new List<string> { "UI noise: reduzindo animacoes, transparencia e notificacoes promocionais." };
+            log.AddRange(ApplyPerceivedResponsivenessTweaks());
+            TrySetDword(Registry.CurrentUser, @"Software\Microsoft\Windows\CurrentVersion\PushNotifications", "ToastEnabled", 0, "Toasts do sistema desativados para o usuario atual (pode reativar em Configuracoes).", log);
+            TrySetDword(Registry.CurrentUser, @"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced", "Start_TrackProgs", 0, "Tracking de apps no Start reduzido.", log);
+            return log;
+        });
+    }
+
+    public IReadOnlyList<string> ApplyMemoryTweaks()
+    {
+        return RunMutationPipeline("Memory", () =>
+        {
+            var log = new List<string> { "Memory: perfil de responsividade (nao Extreme completo)." };
+            BackupRegistryKey($@"HKLM\{MemoryManagementPath}", "memory-management", log);
+            BackupRegistryKey(@"HKLM\SYSTEM\CurrentControlSet\Control", "system-control-memory", log);
+            TrySetDword(Registry.LocalMachine, MemoryManagementPath, "DisablePagingExecutive", 1, "DisablePagingExecutive=1.", log);
+            TrySetDword(Registry.LocalMachine, MemoryManagementPath, "LargeSystemCache", 0, "LargeSystemCache=0 (perfil desktop/jogo).", log);
+            TrySetDword(Registry.LocalMachine, @"SYSTEM\CurrentControlSet\Control", "SvcHostSplitThresholdInKB", 67108864, "SvcHostSplitThresholdInKB reforcado.", log);
+            return log;
+        });
+    }
+
+    public IReadOnlyList<string> ApplyAdvancedNetworkTweaks()
+    {
+        return RunMutationPipeline("Rede avancada", () =>
+        {
+            var log = new List<string> { "Rede avancada: TCP/NIC orientados a latencia." };
+            TrySetDword(Registry.LocalMachine, MultimediaProfilePath, "NetworkThrottlingIndex", -1, "Network throttling desligado.", log);
+            var rss = commandRunner.Run("netsh", "int tcp set global rss=enabled");
+            log.Add(rss.ExitCode == 0 ? "TCP RSS habilitado." : $"RSS: {rss.Output}");
+            var ecn = commandRunner.Run("netsh", "int tcp set global ecncapability=disabled");
+            log.Add(ecn.ExitCode == 0 ? "ECN desabilitado." : $"ECN: {ecn.Output}");
+            _ = ExecuteCommand(new NetworkInterruptModerationTweakCommand(), log);
+            log.AddRange(new MarketUtilitiesService(commandRunner).GetBufferbloatGuidance());
+            return log;
+        });
+    }
+
+    public IReadOnlyList<string> ApplyConditionalDebloat(WindowsUsageProfile? usage = null)
+    {
+        usage ??= WindowsUsageProfile.Unknown;
+        return RunMutationPipeline("Debloat condicional", () =>
+        {
+            var log = new List<string> { "Debloat: aplicando apenas itens compativeis com o perfil de uso." };
+            log.AddRange(ApplyGameModeAndGameDvrTweaks());
+            log.AddRange(ApplyEdgeNoiseReduction());
+
+            if (usage.UsesPrinter == UsageAnswer.No)
+            {
+                DisableServiceIfPresent("Spooler", "Print Spooler (usuario declarou nao usar impressora)", log);
+            }
+            else
+            {
+                log.Add("[SKIP] Print Spooler preservado (uso Unknown/Yes).");
+            }
+
+            if (usage.UsesXboxGamePass != UsageAnswer.Yes && usage.UsesGameBarRecording != UsageAnswer.Yes)
+            {
+                DisableServiceIfPresent("XblAuthManager", "Xbox Live Auth (sem Game Pass/Game Bar)", log);
+                DisableServiceIfPresent("XblGameSave", "Xbox Live Game Save", log);
+                DisableServiceIfPresent("XboxNetApiSvc", "Xbox Networking", log);
+            }
+            else
+            {
+                log.Add("[SKIP] Servicos Xbox preservados (Game Pass ou Game Bar = Yes).");
+            }
+
+            if (usage.UsesBluetooth == UsageAnswer.No)
+            {
+                DisableServiceIfPresent("bthserv", "Bluetooth Support Service", log);
+            }
+
+            return log;
+        });
+    }
+
     public IReadOnlyList<string> ApplyHypervisorOffTweak()
     {
         return RunMutationPipeline("Hypervisor off", () => ExecuteSingleCommand(new HypervisorTweakCommand()));

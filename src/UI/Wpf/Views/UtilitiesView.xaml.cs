@@ -9,12 +9,13 @@ namespace ApexTweaker.UI.Wpf.Views;
 public partial class UtilitiesView : WpfUserControl
 {
     public event Func<Task>? RevertRequested;
-
     public event Func<Task>? UninstallRequested;
-
     public event Action? AboutRequested;
-
     public event Action? RiotSupportRequested;
+    public event Func<Task>? CleanTempRequested;
+    public event Func<Task>? TrimSsdRequested;
+    public event Func<Task>? RepairSystemRequested;
+    public event Func<Task>? StorageSenseOffRequested;
 
     public UtilitiesView()
     {
@@ -23,10 +24,47 @@ public partial class UtilitiesView : WpfUserControl
 
     public void SetBusy(bool busy)
     {
-        RevertButton.IsEnabled = !busy;
-        UninstallButton.IsEnabled = !busy;
-        AboutButton.IsEnabled = !busy;
-        RiotSupportButton.IsEnabled = !busy;
+        var enabled = !busy;
+        RevertButton.IsEnabled = enabled;
+        UninstallButton.IsEnabled = enabled;
+        AboutButton.IsEnabled = enabled;
+        RiotSupportButton.IsEnabled = enabled;
+        CleanTempButton.IsEnabled = enabled;
+        TrimButton.IsEnabled = enabled;
+        RepairButton.IsEnabled = enabled;
+        StorageSenseButton.IsEnabled = enabled;
+    }
+
+    private async void CleanTempButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (CleanTempRequested is not null)
+        {
+            await CleanTempRequested.Invoke();
+        }
+    }
+
+    private async void TrimButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (TrimSsdRequested is not null)
+        {
+            await TrimSsdRequested.Invoke();
+        }
+    }
+
+    private async void RepairButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (RepairSystemRequested is not null)
+        {
+            await RepairSystemRequested.Invoke();
+        }
+    }
+
+    private async void StorageSenseButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (StorageSenseOffRequested is not null)
+        {
+            await StorageSenseOffRequested.Invoke();
+        }
     }
 
     private async void RevertButton_OnClick(object sender, RoutedEventArgs e)
@@ -45,14 +83,7 @@ public partial class UtilitiesView : WpfUserControl
         }
     }
 
-    private void AboutButton_OnClick(object sender, RoutedEventArgs e)
-    {
-        AboutRequested?.Invoke();
-    }
+    private void AboutButton_OnClick(object sender, RoutedEventArgs e) => AboutRequested?.Invoke();
 
-    private void RiotSupportButton_OnClick(object sender, RoutedEventArgs e)
-    {
-        RiotSupportRequested?.Invoke();
-    }
+    private void RiotSupportButton_OnClick(object sender, RoutedEventArgs e) => RiotSupportRequested?.Invoke();
 }
-

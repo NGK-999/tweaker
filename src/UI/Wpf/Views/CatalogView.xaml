@@ -1,0 +1,91 @@
+<UserControl x:Class="ApexTweaker.UI.Wpf.Views.CatalogView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="{DynamicResource ContentBgBrush}"
+             FontFamily="Segoe UI Variable Display, Segoe UI, Arial">
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="../Themes/MacTheme.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </UserControl.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel>
+            <Border Style="{StaticResource MacCardStyle}">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource MacSectionLabel}" Text="CATALOGO" />
+                    <TextBlock Margin="0,6,0,0" Style="{StaticResource MacPageTitle}" FontSize="22"
+                               Text="Otimizacoes Windows (modo A)" />
+                    <TextBlock Margin="0,8,0,0" Style="{StaticResource MacBodyText}" FontSize="12"
+                               Text="Analyze only nesta tela. Auto-Optimize nao aplica itens Dangerous. BIOS e checklist sem flash." />
+
+                    <StackPanel Orientation="Horizontal" Margin="0,16,0,0">
+                        <ComboBox x:Name="PresetCombo"
+                                  Width="220"
+                                  Height="36"
+                                  VerticalContentAlignment="Center"
+                                  SelectionChanged="PresetCombo_OnSelectionChanged" />
+                        <Button Margin="10,0,0,0"
+                                Style="{StaticResource MacPrimaryButton}"
+                                Content="Analisar"
+                                Click="AnalyzeButton_OnClick" />
+                    </StackPanel>
+
+                    <TextBlock x:Name="StatusText"
+                               Margin="0,12,0,0"
+                               Style="{StaticResource MacBodyText}"
+                               Text="Selecione um preset e analise." />
+                </StackPanel>
+            </Border>
+
+            <Border Margin="0,14,0,0" Style="{StaticResource MacCardStyle}">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource MacSectionTitle}" Text="Regras" />
+                    <ListView x:Name="RulesList"
+                              Margin="0,10,0,0"
+                              MaxHeight="320"
+                              BorderThickness="0"
+                              Background="Transparent">
+                        <ListView.View>
+                            <GridView>
+                                <GridViewColumn Header="Categoria" Width="110" DisplayMemberBinding="{Binding Category}" />
+                                <GridViewColumn Header="Nome" Width="220" DisplayMemberBinding="{Binding Name}" />
+                                <GridViewColumn Header="Risco" Width="90" DisplayMemberBinding="{Binding RiskLabel}" />
+                                <GridViewColumn Header="Decisao" Width="130" DisplayMemberBinding="{Binding KindLabel}" />
+                                <GridViewColumn Header="Motivo" Width="280" DisplayMemberBinding="{Binding Reason}" />
+                            </GridView>
+                        </ListView.View>
+                    </ListView>
+                </StackPanel>
+            </Border>
+
+            <Border Margin="0,14,0,0" Style="{StaticResource MacCardStyle}">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource MacSectionTitle}" Text="BIOS checklist (sem flash)" />
+                    <ItemsControl x:Name="BiosList" Margin="0,10,0,0">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Margin="0,0,0,10" Padding="0,0,0,8">
+                                    <StackPanel>
+                                        <TextBlock FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}"
+                                                   Text="{Binding Title}" />
+                                        <TextBlock Margin="0,2,0,0" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}"
+                                                   Text="{Binding Vendor}" />
+                                        <TextBlock Margin="0,4,0,0" FontSize="12" TextWrapping="Wrap"
+                                                   Foreground="{DynamicResource TextPrimaryBrush}"
+                                                   Text="{Binding Guidance}" />
+                                        <TextBlock Margin="0,2,0,0" FontSize="11" TextWrapping="Wrap"
+                                                   Foreground="{DynamicResource TextTertiaryBrush}"
+                                                   Text="{Binding RiskNote}" />
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

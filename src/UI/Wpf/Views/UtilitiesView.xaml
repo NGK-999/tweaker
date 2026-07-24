@@ -11,54 +11,44 @@
         </ResourceDictionary>
     </UserControl.Resources>
 
-    <StackPanel>
-        <Border Style="{StaticResource MacCardStyle}">
-            <StackPanel>
-                <TextBlock Style="{StaticResource MacSectionLabel}"
-                           Text="UTILIDADES" />
-                <TextBlock Margin="0,6,0,0"
-                           Style="{StaticResource MacPageTitle}"
-                           FontSize="22"
-                           Text="Suporte e rollback" />
-                <WrapPanel Margin="0,20,0,0">
-                    <Button x:Name="RevertButton"
-                            Style="{StaticResource MacDestructiveButton}"
-                            Width="140"
-                            Content="Reverter"
-                            Click="RevertButton_OnClick" />
-                    <Button x:Name="UninstallButton"
-                            Style="{StaticResource MacSecondaryButton}"
-                            Width="160"
-                            Margin="10,0,0,0"
-                            Content="Desinstalar e sair"
-                            Click="UninstallButton_OnClick" />
-                    <Button x:Name="AboutButton"
-                            Style="{StaticResource MacSecondaryButton}"
-                            Width="120"
-                            Margin="10,0,0,0"
-                            Content="Sobre"
-                            Click="AboutButton_OnClick" />
-                    <Button x:Name="RiotSupportButton"
-                            Style="{StaticResource MacSecondaryButton}"
-                            Width="140"
-                            Margin="10,0,0,0"
-                            Content="Suporte Riot"
-                            Click="RiotSupportButton_OnClick" />
-                </WrapPanel>
-            </StackPanel>
-        </Border>
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel>
+            <Border Style="{StaticResource MacCardStyle}">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource MacSectionLabel}" Text="UTILIDADES" />
+                    <TextBlock Margin="0,6,0,0" Style="{StaticResource MacPageTitle}" FontSize="22"
+                               Text="Manutencao e rollback" />
+                    <WrapPanel Margin="0,20,0,0">
+                        <Button x:Name="CleanTempButton" Style="{StaticResource MacModuleButton}" Width="160"
+                                Content="Limpar temp" Click="CleanTempButton_OnClick" />
+                        <Button x:Name="TrimButton" Style="{StaticResource MacModuleButton}" Width="140" Margin="10,0,0,0"
+                                Content="TRIM SSD" Click="TrimButton_OnClick" />
+                        <Button x:Name="RepairButton" Style="{StaticResource MacModuleButton}" Width="160" Margin="10,0,0,0"
+                                Content="Reparar SFC/DISM" Click="RepairButton_OnClick" />
+                        <Button x:Name="StorageSenseButton" Style="{StaticResource MacModuleButton}" Width="160" Margin="10,0,0,0"
+                                Content="Storage Sense off" Click="StorageSenseButton_OnClick" />
+                    </WrapPanel>
+                    <WrapPanel Margin="0,12,0,0">
+                        <Button x:Name="RevertButton" Style="{StaticResource MacDestructiveButton}" Width="140"
+                                Content="Reverter" Click="RevertButton_OnClick" />
+                        <Button x:Name="UninstallButton" Style="{StaticResource MacSecondaryButton}" Width="160" Margin="10,0,0,0"
+                                Content="Desinstalar e sair" Click="UninstallButton_OnClick" />
+                        <Button x:Name="AboutButton" Style="{StaticResource MacSecondaryButton}" Width="120" Margin="10,0,0,0"
+                                Content="Sobre" Click="AboutButton_OnClick" />
+                        <Button x:Name="RiotSupportButton" Style="{StaticResource MacSecondaryButton}" Width="140" Margin="10,0,0,0"
+                                Content="Suporte Riot" Click="RiotSupportButton_OnClick" />
+                    </WrapPanel>
+                </StackPanel>
+            </Border>
 
-        <Border Margin="0,14,0,0" Style="{StaticResource MacCardStyle}">
-            <StackPanel>
-                <TextBlock Style="{StaticResource MacSectionLabel}"
-                           Text="INFO" />
-                <TextBlock Margin="0,6,0,0"
-                           Style="{StaticResource MacSectionTitle}"
-                           Text="Observa&#x00E7;&#x00F5;es" />
-                <TextBlock Margin="0,10,0,0"
-                           Style="{StaticResource MacBodyText}"
-                           Text="Todas as muta&#x00E7;&#x00F5;es s&#x00E3;o rastre&#x00E1;veis e revers&#x00ED;veis via ledger em ProgramData." />
-            </StackPanel>
-        </Border>
-    </StackPanel>
+            <Border Margin="0,14,0,0" Style="{StaticResource MacCardStyle}">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource MacSectionLabel}" Text="INFO" />
+                    <TextBlock Margin="0,6,0,0" Style="{StaticResource MacSectionTitle}" Text="Observacoes" />
+                    <TextBlock Margin="0,10,0,0" Style="{StaticResource MacBodyText}"
+                               Text="Limpeza de temp e SFC nao entram no Auto-Optimize. Mutacoes de registro continuam reversiveis via ledger." />
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
 </UserControl>

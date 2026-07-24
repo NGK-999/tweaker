@@ -1,3 +1,4 @@
+// Windows processor-group probe used by the topology inventory.
 using System.Runtime.InteropServices;
 using ApexTweaker.NativeInterop;
 

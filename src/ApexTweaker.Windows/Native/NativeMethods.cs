@@ -1,3 +1,4 @@
+// Native topology bridge belongs to Windows infrastructure, not to the UI host.
 using System.Runtime.InteropServices;
 
 namespace ApexTweaker.NativeInterop;

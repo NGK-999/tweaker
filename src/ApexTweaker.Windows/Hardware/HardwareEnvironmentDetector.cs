@@ -1,3 +1,4 @@
+// Windows topology implementation kept in its legacy namespace during migration.
 using ApexTweaker.NativeInterop;
 
 namespace ApexTweaker.Services;

@@ -4,6 +4,12 @@ VisualStudioVersion = 17.5.2.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ApexTweaker", "ApexTweaker.csproj", "{11F50E0F-1005-F8D9-EE59-D9D4D63A0C60}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ApexTweaker.Contracts", "src\ApexTweaker.Contracts\ApexTweaker.Contracts.csproj", "{4D27223A-E368-47F1-BEBD-D59EDBE97A6C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ApexTweaker.Application", "src\ApexTweaker.Application\ApexTweaker.Application.csproj", "{47E7626E-1180-49E4-9C3E-250F3ACABF78}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ApexTweaker.Windows", "src\ApexTweaker.Windows\ApexTweaker.Windows.csproj", "{AFB660E6-1041-41C1-99E9-BEEE9221A2FA}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -14,6 +20,18 @@ Global
 		{11F50E0F-1005-F8D9-EE59-D9D4D63A0C60}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{11F50E0F-1005-F8D9-EE59-D9D4D63A0C60}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{11F50E0F-1005-F8D9-EE59-D9D4D63A0C60}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4D27223A-E368-47F1-BEBD-D59EDBE97A6C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4D27223A-E368-47F1-BEBD-D59EDBE97A6C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4D27223A-E368-47F1-BEBD-D59EDBE97A6C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4D27223A-E368-47F1-BEBD-D59EDBE97A6C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{47E7626E-1180-49E4-9C3E-250F3ACABF78}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{47E7626E-1180-49E4-9C3E-250F3ACABF78}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{47E7626E-1180-49E4-9C3E-250F3ACABF78}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{47E7626E-1180-49E4-9C3E-250F3ACABF78}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AFB660E6-1041-41C1-99E9-BEEE9221A2FA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AFB660E6-1041-41C1-99E9-BEEE9221A2FA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AFB660E6-1041-41C1-99E9-BEEE9221A2FA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AFB660E6-1041-41C1-99E9-BEEE9221A2FA}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -30,6 +30,7 @@ public partial class MainWindow : Window
     private const string DashboardPageKey = "Dashboard";
     private const string ModulesPageKey = "Modules";
     private const string TelemetryPageKey = "Telemetry";
+    private const string CatalogPageKey = "Catalog";
     private const string MinecraftPageKey = "Minecraft";
     private const string UtilitiesPageKey = "Utilities";
 
@@ -57,8 +58,11 @@ public partial class MainWindow : Window
     private DashboardView? dashboardView;
     private ModulesView? modulesView;
     private TelemetryView? telemetryView;
+    private CatalogView? catalogView;
     private MinecraftView? minecraftView;
     private UtilitiesView? utilitiesView;
+    private readonly MarketUtilitiesService marketUtilitiesService = new();
+
     private readonly Dictionary<string, Func<FrameworkElement>> pageFactories = new(StringComparer.OrdinalIgnoreCase);
     private readonly List<string> consoleLines = [];
     private CancellationTokenSource? transitionCancellation;
@@ -97,6 +101,7 @@ public partial class MainWindow : Window
         pageFactories[DashboardPageKey] = () => Dashboard;
         pageFactories[ModulesPageKey] = () => Modules;
         pageFactories[TelemetryPageKey] = () => Telemetry;
+        pageFactories[CatalogPageKey] = () => Catalog;
         pageFactories[MinecraftPageKey] = () => Minecraft;
         pageFactories[UtilitiesPageKey] = () => Utilities;
 
@@ -153,6 +158,8 @@ public partial class MainWindow : Window
         }
     }
 
+    private CatalogView Catalog => catalogView ??= new CatalogView();
+
     private UtilitiesView Utilities
     {
         get
@@ -167,6 +174,10 @@ public partial class MainWindow : Window
             utilitiesView.UninstallRequested += UninstallAndExitAsync;
             utilitiesView.AboutRequested += ShowAbout;
             utilitiesView.RiotSupportRequested += OpenRiotSupport;
+            utilitiesView.CleanTempRequested += () => RunUtilityAsync("Limpar temporarios", () => marketUtilitiesService.CleanTemporaryFiles(execute: true));
+            utilitiesView.TrimSsdRequested += () => RunUtilityAsync("TRIM SSD", () => marketUtilitiesService.TrimSolidStateVolumes(execute: true));
+            utilitiesView.RepairSystemRequested += ConfirmAndRepairSystemAsync;
+            utilitiesView.StorageSenseOffRequested += () => RunUtilityAsync("Storage Sense", () => marketUtilitiesService.DisableStorageSense(execute: true));
             return utilitiesView;
         }
     }
@@ -390,6 +401,7 @@ public partial class MainWindow : Window
             DashboardPageKey => "Dashboard",
             ModulesPageKey => "M\u00F3dulos",
             TelemetryPageKey => "Telemetria",
+            CatalogPageKey => "Catalogo",
             MinecraftPageKey => "Minecraft R\u00e1pido",
             UtilitiesPageKey => "Utilidades",
             _ => AppInfo.Name
@@ -399,7 +411,8 @@ public partial class MainWindow : Window
             MinecraftPageKey => "Encontrar, preparar, testar e restaurar sem complexidade",
             TelemetryPageKey => "Frametime, sensores e comparacao antes/depois",
             ModulesPageKey => "Ajustes individuais com snapshot e verificacao",
-            UtilitiesPageKey => "Rollback, suporte e manutencao",
+            CatalogPageKey => "Analyze: regras, riscos e checklist BIOS (sem flash)",
+            UtilitiesPageKey => "Rollback, limpeza, TRIM, reparo e suporte",
             _ => "Performance, telemetria e rollback transacional"
         };
 
@@ -433,8 +446,12 @@ public partial class MainWindow : Window
 
     private void SetActiveNav(WpfButton selectedButton)
     {
-        foreach (var button in new[] { DashboardButton, ModulesButton, TelemetryButton, MinecraftButton, UtilitiesButton })
+        foreach (var button in new[] { DashboardButton, ModulesButton, TelemetryButton, CatalogButton, MinecraftButton, UtilitiesButton })
         {
+            if (button is null)
+            {
+                continue;
+            }
             button.Tag = ReferenceEquals(button, selectedButton) ? "Active" : null;
         }
     }
@@ -575,7 +592,50 @@ public partial class MainWindow : Window
             case "GPU regedit":
                 await RunTweakAsync("GPU regedit", () => tweakService.ApplyGpuDriverRegistryProfile());
                 break;
+            case "UI noise":
+                await RunTweakAsync("UI noise", () => tweakService.ApplyUiNoiseTweaks());
+                break;
+            case "Memory":
+                await RunTweakAsync("Memory", () => tweakService.ApplyMemoryTweaks());
+                break;
+            case "Rede avancada":
+                await RunTweakAsync("Rede avancada", () => tweakService.ApplyAdvancedNetworkTweaks());
+                break;
+            case "Debloat":
+                await RunTweakAsync("Debloat condicional", () => tweakService.ApplyConditionalDebloat(WindowsUsageProfile.Unknown));
+                break;
+            case "Timer resolution":
+                if (System.Windows.MessageBox.Show(
+                        "Timer resolution altera BCD e exige reinicio. Continuar?",
+                        "Confirmacao Advanced",
+                        MessageBoxButton.YesNo,
+                        MessageBoxImage.Warning) != MessageBoxResult.Yes)
+                {
+                    return;
+                }
+
+                await RunTweakAsync("Timer resolution", () => tweakService.ApplyTimerResolutionTweak());
+                break;
         }
+    }
+
+    private async Task RunUtilityAsync(string section, Func<IReadOnlyList<string>> action)
+    {
+        await RunTweakAsync(section, action, createAutomaticBackup: false);
+    }
+
+    private async Task ConfirmAndRepairSystemAsync()
+    {
+        if (System.Windows.MessageBox.Show(
+                "Executar DISM CheckHealth + SFC /scannow? Pode demorar varios minutos.",
+                "Reparar arquivos do sistema",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question) != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        await RunUtilityAsync("Reparar sistema", () => marketUtilitiesService.PlanOrRunSystemFileRepair(execute: true));
     }
 
     private async Task ApplyExtremeLatencyTweaksAsync()
@@ -2107,6 +2167,11 @@ public partial class MainWindow : Window
     private async void TelemetryButton_OnClick(object sender, RoutedEventArgs e)
     {
         await ShowPageAsync(TelemetryPageKey, TelemetryButton);
+    }
+
+    private async void CatalogButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        await ShowPageAsync(CatalogPageKey, CatalogButton);
     }
 
     private async void MinecraftButton_OnClick(object sender, RoutedEventArgs e)

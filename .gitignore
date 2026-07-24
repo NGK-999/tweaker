@@ -22,10 +22,25 @@ TestResults/
 *.nupkg
 .cursor/
 .agents/
+.codex/
+.impeccable/
 native-msbuild-path.txt
 page0_render.bin
 pdf-pages/
 artifacts/
 
-# Graphify
+# Local agent scratch
+.agent-prompt*.txt
+_launch_claude.js
+.claude-*.log
+.claude-*.log.err
+
+# Graphify — regenerável; versionar só o relatório atual
+graphify-out/cache/
+graphify-out/20*/
+graphify-out/.graphify_*
 graphify-out/cost.json
+graphify-out/graph.html
+graphify-out/graph.json
+graphify-out/manifest.json
+!graphify-out/GRAPH_REPORT.md
