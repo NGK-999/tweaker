@@ -102,8 +102,11 @@
                         </StackPanel>
 
                         <StackPanel Grid.Row="1"
-                                    Margin="12,20,12,0"
+                                    Margin="12,16,12,0"
                                     VerticalAlignment="Top">
+                            <TextBlock Margin="10,0,0,6"
+                                       Style="{StaticResource MacSectionLabel}"
+                                       Text="INICIO" />
                             <Button x:Name="DashboardButton"
                                     Content="Dashboard"
                                     Style="{StaticResource MacNavButton}"
@@ -114,21 +117,29 @@
                                     Style="{StaticResource MacNavButton}"
                                     AutomationProperties.Name="Abrir Desempenho"
                                     Click="PerformanceButton_OnClick" />
+
+                            <TextBlock Margin="10,14,0,6"
+                                       Style="{StaticResource MacSectionLabel}"
+                                       Text="AJUSTES" />
                             <Button x:Name="ModulesButton"
-                                    Content="M&#x00F3;dulos"
+                                    Content="Modulos"
                                     Style="{StaticResource MacNavButton}"
-                                    AutomationProperties.Name="Abrir M&#x00F3;dulos"
+                                    AutomationProperties.Name="Abrir Modulos"
                                     Click="ModulesButton_OnClick" />
-                            <Button x:Name="TelemetryButton"
-                                    Content="Telemetria"
-                                    Style="{StaticResource MacNavButton}"
-                                    AutomationProperties.Name="Abrir Telemetria"
-                                    Click="TelemetryButton_OnClick" />
                             <Button x:Name="CatalogButton"
                                     Content="Catalogo"
                                     Style="{StaticResource MacNavButton}"
                                     AutomationProperties.Name="Abrir Catalogo de otimizacoes"
                                     Click="CatalogButton_OnClick" />
+
+                            <TextBlock Margin="10,14,0,6"
+                                       Style="{StaticResource MacSectionLabel}"
+                                       Text="SISTEMA" />
+                            <Button x:Name="TelemetryButton"
+                                    Content="Telemetria"
+                                    Style="{StaticResource MacNavButton}"
+                                    AutomationProperties.Name="Abrir Telemetria"
+                                    Click="TelemetryButton_OnClick" />
                             <Button x:Name="UtilitiesButton"
                                     Content="Utilidades"
                                     Style="{StaticResource MacNavButton}"

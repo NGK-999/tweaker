@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using ApexTweaker.Models;
 using ApexTweaker.Services;
+using ApexTweaker.UI.Wpf.Controls;
 using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace ApexTweaker.UI.Wpf.ViewModels;
@@ -60,15 +61,45 @@ internal sealed class CatalogRowViewModel
 
     public WindowsOptimizationRule Rule { get; }
 
-    public string KindLabel => Decision.Kind.ToString();
+    public string KindLabel => Decision.Kind switch
+    {
+        OptimizationDecisionKind.Recommended => "Recomendado",
+        OptimizationDecisionKind.RequiresConfirmation => "Confirmacao",
+        OptimizationDecisionKind.ExperimentalOnly => "Experimental",
+        OptimizationDecisionKind.AlreadyConfigured => "Ja aplicado",
+        OptimizationDecisionKind.NotApplicable => "N/A",
+        OptimizationDecisionKind.Blocked => "Bloqueado",
+        _ => Decision.Kind.ToString()
+    };
 
-    public string RiskLabel => Rule.Risk.ToString();
+    public string RiskLabel => Rule.Risk switch
+    {
+        WindowsOptimizationRisk.Safe => "Seguro",
+        WindowsOptimizationRisk.Conditional => "Condicional",
+        WindowsOptimizationRisk.Experimental => "Experimental",
+        WindowsOptimizationRisk.Dangerous => "Perigoso",
+        _ => Rule.Risk.ToString()
+    };
+
+    public RiskLevel BadgeLevel => Rule.Risk switch
+    {
+        WindowsOptimizationRisk.Dangerous => RiskLevel.Dangerous,
+        WindowsOptimizationRisk.Experimental => RiskLevel.Advanced,
+        WindowsOptimizationRisk.Conditional => RiskLevel.Advanced,
+        _ => RiskLevel.Safe
+    };
 
     public string Category => Rule.Category;
 
     public string Name => Rule.Name;
 
     public string Reason => Decision.Reason;
+
+    public string Impact => string.IsNullOrWhiteSpace(Rule.ExpectedImpact)
+        ? Reason
+        : Rule.ExpectedImpact;
+
+    public bool RequiresRestart => Rule.RequiresRestart;
 
     public bool IsDangerous => Rule.Risk == WindowsOptimizationRisk.Dangerous;
 }

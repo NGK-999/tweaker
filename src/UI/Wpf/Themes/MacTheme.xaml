@@ -376,11 +376,11 @@
         <Setter Property="Foreground" Value="{DynamicResource OnAccentTextBrush}" />
     </Style>
 
-    <!-- Sidebar navigation (IDE-style: left accent bar marks the active item, no pill fill) -->
+    <!-- Sidebar navigation: quieter chrome, taller hit targets, accent bar when active -->
     <Style x:Key="MacNavButton" TargetType="Button">
         <Setter Property="FontFamily" Value="{StaticResource MacFont}" />
-        <Setter Property="Height" Value="32" />
-        <Setter Property="Margin" Value="0,0,0,2" />
+        <Setter Property="Height" Value="36" />
+        <Setter Property="Margin" Value="0,0,0,4" />
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
         <Setter Property="BorderBrush" Value="Transparent" />
@@ -397,19 +397,20 @@
                     <Grid SnapsToDevicePixels="True">
                         <Border x:Name="HoverOverlay"
                                 Background="{DynamicResource NavHoverBrush}"
-                                CornerRadius="6"
+                                CornerRadius="8"
                                 Opacity="0"
                                 IsHitTestVisible="False" />
                         <Border x:Name="ActiveOverlay"
                                 Background="{DynamicResource NavActiveBrush}"
-                                CornerRadius="6"
+                                CornerRadius="8"
                                 Opacity="0"
                                 IsHitTestVisible="False" />
                         <Border x:Name="ActiveBar"
-                                Width="2"
-                                Margin="0,2,0,2"
+                                Width="3"
+                                Margin="0,6,0,6"
                                 HorizontalAlignment="Left"
                                 Background="{DynamicResource AccentBrush}"
+                                CornerRadius="1.5"
                                 Opacity="0"
                                 IsHitTestVisible="False" />
                         <ContentPresenter VerticalAlignment="Center"
@@ -439,48 +440,14 @@
                                 </Storyboard>
                             </BeginStoryboard>
                         </EventTrigger>
-                        <Trigger Property="IsMouseOver" Value="True">
-                            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
-                        </Trigger>
                         <Trigger Property="Tag" Value="Active">
+                            <Setter TargetName="ActiveOverlay" Property="Opacity" Value="1" />
+                            <Setter TargetName="ActiveBar" Property="Opacity" Value="1" />
                             <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
                             <Setter Property="FontWeight" Value="SemiBold" />
-                            <Trigger.EnterActions>
-                                <BeginStoryboard>
-                                    <Storyboard>
-                                        <DoubleAnimation Storyboard.TargetName="ActiveOverlay"
-                                                         Storyboard.TargetProperty="Opacity"
-                                                         To="1"
-                                                         Duration="{StaticResource MotionNormal}"
-                                                         EasingFunction="{StaticResource MotionEaseOut}" />
-                                        <DoubleAnimation Storyboard.TargetName="ActiveBar"
-                                                         Storyboard.TargetProperty="Opacity"
-                                                         To="1"
-                                                         Duration="{StaticResource MotionNormal}"
-                                                         EasingFunction="{StaticResource MotionEaseOut}" />
-                                        <DoubleAnimation Storyboard.TargetName="HoverOverlay"
-                                                         Storyboard.TargetProperty="Opacity"
-                                                         To="0"
-                                                         Duration="{StaticResource MotionFast}" />
-                                    </Storyboard>
-                                </BeginStoryboard>
-                            </Trigger.EnterActions>
-                            <Trigger.ExitActions>
-                                <BeginStoryboard>
-                                    <Storyboard>
-                                        <DoubleAnimation Storyboard.TargetName="ActiveOverlay"
-                                                         Storyboard.TargetProperty="Opacity"
-                                                         To="0"
-                                                         Duration="{StaticResource MotionNormal}"
-                                                         EasingFunction="{StaticResource MotionEaseInOut}" />
-                                        <DoubleAnimation Storyboard.TargetName="ActiveBar"
-                                                         Storyboard.TargetProperty="Opacity"
-                                                         To="0"
-                                                         Duration="{StaticResource MotionNormal}"
-                                                         EasingFunction="{StaticResource MotionEaseInOut}" />
-                                    </Storyboard>
-                                </BeginStoryboard>
-                            </Trigger.ExitActions>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.45" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
