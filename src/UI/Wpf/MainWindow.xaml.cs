@@ -433,7 +433,7 @@ public partial class MainWindow : Window
 
     private void SetActiveNav(WpfButton selectedButton)
     {
-        foreach (var button in new[] { DashboardButton, ModulesButton, TelemetryButton, MinecraftButton, UtilitiesButton })
+        foreach (var button in new[] { DashboardButton, ModulesButton, TelemetryButton, UtilitiesButton })
         {
             button.Tag = ReferenceEquals(button, selectedButton) ? "Active" : null;
         }
@@ -545,6 +545,10 @@ public partial class MainWindow : Window
     {
         switch (moduleKey)
         {
+            case MinecraftPageKey:
+                await ShowPageAsync(MinecraftPageKey, ModulesButton);
+                SetStatus(Minecraft.EasyStatusLine);
+                break;
             case "Energia":
                 await RunTweakAsync("Energia", () => tweakService.ApplyPowerTweaks());
                 break;
@@ -2107,12 +2111,6 @@ public partial class MainWindow : Window
     private async void TelemetryButton_OnClick(object sender, RoutedEventArgs e)
     {
         await ShowPageAsync(TelemetryPageKey, TelemetryButton);
-    }
-
-    private async void MinecraftButton_OnClick(object sender, RoutedEventArgs e)
-    {
-        await ShowPageAsync(MinecraftPageKey, MinecraftButton);
-        SetStatus(Minecraft.EasyStatusLine);
     }
 
     private async void UtilitiesButton_OnClick(object sender, RoutedEventArgs e)

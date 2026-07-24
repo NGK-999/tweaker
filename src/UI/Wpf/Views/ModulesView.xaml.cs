@@ -1,8 +1,10 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
 using WpfButton = System.Windows.Controls.Button;
 using WpfUserControl = System.Windows.Controls.UserControl;
 
@@ -39,11 +41,28 @@ public partial class ModulesView : WpfUserControl
 
     private WpfButton[] EnumerateModuleButtons()
     {
-        return CoreButtonsPanel.Children
-            .OfType<WpfButton>()
-            .Concat(PeripheralButtonsPanel.Children.OfType<WpfButton>())
-            .Concat(GpuButtonsPanel.Children.OfType<WpfButton>())
+        return FindButtons(CoreButtonsPanel)
+            .Concat(FindButtons(PeripheralButtonsPanel))
+            .Concat(FindButtons(GpuButtonsPanel))
+            .Concat(FindButtons(GamesButtonsPanel))
             .ToArray();
+    }
+
+    private static IEnumerable<WpfButton> FindButtons(DependencyObject root)
+    {
+        for (var i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
+        {
+            var child = VisualTreeHelper.GetChild(root, i);
+            if (child is WpfButton button)
+            {
+                yield return button;
+            }
+
+            foreach (var nested in FindButtons(child))
+            {
+                yield return nested;
+            }
+        }
     }
 }
 

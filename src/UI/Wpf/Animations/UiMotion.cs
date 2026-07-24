@@ -119,17 +119,18 @@ internal static class UiMotion
 
         storyboard.Completed += OnFirstCompleted;
 
+        // Runs synchronously as part of the caller's Cancel() call (CancellationToken.Register
+        // callbacks execute on the cancelling thread) — deferring this via Dispatcher.BeginInvoke
+        // let a superseding AnimateHeaderAsync call start first and then get its text/transform
+        // stomped by this stale cleanup on the next dispatcher tick.
         using var registration = cancellationToken.Register(() =>
         {
-            storyboard.Dispatcher.BeginInvoke(() =>
-            {
-                storyboard.Stop();
-                storyboard.Completed -= OnFirstCompleted;
-                target.Text = newText;
-                target.RenderTransform = Transform.Identity;
-                target.Opacity = 1D;
-                completion.TrySetCanceled(cancellationToken);
-            });
+            storyboard.Stop();
+            storyboard.Completed -= OnFirstCompleted;
+            target.Text = newText;
+            target.RenderTransform = Transform.Identity;
+            target.Opacity = 1D;
+            completion.TrySetCanceled(cancellationToken);
         });
 
         storyboard.Begin();

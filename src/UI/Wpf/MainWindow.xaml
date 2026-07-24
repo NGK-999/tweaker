@@ -128,11 +128,6 @@
                                     Style="{StaticResource MacNavButton}"
                                     AutomationProperties.Name="Abrir Telemetria"
                                     Click="TelemetryButton_OnClick" />
-                            <Button x:Name="MinecraftButton"
-                                    Content="Minecraft R&#x00E1;pido"
-                                    Style="{StaticResource MacNavButton}"
-                                    AutomationProperties.Name="Abrir Minecraft R&#x00E1;pido"
-                                    Click="MinecraftButton_OnClick" />
                             <Button x:Name="UtilitiesButton"
                                     Content="Utilidades"
                                     Style="{StaticResource MacNavButton}"
