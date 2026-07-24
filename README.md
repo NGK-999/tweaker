@@ -27,7 +27,7 @@ aplica o perfil leve somente depois da confirmacao do usuario.
 - laboratorio cientifico completo preservado em **Modo Avancado**.
 
 Guia atual: [docs/MINECRAFT_GENERAL_AND_SESSION_HOOKS.md](docs/MINECRAFT_GENERAL_AND_SESSION_HOOKS.md).
-Historico do modo Cobblemon: [docs/V3_2_COBBLEMON_ONE_CLICK.md](docs/V3_2_COBBLEMON_ONE_CLICK.md).
+Indice da documentacao: [docs/README.md](docs/README.md).
 
 ## Minecraft Scientific Optimization Engine
 
@@ -64,19 +64,19 @@ Documentacao geral: [docs/MINECRAFT_GENERAL_AND_SESSION_HOOKS.md](docs/MINECRAFT
 Perfil Cobblemon opcional: [docs/COBBLEMON_LOW_END.md](docs/COBBLEMON_LOW_END.md).
 Fluxo para o PC real: [docs/HOMOLOGACAO_OPERACIONAL_COBBLEMON.md](docs/HOMOLOGACAO_OPERACIONAL_COBBLEMON.md).
 Motor cientifico e CLI: [docs/SCIENTIFIC_ENGINE.md](docs/SCIENTIFIC_ENGINE.md).
-Frontend e Potato: [docs/V3_1_FRONTEND_POTATO.md](docs/V3_1_FRONTEND_POTATO.md).
-Modo facil: [docs/V3_2_COBBLEMON_ONE_CLICK.md](docs/V3_2_COBBLEMON_ONE_CLICK.md).
-Arquitetura da v3: [docs/ARCHITECTURE_V3.md](docs/ARCHITECTURE_V3.md).
+Arquitetura atual: [docs/architecture/current-state.md](docs/architecture/current-state.md).
+Indice completo: [docs/README.md](docs/README.md).
 
 ## Interface
 
 | Aba | Funcao |
 |-----|--------|
 | **Dashboard** | Auto-Tuning, restore point e resumo de hardware |
-| **Modulos** | Tweaks individuais de energia, CPU, GPU e rede |
+| **Modulos** | Tweaks individuais + bloco mercado (UI/Memory/Rede/Debloat) |
 | **Telemetria** | Teste A/B, frametime, metricas e console |
-| **Minecraft Rapido** | Quatro botoes para vanilla ou modded: encontrar, preparar, testar e resolver; laboratorio tecnico no modo avancado |
-| **Utilidades** | Rollback mestre, desinstalacao e suporte |
+| **Catalogo** | Analyze de presets Windows + checklist BIOS (sem flash) |
+| **Minecraft Rapido** | Fluxo facil + laboratorio tecnico no modo avancado |
+| **Utilidades** | Limpeza, TRIM, SFC/DISM, rollback, desinstalacao e suporte |
 
 ## Linha de comando
 

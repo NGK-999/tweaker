@@ -2,7 +2,7 @@
 
 Data da auditoria: 2026-07-24  
 Auditor: Orquestrador (Cursor)  
-Fonte: código no working tree + `README.md` + `docs/PROJECT_STRUCTURE.md` + `docs/ARCHITECTURE_V3.md` + `docs/BACKEND_ARCHITECTURE_AUDIT.md` + graphify
+Fonte: código no working tree + `README.md` + `docs/PROJECT_STRUCTURE.md` + `docs/architecture/` + graphify
 
 ## Resumo executivo
 
