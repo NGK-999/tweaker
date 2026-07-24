@@ -32,6 +32,18 @@ Formato por entrada (preencher após cada decisão/execução):
   notes: []
 ```
 
+### 2026-07-24 — FPS P0/P1 orquestrado
+
+```yaml
+- timestamp: "2026-07-24T14:30:00-03:00"
+  task_id: FPS-P0-P1
+  notes:
+    - "Sites usuario: Winaero/UWT = shell (baixo FPS); CET=Cyberpunk; tweaked.cc=ComputerCraft — ignorar para Windows FPS"
+    - "Idempotencia: reaplicar mesmo DWORD/servico OK; ledger cresce; preferir SKIP se ja aplicado"
+    - "Kernel: NAO e proximo passo — ainda ha VBS/ReBAR/FSO/overlays em user-mode"
+    - "Codex: FPS-P0-P1-BE | Claude: FPS-P0-P1-FE"
+```
+
 ---
 
 ### 2026-07-24 — MARKET B1–B9 (modo A)
@@ -133,3 +145,28 @@ Formato por entrada (preencher após cada decisão/execução):
     - "Nenhuma invocacao codex exec / claude -p de implementacao nesta etapa"
     - "Skills de projeto ainda nao criadas — apenas indice"
 ```
+
+## 2026-07-24 14:32 — Orquestracao FPS-P0-P1
+
+- Sites filtrados em `docs/research/fps-reference-filter.md` (Winaero/UWT = UI; tweaked.cc = ComputerCraft; CET = Cyberpunk).
+- Kernel: **nao** e o proximo passo.
+- Idempotencia: reaplicar registry/servico/power e seguro; ledger ganha nova sessao (preferir SKIP).
+- Codex BE: worktree `Apextweaker-codex` / `agent/codex-fps-p0` (modelo `gpt-5.4` — CLI 0.139 nao aceita terra).
+- Claude FE: worktree `Apextweaker-claude` / `agent/claude-fps-p0`.
+
+## 2026-07-24 14:38 � Orquestracao FE-ALL + FPS-BE
+
+- Relancado Claude `FE-ALL-P0` (FPS painel + maturidade) PID 38388
+- Codex `FPS-P0-P1-BE` continua PID 27820 (Apply* ainda pendente em TweakService)
+- Docs: frontend-task / backend-task / master-plan atualizados
+
+## 2026-07-24 14:47 � BE PASS; FE finish relaunch
+
+- Codex FPS-P0-P1-BE: **concluido** (build + `--gaming-fps-probe-self-test` ALL PASS)
+- Claude FE-ALL morreu sem handoff; relaunch finish PID 9668
+
+## 2026-07-24 14:57 � Integracao no main
+
+- BE FPS sync + self-test PASS
+- FE Claude (Performance/Snackbar/Ctrl+K/RiskBadge/Minecraft A) + Catalog + market + wiring BE real
+- Build Release OK

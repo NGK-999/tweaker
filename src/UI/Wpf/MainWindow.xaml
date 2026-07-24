@@ -2,6 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+        xmlns:controls="clr-namespace:ApexTweaker.UI.Wpf.Controls"
         Title="ApexTweaker"
         Width="1180"
         Height="780"
@@ -93,31 +94,26 @@
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
 
-                        <StackPanel Margin="16,20,16,0">
+                        <StackPanel Margin="16,18,16,0">
                             <TextBlock Text="ApexTweaker"
                                        Foreground="{DynamicResource TextPrimaryBrush}"
-                                       FontSize="22"
+                                       FontSize="14"
                                        FontWeight="SemiBold" />
-                            <TextBlock x:Name="AppVersionText"
-                                       Margin="0,4,0,0"
-                                       Foreground="{DynamicResource TextTertiaryBrush}"
-                                       FontSize="12"
-                                       Text="v0.0.0" />
-                            <TextBlock x:Name="PrivilegeModeText"
-                                       Margin="0,4,0,0"
-                                       Foreground="{DynamicResource AccentBrush}"
-                                       FontSize="11"
-                                       Text="Modo normal" />
                         </StackPanel>
 
                         <StackPanel Grid.Row="1"
-                                    Margin="12,24,12,0"
+                                    Margin="12,20,12,0"
                                     VerticalAlignment="Top">
                             <Button x:Name="DashboardButton"
                                     Content="Dashboard"
                                     Style="{StaticResource MacNavButton}"
                                     AutomationProperties.Name="Abrir Dashboard"
                                     Click="DashboardButton_OnClick" />
+                            <Button x:Name="PerformanceButton"
+                                    Content="Desempenho"
+                                    Style="{StaticResource MacNavButton}"
+                                    AutomationProperties.Name="Abrir Desempenho"
+                                    Click="PerformanceButton_OnClick" />
                             <Button x:Name="ModulesButton"
                                     Content="M&#x00F3;dulos"
                                     Style="{StaticResource MacNavButton}"
@@ -133,11 +129,6 @@
                                     Style="{StaticResource MacNavButton}"
                                     AutomationProperties.Name="Abrir Catalogo de otimizacoes"
                                     Click="CatalogButton_OnClick" />
-                            <Button x:Name="MinecraftButton"
-                                    Content="Minecraft R&#x00E1;pido"
-                                    Style="{StaticResource MacNavButton}"
-                                    AutomationProperties.Name="Abrir Minecraft R&#x00E1;pido"
-                                    Click="MinecraftButton_OnClick" />
                             <Button x:Name="UtilitiesButton"
                                     Content="Utilidades"
                                     Style="{StaticResource MacNavButton}"
@@ -147,17 +138,29 @@
 
                         <StackPanel Grid.Row="2" Margin="12,0,12,16">
                             <Button x:Name="ThemeButton"
-                                    Height="36"
+                                    Height="34"
                                     Padding="12,0"
                                     HorizontalContentAlignment="Left"
                                     Style="{StaticResource MacSecondaryButton}"
                                     Content="Tema claro"
                                     AutomationProperties.Name="Alternar tema claro ou escuro"
                                     Click="ThemeButton_OnClick" />
-                            <TextBlock Margin="4,10,4,0"
-                                       Foreground="{DynamicResource TextTertiaryBrush}"
-                                       FontSize="11"
-                                       Text="Igor Silva" />
+                            <Border Margin="0,12,0,0"
+                                    Padding="0,10,0,0"
+                                    BorderThickness="0,1,0,0"
+                                    BorderBrush="{DynamicResource SeparatorBrush}">
+                                <StackPanel>
+                                    <TextBlock x:Name="AppVersionText"
+                                               Foreground="{DynamicResource TextTertiaryBrush}"
+                                               FontSize="11"
+                                               Text="v0.0.0" />
+                                    <TextBlock x:Name="PrivilegeModeText"
+                                               Margin="0,3,0,0"
+                                               Foreground="{DynamicResource TextTertiaryBrush}"
+                                               FontSize="11"
+                                               Text="Modo normal" />
+                                </StackPanel>
+                            </Border>
                         </StackPanel>
                     </Grid>
                 </Border>
@@ -203,8 +206,61 @@
                                    FontWeight="SemiBold"
                                    Text="Pronto." />
                     </Border>
+
+                    <controls:Snackbar x:Name="ShellSnackbar" Grid.Row="1" Grid.RowSpan="2" Panel.ZIndex="50" />
                 </Grid>
             </Grid>
+
+            <!-- Ctrl+K command palette overlay -->
+            <Border x:Name="CommandPaletteOverlay"
+                    Grid.Row="0"
+                    Grid.RowSpan="2"
+                    Background="#99000000"
+                    Visibility="Collapsed"
+                    Panel.ZIndex="100"
+                    MouseLeftButtonDown="CommandPaletteOverlay_OnMouseLeftButtonDown">
+                <Border Width="480"
+                        MaxHeight="380"
+                        Margin="0,90,0,0"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Top"
+                        Background="{DynamicResource CardBgBrush}"
+                        BorderBrush="{DynamicResource CardBorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="10"
+                        MouseLeftButtonDown="CommandPaletteBox_OnMouseLeftButtonDown">
+                    <StackPanel Margin="4">
+                        <TextBox x:Name="CommandPaletteInput"
+                                 Margin="10,10,10,6"
+                                 BorderThickness="0"
+                                 Background="Transparent"
+                                 FontSize="15"
+                                 TextChanged="CommandPaletteInput_OnTextChanged"
+                                 PreviewKeyDown="CommandPaletteInput_OnPreviewKeyDown" />
+                        <Border Height="1" Margin="4,0,4,4" Background="{DynamicResource SeparatorBrush}" />
+                        <ListBox x:Name="CommandPaletteList"
+                                 MaxHeight="290"
+                                 BorderThickness="0"
+                                 Background="Transparent"
+                                 PreviewMouseLeftButtonUp="CommandPaletteList_OnPreviewMouseLeftButtonUp">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel Margin="10,7">
+                                        <TextBlock Text="{Binding Title}"
+                                                   FontSize="13"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource TextPrimaryBrush}" />
+                                        <TextBlock Margin="0,2,0,0"
+                                                   Text="{Binding Subtitle}"
+                                                   FontSize="11"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </StackPanel>
+                </Border>
+            </Border>
         </Grid>
     </Border>
 </Window>

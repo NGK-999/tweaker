@@ -16,6 +16,7 @@ using Microsoft.Win32;
 using ApexTweaker.Minecraft.Models;
 using ApexTweaker.Minecraft.Services;
 using ApexTweaker.UI.Wpf.Animations;
+using ApexTweaker.UI.Wpf.Controls;
 using ApexTweaker.UI.Wpf.Theming;
 using ApexTweaker.UI.Wpf.Views;
 using ApexTweaker;
@@ -28,6 +29,7 @@ public partial class MainWindow : Window
 {
     private const string RiotSupportUrl = "https://support-valorant.riotgames.com/";
     private const string DashboardPageKey = "Dashboard";
+    private const string PerformancePageKey = "Performance";
     private const string ModulesPageKey = "Modules";
     private const string TelemetryPageKey = "Telemetry";
     private const string CatalogPageKey = "Catalog";
@@ -41,6 +43,8 @@ public partial class MainWindow : Window
     private readonly MasterRollbackService masterRollbackService = new();
     private readonly OptimizationEngine optimizationEngine = new();
     private readonly HardwareTelemetryService hardwareTelemetryService = new();
+    private readonly MarketUtilitiesService marketUtilitiesService = new();
+    private readonly WindowsOptimizationService windowsOptimizationService = new();
     private readonly MinecraftAuditService minecraftAuditService = new();
     private readonly MinecraftProfileService minecraftProfileService = new();
     private readonly MinecraftReportService minecraftReportService = new();
@@ -56,13 +60,12 @@ public partial class MainWindow : Window
     private readonly MinecraftSessionHookService minecraftSessionHookService = new();
     private readonly EtwFrameTracker etwFrameTracker;
     private DashboardView? dashboardView;
+    private PerformanceView? performanceView;
     private ModulesView? modulesView;
     private TelemetryView? telemetryView;
     private CatalogView? catalogView;
     private MinecraftView? minecraftView;
     private UtilitiesView? utilitiesView;
-    private readonly MarketUtilitiesService marketUtilitiesService = new();
-
     private readonly Dictionary<string, Func<FrameworkElement>> pageFactories = new(StringComparer.OrdinalIgnoreCase);
     private readonly List<string> consoleLines = [];
     private CancellationTokenSource? transitionCancellation;
@@ -86,6 +89,9 @@ public partial class MainWindow : Window
     private bool resourcesDisposed;
     private bool telemetryUiUpdateScheduled;
     private string? activePageKey;
+    private readonly List<CommandPaletteItem> commandPaletteItems = [];
+
+    private sealed record CommandPaletteItem(string Title, string Subtitle, Func<Task> Execute);
 
     public MainWindow()
     {
@@ -99,6 +105,7 @@ public partial class MainWindow : Window
         etwFrameTracker = new EtwFrameTracker(hardwareTelemetryService);
 
         pageFactories[DashboardPageKey] = () => Dashboard;
+        pageFactories[PerformancePageKey] = () => Performance;
         pageFactories[ModulesPageKey] = () => Modules;
         pageFactories[TelemetryPageKey] = () => Telemetry;
         pageFactories[CatalogPageKey] = () => Catalog;
@@ -110,6 +117,7 @@ public partial class MainWindow : Window
         Loaded += MainWindow_OnLoaded;
         Closing += MainWindow_OnClosing;
         StateChanged += (_, _) => UpdateMaximizeButtonIcon();
+        PreviewKeyDown += MainWindow_OnPreviewKeyDown;
     }
 
     private DashboardView Dashboard
@@ -125,6 +133,24 @@ public partial class MainWindow : Window
             dashboardView.AutoOptimizeRequested += RunAutoOptimizeAsync;
             dashboardView.CreateRestorePointRequested += CreateRestorePointAsync;
             return dashboardView;
+        }
+    }
+
+    private PerformanceView Performance
+    {
+        get
+        {
+            if (performanceView is not null)
+            {
+                return performanceView;
+            }
+
+            performanceView = new PerformanceView();
+            performanceView.SetValorantStatus(valorantLocator.FindExecutable());
+            performanceView.DisableVbsHvciRequested += DisableVbsHvciAsync;
+            performanceView.OptimizeFullscreenRequested += OptimizeFullscreenAsync;
+            performanceView.CompetitiveModeRequested += RunCompetitiveModeAsync;
+            return performanceView;
         }
     }
 
@@ -399,6 +425,7 @@ public partial class MainWindow : Window
         var headerTitle = pageKey switch
         {
             DashboardPageKey => "Dashboard",
+            PerformancePageKey => "Desempenho",
             ModulesPageKey => "M\u00F3dulos",
             TelemetryPageKey => "Telemetria",
             CatalogPageKey => "Catalogo",
@@ -410,8 +437,9 @@ public partial class MainWindow : Window
         {
             MinecraftPageKey => "Encontrar, preparar, testar e restaurar sem complexidade",
             TelemetryPageKey => "Frametime, sensores e comparacao antes/depois",
-            ModulesPageKey => "Ajustes individuais com snapshot e verificacao",
+            PerformancePageKey => "Estabilidade, 1% low e checagem de VBS/HVCI/HAGS/ReBAR",
             CatalogPageKey => "Analyze: regras, riscos e checklist BIOS (sem flash)",
+            ModulesPageKey => "Ajustes individuais com snapshot e verificacao",
             UtilitiesPageKey => "Rollback, limpeza, TRIM, reparo e suporte",
             _ => "Performance, telemetria e rollback transacional"
         };
@@ -446,12 +474,8 @@ public partial class MainWindow : Window
 
     private void SetActiveNav(WpfButton selectedButton)
     {
-        foreach (var button in new[] { DashboardButton, ModulesButton, TelemetryButton, CatalogButton, MinecraftButton, UtilitiesButton })
+        foreach (var button in new[] { DashboardButton, PerformanceButton, ModulesButton, TelemetryButton, CatalogButton, UtilitiesButton })
         {
-            if (button is null)
-            {
-                continue;
-            }
             button.Tag = ReferenceEquals(button, selectedButton) ? "Active" : null;
         }
     }
@@ -466,6 +490,7 @@ public partial class MainWindow : Window
 
         isTweaking = true;
         dashboardView?.SetBusy(true);
+        performanceView?.SetBusy(true);
         modulesView?.SetBusy(true);
         utilitiesView?.SetBusy(true);
         telemetryView?.SetBusy(true);
@@ -477,6 +502,7 @@ public partial class MainWindow : Window
     {
         isTweaking = false;
         dashboardView?.SetBusy(false);
+        performanceView?.SetBusy(false);
         modulesView?.SetBusy(false);
         utilitiesView?.SetBusy(false);
         telemetryView?.SetBusy(false);
@@ -558,10 +584,94 @@ public partial class MainWindow : Window
             createAutomaticBackup: false);
     }
 
+    // Advanced: VBS/HVCI disable requires explicit confirm + restart.
+    private Task DisableVbsHvciAsync()
+    {
+        if (System.Windows.MessageBox.Show(
+                "Desativar VBS/Memory Integrity (HVCI) reduz uma camada de seguranca do Windows " +
+                "em troca de menos overhead de virtualizacao. Isso exige reinicio do PC.\n\nContinuar?",
+                "Desativar VBS/HVCI - risco de seguranca",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning) != MessageBoxResult.Yes)
+        {
+            return Task.CompletedTask;
+        }
+
+        return RunTweakAsync(
+            "Desativar VBS/HVCI",
+            () => windowsOptimizationService.ApplyVbsMemoryIntegrityDisable(confirmed: true),
+            completionStatus: "VBS/HVCI: alteracao aplicada. Reinicio necessario.");
+    }
+
+    private Task OptimizeFullscreenAsync()
+    {
+        if (System.Windows.MessageBox.Show(
+                "Desliga Fullscreen Optimizations no exe do jogo (Valorant se detectado) e ajusta caminho competitivo. " +
+                "Reversivel via ledger.\n\nContinuar?",
+                "Otimizar tela cheia - confirmar",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning) != MessageBoxResult.Yes)
+        {
+            return Task.CompletedTask;
+        }
+
+        return RunTweakAsync(
+            "Fullscreen optimizations",
+            () => windowsOptimizationService.ApplyGameFullscreenOptimizationsOff(valorantLocator.FindExecutable()));
+    }
+
+    private Task RunCompetitiveModeAsync()
+    {
+        if (System.Windows.MessageBox.Show(
+                "Reduz Game Bar / captura / DVR para menos interferencia na partida. Reversivel.\n\nContinuar?",
+                "Modo competitivo - confirmar",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning) != MessageBoxResult.Yes)
+        {
+            return Task.CompletedTask;
+        }
+
+        return RunTweakAsync(
+            "Modo competitivo (overlays)",
+            () => windowsOptimizationService.ApplyCompetitiveCaptureQuiet());
+    }
+
+    /// <summary>
+    /// One-click from Modules: resolve instance → detect → audit → optimize (same pattern as other module buttons).
+    /// Stays on Modules; does not navigate to Minecraft page.
+    /// </summary>
+    private async Task RunMinecraftModuleOneClickAsync()
+    {
+        const string section = "Minecraft / Cobblemon";
+        _ = Minecraft;
+
+        var path = Minecraft.SelectedPath;
+        if (!minecraftInstanceService.TryResolve(path, out _))
+        {
+            await DetectMinecraftEasyInstanceAsync(string.Empty);
+            path = Minecraft.SelectedPath;
+        }
+
+        if (!minecraftInstanceService.TryResolve(path, out _))
+        {
+            WriteSection(section);
+            WriteLine("Nenhuma instancia Minecraft resolvida. Selecione a pasta e tente novamente.");
+            SetStatus($"{section}: instancia nao selecionada.");
+            return;
+        }
+
+        WriteSection(section);
+        SetStatus($"{section}: detectando, auditando e otimizando...");
+        await OptimizeMinecraftEasyAsync(path, extremeResolution: false, maximumFps: 24);
+    }
+
     private async Task HandleModuleRequestedAsync(string moduleKey)
     {
         switch (moduleKey)
         {
+            case MinecraftPageKey:
+                await RunMinecraftModuleOneClickAsync();
+                break;
             case "Energia":
                 await RunTweakAsync("Energia", () => tweakService.ApplyPowerTweaks());
                 break;
@@ -2131,6 +2241,172 @@ public partial class MainWindow : Window
     private void SetStatus(string message)
     {
         StatusText.Text = message;
+        ShellSnackbar.Show(message, ClassifySnackbarKind(message));
+    }
+
+    // ponytail: heuristica por palavra-chave em vez de tipar cada chamada de SetStatus (50+ pontos);
+    // cobre os casos do handoff (Aplicado / SKIP / falha / reinicio). Se a copy divergir muito, tipar viraria util.
+    private static SnackbarKind ClassifySnackbarKind(string message)
+    {
+        if (message.Contains("falha", StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("negado", StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("bloque", StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("reinicio necess", StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("reinicie", StringComparison.OrdinalIgnoreCase))
+        {
+            return SnackbarKind.Warning;
+        }
+
+        if (message.Contains("conclu", StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("aplicad", StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("restaurad", StringComparison.OrdinalIgnoreCase))
+        {
+            return SnackbarKind.Success;
+        }
+
+        return SnackbarKind.Info;
+    }
+
+    private void MainWindow_OnPreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.K && Keyboard.Modifiers == ModifierKeys.Control)
+        {
+            ToggleCommandPalette();
+            e.Handled = true;
+            return;
+        }
+
+        if (e.Key == Key.Escape && CommandPaletteOverlay.Visibility == Visibility.Visible)
+        {
+            CloseCommandPalette();
+            e.Handled = true;
+        }
+    }
+
+    private void ToggleCommandPalette()
+    {
+        if (CommandPaletteOverlay.Visibility == Visibility.Visible)
+        {
+            CloseCommandPalette();
+            return;
+        }
+
+        OpenCommandPalette();
+    }
+
+    private void OpenCommandPalette()
+    {
+        EnsureCommandPaletteItems();
+        CommandPaletteInput.Text = string.Empty;
+        FilterCommandPalette(string.Empty);
+        CommandPaletteOverlay.Visibility = Visibility.Visible;
+        Keyboard.Focus(CommandPaletteInput);
+    }
+
+    private void CloseCommandPalette()
+    {
+        CommandPaletteOverlay.Visibility = Visibility.Collapsed;
+    }
+
+    private void EnsureCommandPaletteItems()
+    {
+        if (commandPaletteItems.Count > 0)
+        {
+            return;
+        }
+
+        commandPaletteItems.AddRange(
+        [
+            new CommandPaletteItem("Dashboard", "Pagina inicial: status e Auto-Optimize", () => ShowPageAsync(DashboardPageKey, DashboardButton)),
+            new CommandPaletteItem("Desempenho", "VBS/HAGS/GameDVR e acoes de estabilidade", () => ShowPageAsync(PerformancePageKey, PerformanceButton)),
+            new CommandPaletteItem("Módulos", "Ajustes individuais por categoria", () => ShowPageAsync(ModulesPageKey, ModulesButton)),
+            new CommandPaletteItem("Telemetria", "Frametime e comparação antes/depois", () => ShowPageAsync(TelemetryPageKey, TelemetryButton)),
+            new CommandPaletteItem("Catalogo", "Analyze, riscos e checklist BIOS", () => ShowPageAsync(CatalogPageKey, CatalogButton)),
+            new CommandPaletteItem("Utilidades", "Rollback, suporte e desinstalação", () => ShowPageAsync(UtilitiesPageKey, UtilitiesButton)),
+            new CommandPaletteItem("CPU/Scheduler", "Tweak: prioridade e MMCSS para jogos", () => HandleModuleRequestedAsync("CPU/Scheduler")),
+            new CommandPaletteItem("GPU/Display", "Tweak: HAGS, Game Mode e tela cheia", () => HandleModuleRequestedAsync("GPU/Display")),
+            new CommandPaletteItem("Energia", "Tweak: plano de energia máximo", () => HandleModuleRequestedAsync("Energia")),
+            new CommandPaletteItem("Latência extrema", "Tweak avançado: scheduler agressivo", () => HandleModuleRequestedAsync("Latência extrema")),
+            new CommandPaletteItem("Input/USB", "Tweak: aceleração do mouse e USB", () => HandleModuleRequestedAsync("Input/USB")),
+            new CommandPaletteItem("Rede", "Tweak: limitação de rede e adaptadores", () => HandleModuleRequestedAsync("Rede")),
+            new CommandPaletteItem("Políticas/Serviços", "Tweak avançado: serviços do Windows", () => HandleModuleRequestedAsync("Políticas/Serviços")),
+            new CommandPaletteItem("GPU Windows", "Tweak: ajustes de GPU do Windows", () => HandleModuleRequestedAsync("GPU Windows")),
+            new CommandPaletteItem("GPU regedit", "Tweak: registro por fabricante, com backup", () => HandleModuleRequestedAsync("GPU regedit")),
+            new CommandPaletteItem("Background", "Tweak: Game DVR e painéis do Game Bar", () => HandleModuleRequestedAsync("Background")),
+            new CommandPaletteItem("UI noise", "Tweak mercado: menos ruido de UI", () => HandleModuleRequestedAsync("UI noise")),
+            new CommandPaletteItem("Memory", "Tweak mercado: memoria", () => HandleModuleRequestedAsync("Memory")),
+            new CommandPaletteItem("Rede avancada", "Tweak mercado: rede avancada", () => HandleModuleRequestedAsync("Rede avancada")),
+            new CommandPaletteItem("Debloat", "Tweak mercado: debloat condicional", () => HandleModuleRequestedAsync("Debloat")),
+            new CommandPaletteItem("Timer resolution", "Tweak avancado: BCD timer (reinicio)", () => HandleModuleRequestedAsync("Timer resolution")),
+            new CommandPaletteItem("Minecraft / Cobblemon", "Detectar, auditar e otimizar em um clique", () => HandleModuleRequestedAsync(MinecraftPageKey))
+        ]);
+    }
+
+    private void FilterCommandPalette(string query)
+    {
+        var filtered = string.IsNullOrWhiteSpace(query)
+            ? commandPaletteItems
+            : commandPaletteItems
+                .Where(item =>
+                    item.Title.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                    item.Subtitle.Contains(query, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+        CommandPaletteList.ItemsSource = filtered;
+        if (filtered.Count > 0)
+        {
+            CommandPaletteList.SelectedIndex = 0;
+        }
+    }
+
+    private void CommandPaletteInput_OnTextChanged(object sender, TextChangedEventArgs e)
+    {
+        FilterCommandPalette(CommandPaletteInput.Text);
+    }
+
+    private async void CommandPaletteInput_OnPreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        switch (e.Key)
+        {
+            case Key.Down when CommandPaletteList.Items.Count > 0:
+                CommandPaletteList.SelectedIndex = Math.Min(CommandPaletteList.SelectedIndex + 1, CommandPaletteList.Items.Count - 1);
+                e.Handled = true;
+                break;
+            case Key.Up when CommandPaletteList.Items.Count > 0:
+                CommandPaletteList.SelectedIndex = Math.Max(CommandPaletteList.SelectedIndex - 1, 0);
+                e.Handled = true;
+                break;
+            case Key.Enter:
+                await ExecuteSelectedCommandPaletteItemAsync();
+                e.Handled = true;
+                break;
+        }
+    }
+
+    private async void CommandPaletteList_OnPreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        await ExecuteSelectedCommandPaletteItemAsync();
+    }
+
+    private async Task ExecuteSelectedCommandPaletteItemAsync()
+    {
+        if (CommandPaletteList.SelectedItem is not CommandPaletteItem item)
+        {
+            return;
+        }
+
+        CloseCommandPalette();
+        await item.Execute();
+    }
+
+    private void CommandPaletteOverlay_OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        CloseCommandPalette();
+    }
+
+    private void CommandPaletteBox_OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        e.Handled = true;
     }
 
     private bool LatestMinecraftAuditMatches(string selectedPath)
@@ -2159,6 +2435,11 @@ public partial class MainWindow : Window
         await ShowPageAsync(DashboardPageKey, DashboardButton);
     }
 
+    private async void PerformanceButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        await ShowPageAsync(PerformancePageKey, PerformanceButton);
+    }
+
     private async void ModulesButton_OnClick(object sender, RoutedEventArgs e)
     {
         await ShowPageAsync(ModulesPageKey, ModulesButton);
@@ -2172,12 +2453,6 @@ public partial class MainWindow : Window
     private async void CatalogButton_OnClick(object sender, RoutedEventArgs e)
     {
         await ShowPageAsync(CatalogPageKey, CatalogButton);
-    }
-
-    private async void MinecraftButton_OnClick(object sender, RoutedEventArgs e)
-    {
-        await ShowPageAsync(MinecraftPageKey, MinecraftButton);
-        SetStatus(Minecraft.EasyStatusLine);
     }
 
     private async void UtilitiesButton_OnClick(object sender, RoutedEventArgs e)

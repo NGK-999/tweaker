@@ -14,6 +14,12 @@ internal sealed class WindowsOptimizationInventoryService : IWindowsOptimization
     private const string MdmAccountsPath = @"SOFTWARE\Microsoft\Provisioning\OMADM\Accounts";
     private const string UserShellFoldersPath =
         @"Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders";
+    private const string DeviceGuardPath = @"SYSTEM\CurrentControlSet\Control\DeviceGuard";
+    private const string HvciPath = @"SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity";
+    private const string GraphicsDriversPath = @"SYSTEM\CurrentControlSet\Control\GraphicsDrivers";
+    private const string GameBarPath = @"Software\Microsoft\GameBar";
+    private const string GameConfigStorePath = @"System\GameConfigStore";
+    private const string GameDvrPath = @"Software\Microsoft\Windows\CurrentVersion\GameDVR";
 
     public WindowsOptimizationContext Capture(WindowsUsageProfile? usage = null)
     {
@@ -53,6 +59,23 @@ internal sealed class WindowsOptimizationInventoryService : IWindowsOptimization
             deviceGuard.HypervisorPresent,
             hasOneDriveRedirection,
             inferredUsage);
+    }
+
+    public GamingPerformanceProbe CaptureGamingPerformanceProbe()
+    {
+        var deviceGuard = ReadDeviceGuard();
+        var hagsState = ReadHagsState();
+        var gameModeState = ReadGameModeState();
+        var gameDvrState = ReadGameDvrState();
+        var rebarProbe = ReadResizableBarProbe();
+
+        return new GamingPerformanceProbe(
+            ToFeatureState(deviceGuard.VbsEnabled, DeviceGuardPath, "EnableVirtualizationBasedSecurity"),
+            ToFeatureState(deviceGuard.MemoryIntegrityEnabled, HvciPath, "Enabled"),
+            hagsState,
+            gameModeState,
+            gameDvrState,
+            rebarProbe);
     }
 
     private static OperatingSystemInventory ReadOperatingSystem()
@@ -211,6 +234,93 @@ internal sealed class WindowsOptimizationInventoryService : IWindowsOptimization
         }
     }
 
+    private static RequestedFeatureState ReadHagsState()
+    {
+        if (!TryReadDword(Registry.LocalMachine, GraphicsDriversPath, "HwSchMode", out var value))
+        {
+            return RequestedFeatureState.Unknown;
+        }
+
+        return value switch
+        {
+            2 => RequestedFeatureState.Requested,
+            1 => RequestedFeatureState.NotRequested,
+            _ => RequestedFeatureState.Unknown
+        };
+    }
+
+    private static FeatureState ReadGameModeState()
+    {
+        var values = new List<int>();
+
+        if (TryReadDword(Registry.CurrentUser, GameBarPath, "AutoGameModeEnabled", out var autoMode))
+        {
+            values.Add(autoMode);
+        }
+
+        if (TryReadDword(Registry.CurrentUser, GameBarPath, "AllowAutoGameMode", out var allowMode))
+        {
+            values.Add(allowMode);
+        }
+
+        return ToFeatureState(values);
+    }
+
+    private static FeatureState ReadGameDvrState()
+    {
+        var values = new List<int>();
+
+        if (TryReadDword(Registry.CurrentUser, GameConfigStorePath, "GameDVR_Enabled", out var gameDvrEnabled))
+        {
+            values.Add(gameDvrEnabled);
+        }
+
+        if (TryReadDword(Registry.CurrentUser, GameDvrPath, "AppCaptureEnabled", out var appCaptureEnabled))
+        {
+            values.Add(appCaptureEnabled);
+        }
+
+        return ToFeatureState(values);
+    }
+
+    private static ResizableBarProbe ReadResizableBarProbe()
+    {
+        var checklist = BiosChecklistCatalog.Items.FirstOrDefault(item =>
+            string.Equals(item.Id, "bios.resizable-bar", StringComparison.OrdinalIgnoreCase));
+
+        try
+        {
+            using var searcher = new ManagementObjectSearcher(
+                "SELECT Name, PNPDeviceID FROM Win32_VideoController");
+            using var results = searcher.Get();
+            var hasDiscreteGpu = results.Cast<ManagementObject>()
+                .Select(gpu => gpu["Name"]?.ToString())
+                .Any(name =>
+                    !string.IsNullOrWhiteSpace(name) &&
+                    (name.Contains("NVIDIA", StringComparison.OrdinalIgnoreCase) ||
+                     name.Contains("AMD", StringComparison.OrdinalIgnoreCase) ||
+                     name.Contains("RADEON", StringComparison.OrdinalIgnoreCase) ||
+                     name.Contains("ARC", StringComparison.OrdinalIgnoreCase)));
+
+            if (!hasDiscreteGpu)
+            {
+                return new ResizableBarProbe(
+                    ResizableBarStatus.Unknown,
+                    "Best effort: sem GPU discreta detectada para inferencia de Resizable BAR.",
+                    checklist);
+            }
+        }
+        catch
+        {
+            // Best effort only; fall back to BIOS guidance below.
+        }
+
+        return new ResizableBarProbe(
+            ResizableBarStatus.Unknown,
+            "Best effort: Windows nao expoe um sinal confiavel de Resizable BAR neste inventario; validar na BIOS/driver.",
+            checklist);
+    }
+
     private static bool DetectMdmEnrollment()
     {
         try
@@ -282,6 +392,71 @@ internal sealed class WindowsOptimizationInventoryService : IWindowsOptimization
             IsCorporateComputer = domainJoined || mdmManaged ? UsageAnswer.Yes : UsageAnswer.Unknown,
             UsesOneDrive = hasOneDriveRedirection ? UsageAnswer.Yes : UsageAnswer.Unknown
         };
+    }
+
+    private static FeatureState ToFeatureState(bool enabled, string path, string valueName)
+    {
+        if (!ValueExists(Registry.LocalMachine, path, valueName))
+        {
+            return enabled ? FeatureState.Enabled : FeatureState.Unknown;
+        }
+
+        return enabled ? FeatureState.Enabled : FeatureState.Disabled;
+    }
+
+    private static FeatureState ToFeatureState(IReadOnlyCollection<int> values)
+    {
+        if (values.Count == 0)
+        {
+            return FeatureState.Unknown;
+        }
+
+        if (values.Any(value => value > 0))
+        {
+            return FeatureState.Enabled;
+        }
+
+        return FeatureState.Disabled;
+    }
+
+    private static bool TryReadDword(RegistryKey root, string path, string name, out int value)
+    {
+        value = default;
+
+        try
+        {
+            using var key = root.OpenSubKey(path);
+            if (key?.GetValue(name) is not { } rawValue)
+            {
+                return false;
+            }
+
+            value = rawValue switch
+            {
+                int intValue => intValue,
+                long longValue => checked((int)longValue),
+                _ => Convert.ToInt32(rawValue, CultureInfo.InvariantCulture)
+            };
+            return true;
+        }
+        catch
+        {
+            value = default;
+            return false;
+        }
+    }
+
+    private static bool ValueExists(RegistryKey root, string path, string name)
+    {
+        try
+        {
+            using var key = root.OpenSubKey(path);
+            return key?.GetValue(name) is not null;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private static string ReadString(RegistryKey? key, string name, string fallback) =>

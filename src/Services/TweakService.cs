@@ -17,6 +17,8 @@ internal sealed class TweakService
     private const string GameBarPath = @"Software\Microsoft\GameBar";
     private const string GameConfigStorePath = @"System\GameConfigStore";
     private const string GameDvrPath = @"Software\Microsoft\Windows\CurrentVersion\GameDVR";
+    private const string DeviceGuardPath = @"SYSTEM\CurrentControlSet\Control\DeviceGuard";
+    private const string HvciPath = @"SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity";
     private const string EdgePoliciesPath = @"SOFTWARE\Policies\Microsoft\Edge";
     private const string DwmPath = @"SOFTWARE\Microsoft\Windows\Dwm";
     private const string DesktopPath = @"Control Panel\Desktop";
@@ -55,6 +57,7 @@ internal sealed class TweakService
     private readonly MutationExecutor mutationExecutor;
     private readonly GpuOptimizationService gpuOptimizationService = new();
     private readonly OptimizationEngine optimizationEngine = new();
+    private readonly ValorantLocator valorantLocator = new();
 
     public TweakService()
     {
@@ -246,6 +249,118 @@ internal sealed class TweakService
 
         log.Add("Reinicie o PC antes de medir FPS, input lag ou stutter.");
         return log;
+    }
+
+    public IReadOnlyList<string> ApplyVbsMemoryIntegrityDisable(bool confirmed)
+    {
+        if (!confirmed)
+        {
+            return ["[SKIP] VBS/HVCI exige confirmacao explicita antes de qualquer mutacao."];
+        }
+
+        return RunMutationPipeline("VBS/HVCI off", () =>
+        {
+            var log = new List<string>
+            {
+                "VBS/HVCI: desativando Device Guard e Memory Integrity. Reinicio obrigatorio."
+            };
+
+            AddSystemRestorePointIfCurrentRootMutation("VBS/HVCI off", log);
+            TrySetDwordIfDifferent(
+                Registry.LocalMachine,
+                DeviceGuardPath,
+                "EnableVirtualizationBasedSecurity",
+                0,
+                "VBS desativado no Device Guard.",
+                "[SKIP] VBS ja estava desativado no Device Guard.",
+                log);
+            TrySetDwordIfDifferent(
+                Registry.LocalMachine,
+                HvciPath,
+                "Enabled",
+                0,
+                "Memory Integrity / HVCI desativado no cenario do Device Guard.",
+                "[SKIP] Memory Integrity / HVCI ja estava desativado.",
+                log);
+            log.Add("Reinicie o Windows para confirmar a mudanca no hypervisor e nas politicas de Device Guard.");
+            return log;
+        });
+    }
+
+    public IReadOnlyList<string> ApplyGameFullscreenOptimizationsOff(string? exePath)
+    {
+        var targetPath = ResolveTargetGameExecutable(exePath);
+        if (targetPath is null)
+        {
+            return ["[SKIP] Executavel nao informado e VALORANT nao foi localizado automaticamente."];
+        }
+
+        if (!File.Exists(targetPath))
+        {
+            return [$"[ERRO] Executavel nao encontrado: {targetPath}"];
+        }
+
+        return RunMutationPipeline("Fullscreen optimizations per game", () =>
+        {
+            var log = new List<string>
+            {
+                $"FSO per game: avaliando {targetPath}"
+            };
+
+            if (HasFullscreenOptimizationDisabled(targetPath))
+            {
+                log.Add($"[SKIP] Fullscreen optimizations ja estava desativado para {Path.GetFileName(targetPath)}.");
+                return log;
+            }
+
+            DisableFullscreenOptimizations(targetPath, log);
+            return log;
+        });
+    }
+
+    public IReadOnlyList<string> ApplyCompetitiveCaptureQuiet()
+    {
+        return RunMutationPipeline("Competitive capture quiet", () =>
+        {
+            var log = new List<string>
+            {
+                "Competitive overlays: reduzindo Game Bar, DVR e captura em segundo plano sem remover componentes."
+            };
+
+            TrySetDwordIfDifferent(
+                Registry.CurrentUser,
+                GameBarPath,
+                "ShowStartupPanel",
+                0,
+                "Painel inicial do Game Bar desativado.",
+                "[SKIP] Painel inicial do Game Bar ja estava desativado.",
+                log);
+            TrySetDwordIfDifferent(
+                Registry.CurrentUser,
+                GameBarPath,
+                "UseNexusForGameBarEnabled",
+                0,
+                "Atalho/overlay Nexus da Game Bar desativado.",
+                "[SKIP] Atalho/overlay Nexus da Game Bar ja estava desativado.",
+                log);
+            TrySetDwordIfDifferent(
+                Registry.CurrentUser,
+                GameDvrPath,
+                "AppCaptureEnabled",
+                0,
+                "Captura Game DVR desligada via AppCaptureEnabled=0.",
+                "[SKIP] Captura Game DVR ja estava desligada.",
+                log);
+            TrySetDwordIfDifferent(
+                Registry.CurrentUser,
+                GameConfigStorePath,
+                "GameDVR_Enabled",
+                0,
+                "Game DVR desligado no GameConfigStore.",
+                "[SKIP] Game DVR ja estava desligado no GameConfigStore.",
+                log);
+            return log;
+        });
     }
 
     public IReadOnlyList<string> ApplyPowerTweaks()
@@ -565,6 +680,16 @@ internal sealed class TweakService
         using var key = Registry.CurrentUser.OpenSubKey(AppCompatLayersPath);
         var value = key?.GetValue(exePath)?.ToString() ?? string.Empty;
         return value.Contains(DisableFullscreenOptimizationFlag, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private string? ResolveTargetGameExecutable(string? exePath)
+    {
+        if (!string.IsNullOrWhiteSpace(exePath))
+        {
+            return exePath;
+        }
+
+        return valorantLocator.FindExecutable();
     }
 
     public IReadOnlyList<string> ApplyAutonomousOptimization(string? valorantExePath, HardwareInfo? hardware = null)
@@ -1365,6 +1490,24 @@ internal sealed class TweakService
                 successMessage,
                 $"Falha ao alterar {path}\\{name}"),
             log);
+    }
+
+    private void TrySetDwordIfDifferent(
+        RegistryKey root,
+        string path,
+        string name,
+        int value,
+        string successMessage,
+        string skipMessage,
+        List<string> log)
+    {
+        if (RegistryService.TryReadDword(root, path, name, out var currentValue) && currentValue == value)
+        {
+            log.Add(skipMessage);
+            return;
+        }
+
+        TrySetDword(root, path, name, value, successMessage, log);
     }
 
     private void TrySetString(RegistryKey root, string path, string name, string value, string successMessage, List<string> log)

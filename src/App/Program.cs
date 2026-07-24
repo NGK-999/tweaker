@@ -20,6 +20,12 @@ internal static class Program
             return;
         }
 
+        if (args.Any(a => string.Equals(a, "--gaming-fps-probe-self-test", StringComparison.OrdinalIgnoreCase)))
+        {
+            Environment.ExitCode = GamingFpsProbeSelfTest.Run();
+            return;
+        }
+
         if (MinecraftCommandLine.TryRun(args, out var exitCode))
         {
             Environment.ExitCode = exitCode;

@@ -55,6 +55,27 @@ internal enum UsageAnswer
     Yes
 }
 
+internal enum FeatureState
+{
+    Unknown,
+    Disabled,
+    Enabled
+}
+
+internal enum RequestedFeatureState
+{
+    Unknown,
+    NotRequested,
+    Requested
+}
+
+internal enum ResizableBarStatus
+{
+    Unknown,
+    DisabledOrUnsupported,
+    Enabled
+}
+
 internal enum WindowsDeviceKind
 {
     Unknown,
@@ -154,6 +175,19 @@ internal sealed record WindowsOptimizationContext(
     bool IsHypervisorPresent,
     bool HasOneDriveFolderRedirection,
     WindowsUsageProfile Usage);
+
+internal sealed record ResizableBarProbe(
+    ResizableBarStatus Status,
+    string Summary,
+    BiosChecklistItem? Checklist);
+
+internal sealed record GamingPerformanceProbe(
+    FeatureState VbsState,
+    FeatureState MemoryIntegrityState,
+    RequestedFeatureState HagsState,
+    FeatureState GameModeState,
+    FeatureState GameDvrState,
+    ResizableBarProbe ResizableBar);
 
 internal sealed record AdmxPolicyReference(
     string AdmxFile,

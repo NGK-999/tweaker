@@ -15,6 +15,14 @@ internal static class PageTransitionAnimator
     private static readonly IEasingFunction EnterMotion = UiMotion.EaseOut;
     private static readonly IEasingFunction ExitMotion = UiMotion.EaseIn;
 
+    // A cancelled transition's cleanup resumes via the WPF dispatcher, which can land
+    // after a newer transition has already taken ownership of host.Content. This token
+    // lets a stale cleanup detect that and skip touching host.Content instead of
+    // clobbering whatever the newer transition already put there.
+    // ponytail: single global slot assumes one animated host (PageHost); key by host
+    // (ConditionalWeakTable) if a second ContentControl ever needs transitions.
+    private static object? activeTransition;
+
     public static async Task ShowAsync(
         ContentControl host,
         FrameworkElement incoming,
@@ -28,6 +36,9 @@ internal static class PageTransitionAnimator
         }
 
         cancellationToken.ThrowIfCancellationRequested();
+
+        var transitionToken = new object();
+        activeTransition = transitionToken;
 
         if (host.Content is FrameworkElement current && ReferenceEquals(current, incoming))
         {
@@ -79,14 +90,23 @@ internal static class PageTransitionAnimator
         {
             DisableAnimationCache(outgoing);
             DisableAnimationCache(incoming);
-            PreparePage(outgoing);
-            PreparePage(incoming);
-            host.Content = outgoing;
+
+            if (ReferenceEquals(activeTransition, transitionToken))
+            {
+                PreparePage(outgoing);
+                host.Content = outgoing;
+            }
+
             throw;
         }
 
         DisableAnimationCache(outgoing);
         DisableAnimationCache(incoming);
+
+        if (!ReferenceEquals(activeTransition, transitionToken))
+        {
+            return;
+        }
 
         stage.Children.Remove(outgoing);
         stage.Children.Remove(incoming);

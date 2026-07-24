@@ -7,6 +7,7 @@ namespace ApexTweaker.Services;
 internal sealed class WindowsOptimizationService
 {
     private readonly WindowsOptimizationApplicationFacade application;
+    private readonly TweakService tweaks = new();
 
     public WindowsOptimizationService()
         : this(
@@ -29,5 +30,25 @@ internal sealed class WindowsOptimizationService
         WindowsUsageProfile? usage = null)
     {
         return application.Analyze(preset, usage);
+    }
+
+    public GamingPerformanceProbe CaptureGamingPerformanceProbe()
+    {
+        return application.CaptureGamingPerformanceProbe();
+    }
+
+    public IReadOnlyList<string> ApplyVbsMemoryIntegrityDisable(bool confirmed)
+    {
+        return tweaks.ApplyVbsMemoryIntegrityDisable(confirmed);
+    }
+
+    public IReadOnlyList<string> ApplyGameFullscreenOptimizationsOff(string? exePath)
+    {
+        return tweaks.ApplyGameFullscreenOptimizationsOff(exePath);
+    }
+
+    public IReadOnlyList<string> ApplyCompetitiveCaptureQuiet()
+    {
+        return tweaks.ApplyCompetitiveCaptureQuiet();
     }
 }

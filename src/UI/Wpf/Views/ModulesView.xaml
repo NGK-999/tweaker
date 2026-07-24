@@ -1,6 +1,7 @@
 <UserControl x:Class="ApexTweaker.UI.Wpf.Views.ModulesView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="clr-namespace:ApexTweaker.UI.Wpf.Controls"
              Background="{DynamicResource ContentBgBrush}"
              FontFamily="Segoe UI Variable Display, Segoe UI, Arial">
     <UserControl.Resources>
@@ -12,42 +13,176 @@
     </UserControl.Resources>
 
     <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <Border Style="{StaticResource MacCardStyle}">
-            <StackPanel>
+        <StackPanel Margin="0,0,8,12">
                 <TextBlock Style="{StaticResource MacSectionLabel}"
                            Text="M&#x00D3;DULOS" />
                 <TextBlock Margin="0,6,0,0"
                            Style="{StaticResource MacPageTitle}"
-                           FontSize="22"
+                           FontSize="20"
                            Text="Ajustes individuais" />
+                <TextBlock Margin="0,4,0,0"
+                           Style="{StaticResource MacBodyText}"
+                           FontSize="13"
+                           Text="Cada bot&#x00E3;o aplica um snapshot antes de alterar e pode ser revertido em Utilidades." />
 
-                <TextBlock Margin="0,24,0,10"
+                <TextBlock Margin="0,26,0,2"
                            Style="{StaticResource MacSectionTitle}"
-                           Text="Core" />
-                <WrapPanel x:Name="CoreButtonsPanel">
-                    <Button Style="{StaticResource MacModuleButton}" Tag="CPU/Scheduler" Content="CPU/Scheduler" Click="ModuleButton_OnClick" />
-                    <Button Style="{StaticResource MacModuleButton}" Tag="GPU/Display" Content="GPU/Display" Click="ModuleButton_OnClick" />
-                    <Button Style="{StaticResource MacModuleButton}" Tag="Energia" Content="Energia" Click="ModuleButton_OnClick" />
-                    <Button Style="{StaticResource MacModuleButton}" Tag="Lat&#x00EA;ncia extrema" Content="Lat&#x00EA;ncia extrema" Click="ModuleButton_OnClick" />
-                </WrapPanel>
+                           Text="CPU e energia" />
+                <TextBlock Margin="0,0,0,10"
+                           Style="{StaticResource MacBodyText}"
+                           FontSize="12"
+                           Text="Afinidade, prioridade e perfil de energia durante o jogo." />
+                <StackPanel x:Name="CoreButtonsPanel">
+                    <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="176" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Margin="0" Style="{StaticResource MacModuleButton}" Tag="CPU/Scheduler" Content="CPU/Scheduler" Click="ModuleButton_OnClick" />
+                        <TextBlock Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center" Style="{StaticResource MacBodyText}" FontSize="12" Text="Prioridade e agendamento MMCSS para jogos." />
+                        <controls:RiskBadge Grid.Column="2" Margin="8,0,0,0" Level="Safe" />
+                    </Grid>
+                    <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="176" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Margin="0" Style="{StaticResource MacModuleButton}" Tag="GPU/Display" Content="GPU/Display" Click="ModuleButton_OnClick" />
+                        <TextBlock Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center" Style="{StaticResource MacBodyText}" FontSize="12" Text="HAGS, Game Mode e otimiza&#x00E7;&#x00F5;es de tela cheia." />
+                        <controls:RiskBadge Grid.Column="2" Margin="8,0,0,0" Level="Safe" />
+                    </Grid>
+                    <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="176" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Margin="0" Style="{StaticResource MacModuleButton}" Tag="Energia" Content="Energia" Click="ModuleButton_OnClick" />
+                        <TextBlock Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center" Style="{StaticResource MacBodyText}" FontSize="12" Text="Plano de energia m&#x00E1;ximo e resfriamento ativo." />
+                        <controls:RiskBadge Grid.Column="2" Margin="8,0,0,0" Level="Safe" />
+                    </Grid>
+                    <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="176" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Margin="0" Style="{StaticResource MacModuleButton}" Tag="Lat&#x00EA;ncia extrema" Content="Lat&#x00EA;ncia extrema" Click="ModuleButton_OnClick" />
+                        <TextBlock Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center" Style="{StaticResource MacBodyText}" FontSize="12" Text="Perfil agressivo de energia e scheduler; aumenta consumo." />
+                        <controls:RiskBadge Grid.Column="2" Margin="8,0,0,0" Level="Advanced" />
+                    </Grid>
+                </StackPanel>
 
-                <TextBlock Margin="0,8,0,10"
+                <TextBlock Margin="0,18,0,2"
                            Style="{StaticResource MacSectionTitle}"
                            Text="Rede e perif&#x00E9;ricos" />
-                <WrapPanel x:Name="PeripheralButtonsPanel">
-                    <Button Style="{StaticResource MacModuleButton}" Tag="Input/USB" Content="Input/USB" Click="ModuleButton_OnClick" />
-                    <Button Style="{StaticResource MacModuleButton}" Tag="Rede" Content="Rede" Click="ModuleButton_OnClick" />
-                    <Button Style="{StaticResource MacModuleButton}" Tag="Pol&#x00ED;ticas/Servi&#x00E7;os" Content="Pol&#x00ED;ticas/Servi&#x00E7;os" Click="ModuleButton_OnClick" />
-                </WrapPanel>
+                <TextBlock Margin="0,0,0,10"
+                           Style="{StaticResource MacBodyText}"
+                           FontSize="12"
+                           Text="Entrada, lat&#x00EA;ncia de rede e pol&#x00ED;ticas do sistema." />
+                <StackPanel x:Name="PeripheralButtonsPanel">
+                    <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="176" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Margin="0" Style="{StaticResource MacModuleButton}" Tag="Input/USB" Content="Input/USB" Click="ModuleButton_OnClick" />
+                        <TextBlock Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center" Style="{StaticResource MacBodyText}" FontSize="12" Text="Remove acelera&#x00E7;&#x00E3;o do mouse e suspens&#x00E3;o seletiva de USB." />
+                        <controls:RiskBadge Grid.Column="2" Margin="8,0,0,0" Level="Safe" />
+                    </Grid>
+                    <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="176" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Margin="0" Style="{StaticResource MacModuleButton}" Tag="Rede" Content="Rede" Click="ModuleButton_OnClick" />
+                        <TextBlock Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center" Style="{StaticResource MacBodyText}" FontSize="12" Text="Reduz limita&#x00E7;&#x00E3;o de rede e ajusta adaptadores." />
+                        <controls:RiskBadge Grid.Column="2" Margin="8,0,0,0" Level="Safe" />
+                    </Grid>
+                    <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="176" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Margin="0" Style="{StaticResource MacModuleButton}" Tag="Pol&#x00ED;ticas/Servi&#x00E7;os" Content="Pol&#x00ED;ticas/Servi&#x00E7;os" Click="ModuleButton_OnClick" />
+                        <TextBlock Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center" Style="{StaticResource MacBodyText}" FontSize="12" Text="Desliga servi&#x00E7;os e pol&#x00ED;ticas do Windows (Xbox, Busca, WER)." />
+                        <controls:RiskBadge Grid.Column="2"
+                                             Margin="8,0,0,0"
+                                             Level="Advanced"
+                                             ToolTip="Altera servi&#x00E7;os do Windows. Revis&#x00E3;o antes de aplicar recomendada." />
+                    </Grid>
+                </StackPanel>
 
-                <TextBlock Margin="0,8,0,10"
+                <TextBlock Margin="0,18,0,2"
                            Style="{StaticResource MacSectionTitle}"
                            Text="GPU e background" />
-                <WrapPanel x:Name="GpuButtonsPanel">
-                    <Button Style="{StaticResource MacModuleButton}" Tag="GPU Windows" Content="GPU Windows" Click="ModuleButton_OnClick" />
-                    <Button Style="{StaticResource MacModuleButton}" Tag="GPU regedit" Content="GPU regedit" Click="ModuleButton_OnClick" />
-                    <Button Style="{StaticResource MacModuleButton}" Tag="Background" Content="Background" Click="ModuleButton_OnClick" />
-                </WrapPanel>
+                <TextBlock Margin="0,0,0,10"
+                           Style="{StaticResource MacBodyText}"
+                           FontSize="12"
+                           Text="Perfil de driver e ru&#x00ED;do de fundo do Windows." />
+                <StackPanel x:Name="GpuButtonsPanel">
+                    <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="176" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Margin="0" Style="{StaticResource MacModuleButton}" Tag="GPU Windows" Content="GPU Windows" Click="ModuleButton_OnClick" />
+                        <TextBlock Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center" Style="{StaticResource MacBodyText}" FontSize="12" Text="Aplica ajustes de GPU expostos pelo pr&#x00F3;prio Windows." />
+                        <controls:RiskBadge Grid.Column="2" Margin="8,0,0,0" Level="Safe" />
+                    </Grid>
+                    <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="176" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Margin="0" Style="{StaticResource MacModuleButton}" Tag="GPU regedit" Content="GPU regedit" Click="ModuleButton_OnClick" />
+                        <TextBlock Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center" Style="{StaticResource MacBodyText}" FontSize="12" Text="Ajustes de Registro por fabricante de GPU, com backup .reg." />
+                        <controls:RiskBadge Grid.Column="2" Margin="8,0,0,0" Level="Advanced" />
+                    </Grid>
+                    <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="176" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Margin="0" Style="{StaticResource MacModuleButton}" Tag="Background" Content="Background" Click="ModuleButton_OnClick" />
+                        <TextBlock Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center" Style="{StaticResource MacBodyText}" FontSize="12" Text="Desliga Game DVR/App Capture e reduz pain&#x00E9;is do Game Bar." />
+                        <controls:RiskBadge Grid.Column="2" Margin="8,0,0,0" Level="Safe" />
+                    </Grid>
+                </StackPanel>
+
+                <TextBlock Margin="0,18,0,2"
+                           Style="{StaticResource MacSectionTitle}"
+                           Text="Jogos / Ferramentas" />
+                <TextBlock Margin="0,0,0,10"
+                           Style="{StaticResource MacBodyText}"
+                           FontSize="12"
+                           Text="Mesmo padr&#x00E3;o dos outros m&#x00F3;dulos: um clique executa o fluxo." />
+                <StackPanel x:Name="GamesButtonsPanel">
+                    <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="176" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0"
+                                Margin="0"
+                                Style="{StaticResource MacModuleButton}"
+                                Tag="Minecraft"
+                                Content="Minecraft / Cobblemon"
+                                AutomationProperties.Name="Executar otimizacao Minecraft e Cobblemon"
+                                Click="ModuleButton_OnClick" />
+                        <TextBlock Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center" Style="{StaticResource MacBodyText}" FontSize="12" Text="Detecta instancia, audita mods e aplica perfil (pede confirmacao antes de gravar)." />
+                        <controls:RiskBadge Grid.Column="2" Margin="8,0,0,0" Level="Safe" />
+                    </Grid>
+                </StackPanel>
 
                 <TextBlock Margin="0,16,0,10"
                            Style="{StaticResource MacSectionTitle}"
@@ -60,6 +195,5 @@
                     <Button Style="{StaticResource MacModuleButton}" Tag="Timer resolution" Content="Timer resolution" Click="ModuleButton_OnClick" />
                 </WrapPanel>
             </StackPanel>
-        </Border>
     </ScrollViewer>
 </UserControl>

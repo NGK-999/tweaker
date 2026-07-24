@@ -2,42 +2,42 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
     <!-- Shared theme tokens. AppThemeManager swaps these values in-place. -->
-    <Color x:Key="WindowBgColor">#1C1C1E</Color>
-    <Color x:Key="SidebarBgColor">#252528</Color>
-    <Color x:Key="ContentBgColor">#1C1C1E</Color>
-    <Color x:Key="CardBgColor">#2C2C2E</Color>
-    <Color x:Key="CardElevatedColor">#3A3A3C</Color>
-    <Color x:Key="CardBorderColor">#48484A</Color>
-    <Color x:Key="AccentColor">#0A84FF</Color>
-    <Color x:Key="AccentPressedColor">#007BEA</Color>
-    <Color x:Key="AccentHoverColor">#1A94FF</Color>
-    <Color x:Key="TextPrimaryColor">#F5F5F7</Color>
-    <Color x:Key="TextSecondaryColor">#A7A7AD</Color>
-    <Color x:Key="TextTertiaryColor">#94949B</Color>
-    <Color x:Key="SeparatorColor">#38383A</Color>
-    <Color x:Key="DestructiveColor">#FF5A52</Color>
-    <Color x:Key="DestructiveHoverColor">#FF756B</Color>
-    <Color x:Key="SuccessColor">#30D158</Color>
-    <Color x:Key="WarningColor">#F5B942</Color>
-    <Color x:Key="ErrorColor">#FF756B</Color>
+    <Color x:Key="WindowBgColor">#17181B</Color>
+    <Color x:Key="SidebarBgColor">#141517</Color>
+    <Color x:Key="ContentBgColor">#1B1D21</Color>
+    <Color x:Key="CardBgColor">#212328</Color>
+    <Color x:Key="CardElevatedColor">#2A2D33</Color>
+    <Color x:Key="CardBorderColor">#2E3138</Color>
+    <Color x:Key="AccentColor">#4B9E9E</Color>
+    <Color x:Key="AccentPressedColor">#3A8484</Color>
+    <Color x:Key="AccentHoverColor">#5CB0B0</Color>
+    <Color x:Key="TextPrimaryColor">#EDEEF0</Color>
+    <Color x:Key="TextSecondaryColor">#9AA0AC</Color>
+    <Color x:Key="TextTertiaryColor">#6C7280</Color>
+    <Color x:Key="SeparatorColor">#2A2D33</Color>
+    <Color x:Key="DestructiveColor">#E5534B</Color>
+    <Color x:Key="DestructiveHoverColor">#EF6B63</Color>
+    <Color x:Key="SuccessColor">#4CAF7D</Color>
+    <Color x:Key="WarningColor">#D8A657</Color>
+    <Color x:Key="ErrorColor">#EF6B63</Color>
     <Color x:Key="TrafficRedColor">#FF5F57</Color>
     <Color x:Key="TrafficYellowColor">#FEBC2E</Color>
     <Color x:Key="TrafficGreenColor">#28C840</Color>
-    <Color x:Key="ChartBgColor">#1A1A1C</Color>
-    <Color x:Key="NavHoverColor">#3A3A3C</Color>
-    <Color x:Key="NavActiveColor">#48484A</Color>
-    <Color x:Key="SecondaryHoverColor">#454547</Color>
-    <Color x:Key="ControlBgColor">#202024</Color>
-    <Color x:Key="ControlDisabledColor">#323238</Color>
-    <Color x:Key="SelectionColor">#184A73</Color>
-    <Color x:Key="FocusColor">#65B1FF</Color>
-    <Color x:Key="InfoSurfaceColor">#13283D</Color>
-    <Color x:Key="SuccessSurfaceColor">#153126</Color>
-    <Color x:Key="WarningSurfaceColor">#302817</Color>
-    <Color x:Key="ErrorSurfaceColor">#351D22</Color>
-    <Color x:Key="PanelBgColor">#101B2B</Color>
-    <Color x:Key="PanelBorderColor">#2B3D58</Color>
-    <Color x:Key="OnAccentTextColor">#08111E</Color>
+    <Color x:Key="ChartBgColor">#17181B</Color>
+    <Color x:Key="NavHoverColor">#1E2024</Color>
+    <Color x:Key="NavActiveColor">#20282A</Color>
+    <Color x:Key="SecondaryHoverColor">#31343B</Color>
+    <Color x:Key="ControlBgColor">#1B1D21</Color>
+    <Color x:Key="ControlDisabledColor">#26282E</Color>
+    <Color x:Key="SelectionColor">#1F3B3B</Color>
+    <Color x:Key="FocusColor">#5CB0B0</Color>
+    <Color x:Key="InfoSurfaceColor">#182A2A</Color>
+    <Color x:Key="SuccessSurfaceColor">#16261E</Color>
+    <Color x:Key="WarningSurfaceColor">#2A2317</Color>
+    <Color x:Key="ErrorSurfaceColor">#2C1D1B</Color>
+    <Color x:Key="PanelBgColor">#1B1D21</Color>
+    <Color x:Key="PanelBorderColor">#2E3138</Color>
+    <Color x:Key="OnAccentTextColor">#0B1414</Color>
 
     <SolidColorBrush x:Key="WindowBgBrush" Color="{StaticResource WindowBgColor}" />
     <SolidColorBrush x:Key="SidebarBgBrush" Color="{StaticResource SidebarBgColor}" />
@@ -102,9 +102,9 @@
     <Style x:Key="MacCardStyle" TargetType="Border">
         <Setter Property="Background" Value="{DynamicResource CardBgBrush}" />
         <Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}" />
-        <Setter Property="BorderThickness" Value="0.5" />
-        <Setter Property="CornerRadius" Value="16" />
-        <Setter Property="Padding" Value="24" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="Padding" Value="20" />
         <Setter Property="SnapsToDevicePixels" Value="True" />
     </Style>
 
@@ -112,20 +112,20 @@
     <Style x:Key="MacPageTitle" TargetType="TextBlock">
         <Setter Property="FontFamily" Value="{StaticResource MacFont}" />
         <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
-        <Setter Property="FontSize" Value="26" />
+        <Setter Property="FontSize" Value="24" />
         <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
 
     <Style x:Key="MacSectionTitle" TargetType="TextBlock">
         <Setter Property="FontFamily" Value="{StaticResource MacFont}" />
         <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
-        <Setter Property="FontSize" Value="15" />
+        <Setter Property="FontSize" Value="14" />
         <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
 
     <Style x:Key="MacSectionLabel" TargetType="TextBlock">
         <Setter Property="FontFamily" Value="{StaticResource MacFont}" />
-        <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource TextTertiaryBrush}" />
         <Setter Property="FontSize" Value="11" />
         <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
@@ -170,7 +170,7 @@
                     <Grid x:Name="RootGrid" SnapsToDevicePixels="True">
                         <Border x:Name="RootBorder"
                                 Background="{DynamicResource AccentBrush}"
-                                CornerRadius="12"
+                                CornerRadius="8"
                                 RenderTransformOrigin="0.5,0.5">
                             <Border.RenderTransform>
                                 <ScaleTransform ScaleX="1" ScaleY="1" />
@@ -178,12 +178,12 @@
                         </Border>
                         <Border x:Name="HoverOverlay"
                                 Background="{DynamicResource AccentHoverBrush}"
-                                CornerRadius="12"
+                                CornerRadius="8"
                                 Opacity="0"
                                 IsHitTestVisible="False" />
                         <Border x:Name="PressOverlay"
                                 Background="{DynamicResource AccentPressedBrush}"
-                                CornerRadius="12"
+                                CornerRadius="8"
                                 Opacity="0"
                                 IsHitTestVisible="False" />
                         <ContentPresenter HorizontalAlignment="Center"
@@ -282,7 +282,7 @@
                                 Background="{DynamicResource CardElevatedBrush}"
                                 BorderBrush="{DynamicResource CardBorderBrush}"
                                 BorderThickness="0.5"
-                                CornerRadius="10"
+                                CornerRadius="8"
                                 RenderTransformOrigin="0.5,0.5">
                             <Border.RenderTransform>
                                 <ScaleTransform ScaleX="1" ScaleY="1" />
@@ -290,7 +290,7 @@
                         </Border>
                         <Border x:Name="HoverOverlay"
                                 Background="{DynamicResource SecondaryHoverBrush}"
-                                CornerRadius="10"
+                                CornerRadius="8"
                                 Opacity="0"
                                 IsHitTestVisible="False" />
                         <ContentPresenter HorizontalAlignment="Center"
@@ -376,16 +376,16 @@
         <Setter Property="Foreground" Value="{DynamicResource OnAccentTextBrush}" />
     </Style>
 
-    <!-- Sidebar navigation -->
+    <!-- Sidebar navigation (IDE-style: left accent bar marks the active item, no pill fill) -->
     <Style x:Key="MacNavButton" TargetType="Button">
         <Setter Property="FontFamily" Value="{StaticResource MacFont}" />
-        <Setter Property="Height" Value="34" />
-        <Setter Property="Margin" Value="0,0,0,4" />
+        <Setter Property="Height" Value="32" />
+        <Setter Property="Margin" Value="0,0,0,2" />
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
         <Setter Property="BorderBrush" Value="Transparent" />
         <Setter Property="BorderThickness" Value="0" />
-        <Setter Property="FontSize" Value="14" />
+        <Setter Property="FontSize" Value="13" />
         <Setter Property="FontWeight" Value="Normal" />
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="FocusVisualStyle" Value="{StaticResource ModernFocusVisual}" />
@@ -395,17 +395,21 @@
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
                     <Grid SnapsToDevicePixels="True">
-                        <Border x:Name="RootBorder"
-                                Background="Transparent"
-                                CornerRadius="8" />
                         <Border x:Name="HoverOverlay"
                                 Background="{DynamicResource NavHoverBrush}"
-                                CornerRadius="8"
+                                CornerRadius="6"
                                 Opacity="0"
                                 IsHitTestVisible="False" />
                         <Border x:Name="ActiveOverlay"
                                 Background="{DynamicResource NavActiveBrush}"
-                                CornerRadius="8"
+                                CornerRadius="6"
+                                Opacity="0"
+                                IsHitTestVisible="False" />
+                        <Border x:Name="ActiveBar"
+                                Width="2"
+                                Margin="0,2,0,2"
+                                HorizontalAlignment="Left"
+                                Background="{DynamicResource AccentBrush}"
                                 Opacity="0"
                                 IsHitTestVisible="False" />
                         <ContentPresenter VerticalAlignment="Center"
@@ -449,6 +453,11 @@
                                                          To="1"
                                                          Duration="{StaticResource MotionNormal}"
                                                          EasingFunction="{StaticResource MotionEaseOut}" />
+                                        <DoubleAnimation Storyboard.TargetName="ActiveBar"
+                                                         Storyboard.TargetProperty="Opacity"
+                                                         To="1"
+                                                         Duration="{StaticResource MotionNormal}"
+                                                         EasingFunction="{StaticResource MotionEaseOut}" />
                                         <DoubleAnimation Storyboard.TargetName="HoverOverlay"
                                                          Storyboard.TargetProperty="Opacity"
                                                          To="0"
@@ -460,6 +469,11 @@
                                 <BeginStoryboard>
                                     <Storyboard>
                                         <DoubleAnimation Storyboard.TargetName="ActiveOverlay"
+                                                         Storyboard.TargetProperty="Opacity"
+                                                         To="0"
+                                                         Duration="{StaticResource MotionNormal}"
+                                                         EasingFunction="{StaticResource MotionEaseInOut}" />
+                                        <DoubleAnimation Storyboard.TargetName="ActiveBar"
                                                          Storyboard.TargetProperty="Opacity"
                                                          To="0"
                                                          Duration="{StaticResource MotionNormal}"

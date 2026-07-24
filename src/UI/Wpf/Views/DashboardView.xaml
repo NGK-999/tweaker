@@ -51,12 +51,12 @@
                             Background="{DynamicResource CardBgBrush}"
                             BorderBrush="{DynamicResource CardBorderBrush}"
                             BorderThickness="1"
-                            CornerRadius="14">
+                            CornerRadius="8">
                         <StackPanel VerticalAlignment="Center">
                             <Border Width="48" Height="48"
                                     HorizontalAlignment="Left"
                                     Background="{DynamicResource AccentBrush}"
-                                    CornerRadius="14">
+                                    CornerRadius="8">
                                 <TextBlock HorizontalAlignment="Center"
                                            VerticalAlignment="Center"
                                            FontFamily="Segoe MDL2 Assets"
@@ -95,7 +95,7 @@
                                 Background="{DynamicResource SuccessSurfaceBrush}"
                                 BorderBrush="{DynamicResource SuccessBrush}"
                                 BorderThickness="1"
-                                CornerRadius="12">
+                                CornerRadius="8">
                             <TextBlock HorizontalAlignment="Center"
                                        VerticalAlignment="Center"
                                        FontFamily="Segoe MDL2 Assets"
@@ -135,7 +135,7 @@
                                 Background="{DynamicResource InfoSurfaceBrush}"
                                 BorderBrush="{DynamicResource AccentBrush}"
                                 BorderThickness="1"
-                                CornerRadius="12">
+                                CornerRadius="8">
                             <TextBlock HorizontalAlignment="Center"
                                        VerticalAlignment="Center"
                                        FontFamily="Segoe MDL2 Assets"

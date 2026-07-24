@@ -23,4 +23,9 @@ internal sealed class WindowsOptimizationApplicationFacade
         var context = inventory.Capture(usage);
         return recommendations.BuildPlan(context, preset);
     }
+
+    public GamingPerformanceProbe CaptureGamingPerformanceProbe()
+    {
+        return inventory.CaptureGamingPerformanceProbe();
+    }
 }

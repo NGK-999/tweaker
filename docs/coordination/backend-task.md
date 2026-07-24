@@ -1,26 +1,36 @@
-# Backend Task — Market coverage B1–B8 (modo A)
+# Backend Task — FPS P0/P1 (modo A)
 
-**Task ID:** `MARKET-B1-B8`  
-**Executor:** Codex / orquestrador nesta entrega  
-**Worktree:** main (WIP Contracts/Application preservado)
+**Task ID:** `FPS-P0-P1-BE`  
+**Executor:** Codex (`gpt-5.4`, effort `high`) — CLI 0.139 não aceita `gpt-5.6-terra`  
+**Worktree:** `C:\projetos\Apextweaker-codex` branch `agent/codex-fps-p0`  
+**Proibido:** mutar Windows na máquina de dev nos testes; unsigned kernel drivers; Defender/Update off no Auto
 
-## Escopo
+## Contexto
 
-1. `MarketUtilitiesService` — clean temp (seguro), TRIM, SFC/DISM dry-run/report, Storage Sense
-2. `TweakService.ApplyUiNoiseTweaks` / `ApplyMemoryTweaks` / `ApplyAdvancedNetworkTweaks` / `ApplyConditionalDebloat`
-3. Expandir `WindowsOptimizationCatalog` com regras B1–B8
-4. `BiosChecklistCatalog` (dados estáticos)
-5. Self-test `--market-coverage-self-test` (zero mutação)
+Prioridade FPS realista (não Winaero/Cyberpunk/ComputerCraft):
+1. Probe VBS + HVCI + HAGS + Game Mode/DVR + ReBAR best-effort
+2. `ApplyVbsMemoryIntegrityDisable(confirmed)` + restart note; MayApplyAutomatically=false
+3. `ApplyGameFullscreenOptimizationsOff(exePath?)` (Valorant locator se null)
+4. `ApplyCompetitiveCaptureQuiet()`
+5. Catálogo: `fps.vbs-hvci`, `fps.hags-status`, `fps.rebar-checklist`, `fps.fso-per-game`, `fps.competitive-overlays`
+6. `--gaming-fps-probe-self-test` (só leitura)
 
-## Proibido
+## Idempotência
 
-- Mutar Windows na máquina de CI/dev nos testes
-- Auto-Optimize aplicar dangerous
-- Flash BIOS / unsigned kernel drivers
+Preferir log `[SKIP] já aplicado` quando read-back == alvo. Reaplicar registry/serviço/power é seguro.
+
+## Estado parcial (continuar, não recomeçar)
+
+Já no worktree: `GamingPerformanceProbe` no inventory/facade/host; wiring `Apply*` no host **sem** implementação em `TweakService` ainda.  
+**Nota ownership:** `GamingPerformanceProbe` em Contracts deve ser **public** (não `internal`) — orquestrador aprova.
 
 ## Verificação
 
 ```
 dotnet build ApexTweaker.sln -c Release
-dotnet run --project ApexTweaker.csproj -- --market-coverage-self-test
+dotnet run --project ApexTweaker.csproj -c Release -- --gaming-fps-probe-self-test
 ```
+
+## Handoff
+
+`docs/coordination/backend-handoff.md` — arquivos, testes, riscos.

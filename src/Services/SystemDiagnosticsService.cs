@@ -5,15 +5,15 @@ using System.Management;
 using System.Runtime.InteropServices;
 using System.Security.Principal;
 using System.Text.RegularExpressions;
-using Microsoft.Win32;
 using ApexTweaker.Infrastructure;
 using ApexTweaker.Models;
+using ApexTweaker.Windows.Inventory;
+using Microsoft.Win32;
 
 namespace ApexTweaker.Services;
 
 internal sealed class SystemDiagnosticsService
 {
-    private const string GraphicsDriversPath = @"SYSTEM\CurrentControlSet\Control\GraphicsDrivers";
     private const string DwmPath = @"SOFTWARE\Microsoft\Windows\Dwm";
     private const string EdgePoliciesPath = @"SOFTWARE\Policies\Microsoft\Edge";
     private const string AppPrivacyPoliciesPath = @"SOFTWARE\Policies\Microsoft\Windows\AppPrivacy";
@@ -30,6 +30,7 @@ internal sealed class SystemDiagnosticsService
     {
         var hardware = GetHardwareInfo();
         var recommendation = optimizationEngine.Analyze(hardware);
+        var gamingProbe = new WindowsOptimizationInventoryService().CaptureGamingPerformanceProbe();
 
         return
         [
@@ -45,9 +46,9 @@ internal sealed class SystemDiagnosticsService
             $"Preset recomendado: {FormatPreset(recommendation.RecommendedPreset)}",
             $"Motivo: {recommendation.Reason}",
             $"Power Mode overlay: {GetCurrentPowerModeOverlay()}",
-            $"Game Mode: {RegistryService.GetDword(Registry.CurrentUser, @"Software\Microsoft\GameBar", "AutoGameModeEnabled", 0)}",
-            $"Game DVR: {RegistryService.GetDword(Registry.CurrentUser, @"System\GameConfigStore", "GameDVR_Enabled", 1)}",
-            $"HAGS solicitado: {FormatRequestedState(RegistryService.GetDword(Registry.LocalMachine, GraphicsDriversPath, "HwSchMode", -1), 2)}",
+            $"Game Mode: {FormatFeatureState(gamingProbe.GameModeState)}",
+            $"Game DVR: {FormatFeatureState(gamingProbe.GameDvrState)}",
+            $"HAGS solicitado: {FormatRequestedFeatureState(gamingProbe.HagsState)}",
             $"MPO fix: {FormatRequestedState(RegistryService.GetDword(Registry.LocalMachine, DwmPath, "OverlayTestMode", -1), 5)}",
             $"Edge Startup Boost: {FormatDisabledState(RegistryService.GetDword(Registry.LocalMachine, EdgePoliciesPath, "StartupBoostEnabled", -1))}",
             $"Edge em segundo plano: {FormatDisabledState(RegistryService.GetDword(Registry.LocalMachine, EdgePoliciesPath, "BackgroundModeEnabled", -1))}",
@@ -57,7 +58,9 @@ internal sealed class SystemDiagnosticsService
             $"Transparencia: {FormatRequestedState(RegistryService.GetDword(Registry.CurrentUser, ThemesPersonalizePath, "EnableTransparency", -1), 0, appliedLabel: "desativada")}",
             $"Apps UWP em background: {FormatRequestedState(RegistryService.GetDword(Registry.LocalMachine, AppPrivacyPoliciesPath, "LetAppsRunInBackground", -1), 2)}",
             $"Delivery Optimization: {FormatRequestedState(RegistryService.GetDword(Registry.LocalMachine, DeliveryOptimizationConfigPath, "DODownloadMode", -1), 0)}",
-            $"VBS configurado: {RegistryService.GetDword(Registry.LocalMachine, @"SYSTEM\CurrentControlSet\Control\DeviceGuard", "EnableVirtualizationBasedSecurity", -1)}",
+            $"VBS configurado: {FormatFeatureState(gamingProbe.VbsState)}",
+            $"Memory Integrity / HVCI: {FormatFeatureState(gamingProbe.MemoryIntegrityState)}",
+            $"Resizable BAR: {gamingProbe.ResizableBar.Summary}",
             $"Secure Boot: {RunPowerShellScalar("Confirm-SecureBootUEFI")}",
             $"TPM: {RunPowerShellScalar("(Get-Tpm).TpmPresent")}"
         ];
@@ -261,7 +264,7 @@ internal sealed class SystemDiagnosticsService
     {
         if (!WindowsPowerModeService.TryReadConfiguredPowerModes(out var acModeGuid, out var dcModeGuid, out _))
         {
-            return "indisponível";
+            return "indisponivel";
         }
 
         if (WindowsPowerModeService.IsBestPerformanceConfigured(acModeGuid, dcModeGuid))
@@ -276,7 +279,7 @@ internal sealed class SystemDiagnosticsService
     {
         if (actualValue < 0)
         {
-            return "indisponível";
+            return "indisponivel";
         }
 
         return actualValue == expectedValue
@@ -288,7 +291,7 @@ internal sealed class SystemDiagnosticsService
     {
         if (actualValue < 0)
         {
-            return "indisponível";
+            return "indisponivel";
         }
 
         return actualValue == 0
@@ -296,16 +299,36 @@ internal sealed class SystemDiagnosticsService
             : $"ativo ({actualValue})";
     }
 
+    private static string FormatFeatureState(FeatureState state)
+    {
+        return state switch
+        {
+            FeatureState.Enabled => "ativado",
+            FeatureState.Disabled => "desativado",
+            _ => "indisponivel"
+        };
+    }
+
+    private static string FormatRequestedFeatureState(RequestedFeatureState state)
+    {
+        return state switch
+        {
+            RequestedFeatureState.Requested => "solicitado",
+            RequestedFeatureState.NotRequested => "nao solicitado",
+            _ => "indisponivel"
+        };
+    }
+
     private static string ReadStringOrDefault(RegistryKey root, string path, string name)
     {
         return RegistryService.TryReadString(root, path, name, out var value) && !string.IsNullOrWhiteSpace(value)
             ? value
-            : "indisponível";
+            : "indisponivel";
     }
 
     private static string FormatStringState(string value, string expectedValue, string disabledLabel = "aplicado")
     {
-        if (string.Equals(value, "indisponível", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(value, "indisponivel", StringComparison.OrdinalIgnoreCase))
         {
             return value;
         }
