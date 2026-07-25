@@ -4,6 +4,7 @@ using System.Windows;
 using ApexTweaker.Infrastructure;
 using ApexTweaker.Minecraft;
 using ApexTweaker.UI.Wpf;
+using ApexTweaker.UI.Wpf.Testing;
 using ApexTweaker.UI.Wpf.Windows;
 
 namespace ApexTweaker;
@@ -33,6 +34,12 @@ internal static class Program
         if (args.Any(a => string.Equals(a, "--demo-self-test", StringComparison.OrdinalIgnoreCase)))
         {
             Environment.ExitCode = DemoSafetySelfTest.Run();
+            return;
+        }
+
+        if (args.Any(a => string.Equals(a, "--catalog-feedback-self-test", StringComparison.OrdinalIgnoreCase)))
+        {
+            Environment.ExitCode = CatalogFeedbackSelfTest.Run();
             return;
         }
 
