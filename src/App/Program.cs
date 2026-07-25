@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Linq;
 using System.Windows;
+using ApexTweaker.Infrastructure;
 using ApexTweaker.Minecraft;
 using ApexTweaker.UI.Wpf;
 using ApexTweaker.UI.Wpf.Windows;
@@ -12,7 +13,10 @@ internal static class Program
     [STAThread]
     private static void Main(string[] args)
     {
-        _ = ApplicationPaths.MigrateLegacyMinecraftData();
+        RuntimeModeContext.Configure(
+            args.Any(a => string.Equals(a, "--demo", StringComparison.OrdinalIgnoreCase))
+                ? RuntimeMode.Demo
+                : RuntimeMode.Standard);
 
         if (args.Any(a => string.Equals(a, "--market-coverage-self-test", StringComparison.OrdinalIgnoreCase)))
         {
@@ -25,6 +29,14 @@ internal static class Program
             Environment.ExitCode = GamingFpsProbeSelfTest.Run();
             return;
         }
+
+        if (args.Any(a => string.Equals(a, "--demo-self-test", StringComparison.OrdinalIgnoreCase)))
+        {
+            Environment.ExitCode = DemoSafetySelfTest.Run();
+            return;
+        }
+
+        _ = ApplicationPaths.MigrateLegacyMinecraftData();
 
         if (MinecraftCommandLine.TryRun(args, out var exitCode))
         {

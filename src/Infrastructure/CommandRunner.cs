@@ -10,6 +10,7 @@ namespace ApexTweaker.Infrastructure;
 internal sealed class CommandRunner
 {
     private static readonly TimeSpan DefaultTimeout = TimeSpan.FromMinutes(2);
+    private const int BlockedExitCode = -3900;
 
     public CommandResult Run(string fileName, string arguments)
     {
@@ -22,6 +23,15 @@ internal sealed class CommandRunner
         CancellationToken cancellationToken = default,
         TimeSpan? timeout = null)
     {
+        var mutationDecision = EvaluateRuntimeBoundary(fileName, arguments);
+        if (!mutationDecision.Allowed)
+        {
+            return new CommandResult(
+                BlockedExitCode,
+                string.Empty,
+                mutationDecision.Reason);
+        }
+
         using var process = new Process();
         var standardOutput = new StringBuilder();
         var standardError = new StringBuilder();
@@ -152,5 +162,43 @@ internal sealed class CommandRunner
         {
             return -1;
         }
+    }
+
+    private static RuntimeMutationDecision EvaluateRuntimeBoundary(string fileName, string arguments)
+    {
+        if (!LooksLikeMutation(fileName, arguments))
+        {
+            return RuntimeMutationDecision.Allow(RuntimeModeContext.Current);
+        }
+
+        var subject = string.Concat(fileName, " ", arguments).Trim();
+        return RuntimeModeContext.EvaluateMutation(subject);
+    }
+
+    private static bool LooksLikeMutation(string fileName, string arguments)
+    {
+        var command = fileName.Trim().ToLowerInvariant();
+        var normalizedArguments = (arguments ?? string.Empty).Trim();
+        var lowerArguments = normalizedArguments.ToLowerInvariant();
+
+        return command switch
+        {
+            "powercfg" or "powercfg.exe" => !(lowerArguments.StartsWith("/list", StringComparison.Ordinal) ||
+                                              lowerArguments.StartsWith("/query", StringComparison.Ordinal) ||
+                                              lowerArguments.StartsWith("/aliases", StringComparison.Ordinal) ||
+                                              lowerArguments.StartsWith("/getactivescheme", StringComparison.Ordinal)),
+            "bcdedit" or "bcdedit.exe" => !lowerArguments.StartsWith("/enum", StringComparison.Ordinal),
+            "sc" or "sc.exe" => !(lowerArguments.StartsWith("query", StringComparison.Ordinal) ||
+                                  lowerArguments.StartsWith("queryex", StringComparison.Ordinal) ||
+                                  lowerArguments.StartsWith("qc", StringComparison.Ordinal)),
+            "reg" or "reg.exe" => !lowerArguments.StartsWith("query", StringComparison.Ordinal),
+            "netsh" or "netsh.exe" => !lowerArguments.Contains(" show ", StringComparison.Ordinal) &&
+                                      !lowerArguments.StartsWith("show ", StringComparison.Ordinal),
+            "dism" or "dism.exe" => !lowerArguments.Contains("/checkhealth", StringComparison.Ordinal),
+            "sfc" or "sfc.exe" => true,
+            "defrag" or "defrag.exe" => true,
+            "powershell" or "powershell.exe" => true,
+            _ => false
+        };
     }
 }
