@@ -1,67 +1,95 @@
-# ApexTweaker
+<p align="center">
+  <img src="docs/assets/banner.svg" alt="ApexTweaker" width="920"/>
+</p>
 
-Otimizador Windows para jogos — diagnóstico, telemetria e tweaks **reversíveis**,
-mais preparação segura de Minecraft em PCs limitados.
+<p align="center">
+  <strong>Otimizador Windows para jogos</strong> — diagnóstico, telemetria e tweaks
+  <em>reversíveis</em>, com preparação segura de Minecraft em PCs limitados.
+</p>
 
-**Versão 3.3.1** · .NET 10 + WPF · Autor: **Igor Silva**  
-Repo: [NGK-999/tweaker](https://github.com/NGK-999/tweaker)
+<p align="center">
+  <a href="https://github.com/NGK-999/tweaker/releases"><img src="https://img.shields.io/badge/version-3.3.1-0ea5e9?style=for-the-badge&labelColor=0b1220" alt="Version 3.3.1"/></a>
+  <a href="https://dotnet.microsoft.com/"><img src="https://img.shields.io/badge/.NET-10-512BD4?style=for-the-badge&labelColor=0b1220&logo=dotnet&logoColor=white" alt=".NET 10"/></a>
+  <img src="https://img.shields.io/badge/platform-Windows-0078D4?style=for-the-badge&labelColor=0b1220&logo=windows&logoColor=white" alt="Windows"/>
+  <a href="#segurança-primeiro"><img src="https://img.shields.io/badge/demo-fail--closed-10b981?style=for-the-badge&labelColor=0b1220" alt="Demo fail-closed"/></a>
+</p>
+
+<p align="center">
+  <a href="#segurança-primeiro">Segurança</a> ·
+  <a href="#interface">Interface</a> ·
+  <a href="#minecraft-resumo">Minecraft</a> ·
+  <a href="#build-local">Build</a> ·
+  <a href="#distribuição">Download</a> ·
+  <a href="#arquitetura-e-produto">Docs</a>
+</p>
+
+---
 
 ## Por que existe
 
-- Medir e entender o PC (hardware, VBS/HVCI/HAGS, frametime).
-- Aplicar otimizações Windows com **snapshot/ledger** e rollback.
-- Preparar Minecraft (vanilla/modded) sem prometer FPS mágico nem apagar mods.
+| | |
+|:--|:--|
+| **Medir** | Hardware, VBS/HVCI/HAGS, frametime — entender o PC antes de mexer |
+| **Otimizar** | Tweaks Windows com snapshot/ledger e rollback |
+| **Preparar** | Minecraft (vanilla/modded) sem prometer FPS mágico nem apagar mods |
+
+---
 
 ## Segurança primeiro
 
+> Em `--demo`, o ApexTweaker **não muta** o Windows. Fail-closed.
+
 | Regra | Comportamento |
-|-------|----------------|
-| Demo | `--demo` **não muta** Windows (fail-closed) |
-| Elevação | UAC só quando a mutação Windows exige admin |
-| Minecraft | Backup antes de escrever; rollback separado; sem delete de mods |
-| Kernel | Sem drivers / injeção / RealTime |
+|:------|:--------------|
+| **Demo** | `--demo` bloqueia mutações Windows |
+| **Elevação** | UAC só quando a mutação realmente exige admin |
+| **Minecraft** | Backup antes de escrever · rollback separado · sem delete de mods |
+| **Kernel** | Sem drivers · sem injeção · sem RealTime |
 
 ```powershell
-# Abrir a UI sem risco de mutação Windows
+# UI sem risco de mutação Windows
 dotnet run --project ApexTweaker.csproj -c Release -- --demo
 
-# Self-tests de segurança / feedback / probe
+# Self-tests
 dotnet run --project ApexTweaker.csproj -c Release -- --demo-self-test
 dotnet run --project ApexTweaker.csproj -c Release -- --catalog-feedback-self-test
 dotnet run --project ApexTweaker.csproj -c Release -- --gaming-fps-probe-self-test
 ```
 
+---
+
 ## Interface
 
+Shell WPF com transição leve (opacity). Catálogo e probe de Desempenho rodam fora do UI thread.
+
 | Aba | Função |
-|-----|--------|
+|:----|:-------|
 | **Dashboard** | Auto-Tuning, restore point, resumo de hardware |
-| **Desempenho** | Probe VBS/HVCI/HAGS/Game DVR/ReBAR + ações de estabilidade |
+| **Desempenho** | Probe VBS / HVCI / HAGS / Game DVR / ReBAR + estabilidade |
 | **Módulos** | Tweaks individuais com snapshot |
 | **Telemetria** | Teste A/B, frametime, sensores |
 | **Catálogo** | Analyze de presets (sem aplicar) + checklist BIOS |
 | **Minecraft Rápido** | `Encontrar → Preparar → Testar → Restaurar` |
 | **Utilidades** | Rollback, limpeza, TRIM, SFC/DISM, desinstalação |
 
-Navegação com transição leve (opacity); análise do Catálogo e probe de Desempenho
-correm fora do UI thread.
+---
 
 ## Minecraft (resumo)
 
-Fluxo fácil na página **Minecraft Rápido**:
+```text
+Encontrar  →  Preparar  →  Testar  →  Resolver / Restaurar
+```
 
-`Encontrar → Preparar → Testar → Resolver ou Restaurar`
+- Perfis leves (ex.: `POTATO_4GB`) só após confirmação e backup
+- Cobblemon como perfil opcional quando detectado
+- Avançado: auditoria de mods, quarentena SHA-256, motor científico
 
-- Perfis leves (ex.: `POTATO_4GB`) só após confirmação e backup.
-- Cobblemon detectado como perfil opcional.
-- Modo avançado: auditoria de mods, quarentena com SHA-256, motor científico.
+**Docs:** [hooks de sessão](docs/MINECRAFT_GENERAL_AND_SESSION_HOOKS.md) ·
+[motor científico](docs/SCIENTIFIC_ENGINE.md) ·
+[Cobblemon low-end](docs/COBBLEMON_LOW_END.md) ·
+[índice](docs/README.md)
 
-Documentação:
-
-- [Minecraft + session hooks](docs/MINECRAFT_GENERAL_AND_SESSION_HOOKS.md)
-- [Motor científico](docs/SCIENTIFIC_ENGINE.md)
-- [Cobblemon low-end](docs/COBBLEMON_LOW_END.md)
-- [Índice docs](docs/README.md)
+---
 
 ## Build local
 
@@ -72,46 +100,57 @@ dotnet publish ApexTweaker.csproj -c Release -r win-x64 --self-contained true -o
 
 Requisito: Visual Studio Build Tools com C++ para `ApexTweaker.Native.dll`.
 
+---
+
 ## Distribuição
 
-- [ApexTweaker.exe](https://github.com/NGK-999/tweaker/releases/latest/download/ApexTweaker.exe)
-- [ApexTweaker.Native.dll](https://github.com/NGK-999/tweaker/releases/latest/download/ApexTweaker.Native.dll)
-- [ApexTweaker-Setup.exe](https://github.com/NGK-999/tweaker/releases/latest/download/ApexTweaker-Setup.exe)
+| Artefato | Link |
+|:---------|:-----|
+| App | [ApexTweaker.exe](https://github.com/NGK-999/tweaker/releases/latest/download/ApexTweaker.exe) |
+| Native | [ApexTweaker.Native.dll](https://github.com/NGK-999/tweaker/releases/latest/download/ApexTweaker.Native.dll) |
+| Setup | [ApexTweaker-Setup.exe](https://github.com/NGK-999/tweaker/releases/latest/download/ApexTweaker-Setup.exe) |
 
-Publicação self-contained (não exige .NET instalado). Repo privado: releases
-podem retornar 404 sem conta autorizada. Detalhes: [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md).
+Self-contained (não exige .NET instalado). Detalhes: [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md).
+
+---
 
 ## Dados locais
 
 | Dados | Caminho |
-|-------|---------|
+|:------|:--------|
 | Backups Windows | `C:\ProgramData\ApexTweaker\Backups` |
 | Backups Minecraft | `%LOCALAPPDATA%\ApexTweaker\MinecraftBackups` |
-| Relatórios / experimentos | `%LOCALAPPDATA%\ApexTweaker\MinecraftReports` (+ Experiments, SessionHooks) |
+| Relatórios / experimentos | `%LOCALAPPDATA%\ApexTweaker\MinecraftReports` |
 | Telemetria | `%LOCALAPPDATA%\ApexTweaker\Telemetry` |
+
+---
 
 ## CLI útil
 
 ```powershell
-# Ajuda Minecraft
 dotnet run --project ApexTweaker.csproj -- --minecraft-help
 
-# Auditoria somente leitura
 dotnet run --project ApexTweaker.csproj -- `
   --minecraft-audit `
   --mods "$env:USERPROFILE\Downloads\mods\mods" `
   --output ".\artifacts\minecraft-audit"
 
-# Self-test Minecraft
 dotnet run --project ApexTweaker.csproj -- --minecraft-self-test
 ```
 
-Escrita via CLI exige `--yes` e instância válida. Fluxo científico completo:
-[docs/SCIENTIFIC_ENGINE.md](docs/SCIENTIFIC_ENGINE.md).
+Escrita via CLI exige `--yes` e instância válida.
+
+---
 
 ## Arquitetura e produto
 
-- [Estado atual](docs/architecture/current-state.md)
-- [Estado alvo](docs/architecture/target-state.md)
-- [Estrutura do projeto](docs/PROJECT_STRUCTURE.md)
-- [Coordenação / plano](docs/coordination/master-plan.md)
+[Estado atual](docs/architecture/current-state.md) ·
+[Estado alvo](docs/architecture/target-state.md) ·
+[Estrutura](docs/PROJECT_STRUCTURE.md) ·
+[Plano de coordenação](docs/coordination/master-plan.md)
+
+---
+
+<p align="center">
+  <sub>ApexTweaker · Igor Silva · .NET 10 + WPF</sub>
+</p>
