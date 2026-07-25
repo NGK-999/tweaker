@@ -1,135 +1,67 @@
 # ApexTweaker
 
-Utilitario Windows em .NET 10 + WPF para diagnostico de hardware, telemetria,
-otimizacoes reversiveis e preparacao segura de Minecraft geral em hardware
-limitado.
+Otimizador Windows para jogos — diagnóstico, telemetria e tweaks **reversíveis**,
+mais preparação segura de Minecraft em PCs limitados.
 
-Versao: **3.3.1** | Autor: **Igor Silva**
+**Versão 3.3.1** · .NET 10 + WPF · Autor: **Igor Silva**  
+Repo: [NGK-999/tweaker](https://github.com/NGK-999/tweaker)
 
-## Minecraft One-Click Mode
+## Por que existe
 
-A pagina **Minecraft Rapido** abre por padrao e reduz o uso real a este fluxo:
+- Medir e entender o PC (hardware, VBS/HVCI/HAGS, frametime).
+- Aplicar otimizações Windows com **snapshot/ledger** e rollback.
+- Preparar Minecraft (vanilla/modded) sem prometer FPS mágico nem apagar mods.
 
-`Encontrar -> Preparar -> Testar -> Resolver ou Restaurar`
+## Segurança primeiro
 
-`Preparar para Jogar` executa a verificacao de mods internamente, cria backup e
-aplica o perfil leve somente depois da confirmacao do usuario.
+| Regra | Comportamento |
+|-------|----------------|
+| Demo | `--demo` **não muta** Windows (fail-closed) |
+| Elevação | UAC só quando a mutação Windows exige admin |
+| Minecraft | Backup antes de escrever; rollback separado; sem delete de mods |
+| Kernel | Sem drivers / injeção / RealTime |
 
-- seis botoes principais e mensagens sem jargao tecnico;
-- resumo de mods sem tabela gigante;
-- aplicacao confirmada de `POTATO_4GB` em 960x540 ou 854x480;
-- Minecraft vanilla e modded; Cobblemon e detectado como perfil opcional;
-- validacao de multiplayer somente leitura;
-- hooks temporarios `Desativado`, `Seguro` e `Extremo`, sempre com rollback;
-- perguntas simples depois do benchmark;
-- restauracao sempre visivel;
-- ZIP de diagnostico com relatorios, logs, configuracoes e hashes;
-- laboratorio cientifico completo preservado em **Modo Avancado**.
+```powershell
+# Abrir a UI sem risco de mutação Windows
+dotnet run --project ApexTweaker.csproj -c Release -- --demo
 
-Guia atual: [docs/MINECRAFT_GENERAL_AND_SESSION_HOOKS.md](docs/MINECRAFT_GENERAL_AND_SESSION_HOOKS.md).
-Indice da documentacao: [docs/README.md](docs/README.md).
-
-## Minecraft Scientific Optimization Engine
-
-A aba **Minecraft** adiciona um motor experimental separado das mutacoes de Windows:
-
-- le `fabric.mod.json`, metadados Forge/NeoForge e JARs aninhados;
-- identifica loader, versao, ambiente, dependencias, `provides` e `breaks`;
-- calcula SHA-256 e encontra duplicidades sem modificar os arquivos;
-- classifica mods com postura conservadora para requisitos de servidor;
-- gera relatorios JSON, Markdown e TXT;
-- gera dry-run de quarentena e move somente JARs explicitamente selecionados;
-- oferece os perfis `SAFE`, `LOW_END`, `EXTREME_4GB`, `POTATO_4GB`,
-  `POTATO_4GB_480P`, `SERVER_ENTRY_COMPATIBLE` e `BENCHMARK`;
-- cria backup antes de alterar `options.txt`, configs suportadas e memoria Prism/MultiMC;
-- permite rollback separado do perfil e da quarentena;
-- mede RAM, CPU, configs, logs e crashes do processo Minecraft por ate 10 minutos;
-- permite escolher 20, 24, 30, 45 ou 60 FPS e explica o patamar de heap de 4 GB;
-- gera checklist e resultado de homologacao sem inventar FPS ou entrada no servidor;
-- exige confirmacao adicional do manifesto para quarentenar mod possivelmente server-side;
-- nunca exclui mods e nunca preseleciona candidatos de quarentena.
-- diagnostica gargalos de RAM, CPU, GPU, disco, heap, pagefile, configs e mods;
-- cria experimentos persistentes com hipotese, baseline, candidato e hashes;
-- compara metricas com limiares declarados e decide `KEEP`, `REVERT` ou `RETEST`;
-- restaura pelo backup exato do experimento quando existe regressao;
-- distingue fato medido, inferencia e recomendacao manual;
-- oferece perfis `GPU_LIMITED`, `RAM_LIMITED`, `CPU_LIMITED` e
-  `SERVER_ENTRY_COMPATIBLE` alem dos perfis anteriores.
-- apresenta um wizard MVVM em dez etapas, modo simples/avancado, progresso,
-  cancelamento e grafico WPF leve de CPU/RAM/commit;
-- oferece experimentos isolados para resolucao, FPS, render, simulation,
-  entidades, qualidade, resource packs, janela e heap.
-
-Documentacao geral: [docs/MINECRAFT_GENERAL_AND_SESSION_HOOKS.md](docs/MINECRAFT_GENERAL_AND_SESSION_HOOKS.md).
-Perfil Cobblemon opcional: [docs/COBBLEMON_LOW_END.md](docs/COBBLEMON_LOW_END.md).
-Fluxo para o PC real: [docs/HOMOLOGACAO_OPERACIONAL_COBBLEMON.md](docs/HOMOLOGACAO_OPERACIONAL_COBBLEMON.md).
-Motor cientifico e CLI: [docs/SCIENTIFIC_ENGINE.md](docs/SCIENTIFIC_ENGINE.md).
-Arquitetura atual: [docs/architecture/current-state.md](docs/architecture/current-state.md).
-Indice completo: [docs/README.md](docs/README.md).
+# Self-tests de segurança / feedback / probe
+dotnet run --project ApexTweaker.csproj -c Release -- --demo-self-test
+dotnet run --project ApexTweaker.csproj -c Release -- --catalog-feedback-self-test
+dotnet run --project ApexTweaker.csproj -c Release -- --gaming-fps-probe-self-test
+```
 
 ## Interface
 
-| Aba | Funcao |
+| Aba | Função |
 |-----|--------|
-| **Dashboard** | Auto-Tuning, restore point e resumo de hardware |
-| **Modulos** | Tweaks individuais + bloco mercado (UI/Memory/Rede/Debloat) |
-| **Telemetria** | Teste A/B, frametime, metricas e console |
-| **Catalogo** | Analyze de presets Windows + checklist BIOS (sem flash) |
-| **Minecraft Rapido** | Fluxo facil + laboratorio tecnico no modo avancado |
-| **Utilidades** | Limpeza, TRIM, SFC/DISM, rollback, desinstalacao e suporte |
+| **Dashboard** | Auto-Tuning, restore point, resumo de hardware |
+| **Desempenho** | Probe VBS/HVCI/HAGS/Game DVR/ReBAR + ações de estabilidade |
+| **Módulos** | Tweaks individuais com snapshot |
+| **Telemetria** | Teste A/B, frametime, sensores |
+| **Catálogo** | Analyze de presets (sem aplicar) + checklist BIOS |
+| **Minecraft Rápido** | `Encontrar → Preparar → Testar → Restaurar` |
+| **Utilidades** | Rollback, limpeza, TRIM, SFC/DISM, desinstalação |
 
-## Linha de comando
+Navegação com transição leve (opacity); análise do Catálogo e probe de Desempenho
+correm fora do UI thread.
 
-Auditoria somente leitura:
+## Minecraft (resumo)
 
-```powershell
-dotnet run --project ApexTweaker.csproj -- `
-  --minecraft-audit `
-  --mods "$env:USERPROFILE\Downloads\mods\mods" `
-  --output ".\artifacts\minecraft-audit"
-```
+Fluxo fácil na página **Minecraft Rápido**:
 
-Autoteste do scanner, relatorios, perfil e rollback:
+`Encontrar → Preparar → Testar → Resolver ou Restaurar`
 
-```powershell
-dotnet run --project ApexTweaker.csproj -- --minecraft-self-test
-```
+- Perfis leves (ex.: `POTATO_4GB`) só após confirmação e backup.
+- Cobblemon detectado como perfil opcional.
+- Modo avançado: auditoria de mods, quarentena com SHA-256, motor científico.
 
-Use `--minecraft-help` para listar os demais comandos. Operacoes de escrita por
-CLI exigem `--yes` e uma instancia valida com `options.txt`; a pasta `mods` e
-opcional para Minecraft vanilla.
+Documentação:
 
-Benchmark com hooks de sessao seguros:
-
-```powershell
-dotnet ApexTweaker.dll --minecraft-benchmark `
-  --instance "C:\PrismLauncher\instances\Minha Instancia\.minecraft" `
-  --seconds 60 --wait-seconds 30 --hooks safe
-```
-
-Inicio de um experimento cientifico:
-
-```powershell
-dotnet ApexTweaker.dll --minecraft-scientific-start `
-  --instance "C:\PrismLauncher\instances\Cobblemon Low-End\.minecraft" `
-  --fps 30
-```
-
-O baseline precisa ser registrado antes de qualquer escrita. O fluxo completo,
-incluindo os comandos de medicao e finalizacao, esta em
-[docs/SCIENTIFIC_ENGINE.md](docs/SCIENTIFIC_ENGINE.md).
-
-## Distribuicao
-
-Artefatos oficiais:
-
-- [ApexTweaker.exe](https://github.com/NGK-999/tweaker/releases/latest/download/ApexTweaker.exe)
-- [ApexTweaker.Native.dll](https://github.com/NGK-999/tweaker/releases/latest/download/ApexTweaker.Native.dll)
-- [ApexTweaker-Setup.exe](https://github.com/NGK-999/tweaker/releases/latest/download/ApexTweaker-Setup.exe)
-- `ApexTweaker-Portable-v3.3.1.zip` sera gerado pela rotina de release da v3.3.1.
-
-O executavel publicado e self-contained, inicia em modo normal e nao exige .NET
-instalado. Apenas mutacoes protegidas do Windows solicitam UAC sob demanda.
+- [Minecraft + session hooks](docs/MINECRAFT_GENERAL_AND_SESSION_HOOKS.md)
+- [Motor científico](docs/SCIENTIFIC_ENGINE.md)
+- [Cobblemon low-end](docs/COBBLEMON_LOW_END.md)
+- [Índice docs](docs/README.md)
 
 ## Build local
 
@@ -138,36 +70,48 @@ dotnet build ApexTweaker.sln -c Release
 dotnet publish ApexTweaker.csproj -c Release -r win-x64 --self-contained true -o release-v2
 ```
 
-Requisito: Visual Studio Build Tools com suporte a C++ para compilar
-`ApexTweaker.Native.dll`.
+Requisito: Visual Studio Build Tools com C++ para `ApexTweaker.Native.dll`.
 
-## Dados e seguranca
+## Distribuição
 
-- Backups de Windows: `C:\ProgramData\ApexTweaker\Backups`
-- Backups de perfis Minecraft: `%LOCALAPPDATA%\ApexTweaker\MinecraftBackups`
-- Backups de quarentena: `%LOCALAPPDATA%\ApexTweaker\MinecraftQuarantineBackups`
-- Relatorios Minecraft: `%LOCALAPPDATA%\ApexTweaker\MinecraftReports`
-- Pacotes de diagnostico: `%LOCALAPPDATA%\ApexTweaker\MinecraftDiagnosticPackages`
-- Experimentos cientificos: `%LOCALAPPDATA%\ApexTweaker\MinecraftExperiments`
-- Diarios e relatorios de hooks: `%LOCALAPPDATA%\ApexTweaker\MinecraftSessionHooks`
-- Telemetria de usuario: `%LOCALAPPDATA%\ApexTweaker\Telemetry`
-- O perfil altera `options.txt`, chaves existentes validadas de Sodium e
-  `enableShaders=false` do Iris. ImmediatelyFast e EntityCulling permanecem
-  nos defaults para experimentos isolados e validacao visual.
-- Prism/MultiMC recebem memoria por instancia; outros launchers recebem uma
-  instrucao JVM manual.
-- Defender, Windows Update, pagefile e mods de servidor nao sao desativados ou
-  removidos por esse fluxo.
-- Hooks operam somente no Java confirmado da instancia, nunca usam RealTime,
-  driver, injecao, BCD ou tweak permanente de Registro.
-- Relatorios e experimentos legados da v3.0.0 sao copiados para LocalAppData
-  sem sobrescrever; manifestos de backup permanecem em ProgramData e sao lidos
-  diretamente como fallback para preservar caminhos e hashes.
+- [ApexTweaker.exe](https://github.com/NGK-999/tweaker/releases/latest/download/ApexTweaker.exe)
+- [ApexTweaker.Native.dll](https://github.com/NGK-999/tweaker/releases/latest/download/ApexTweaker.Native.dll)
+- [ApexTweaker-Setup.exe](https://github.com/NGK-999/tweaker/releases/latest/download/ApexTweaker-Setup.exe)
 
-O repositorio GitHub esta privado; links de release retornam `404` sem uma conta
-autorizada. Mais detalhes de build e distribuicao:
-[docs/DISTRIBUTION.md](docs/DISTRIBUTION.md) e
-[docs/PROJECT_STRUCTURE.md](docs/PROJECT_STRUCTURE.md).
+Publicação self-contained (não exige .NET instalado). Repo privado: releases
+podem retornar 404 sem conta autorizada. Detalhes: [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md).
 
-Primeiro teste no PC de 4 GB:
-[docs/FIRST_REAL_TEST_4GB.md](docs/FIRST_REAL_TEST_4GB.md).
+## Dados locais
+
+| Dados | Caminho |
+|-------|---------|
+| Backups Windows | `C:\ProgramData\ApexTweaker\Backups` |
+| Backups Minecraft | `%LOCALAPPDATA%\ApexTweaker\MinecraftBackups` |
+| Relatórios / experimentos | `%LOCALAPPDATA%\ApexTweaker\MinecraftReports` (+ Experiments, SessionHooks) |
+| Telemetria | `%LOCALAPPDATA%\ApexTweaker\Telemetry` |
+
+## CLI útil
+
+```powershell
+# Ajuda Minecraft
+dotnet run --project ApexTweaker.csproj -- --minecraft-help
+
+# Auditoria somente leitura
+dotnet run --project ApexTweaker.csproj -- `
+  --minecraft-audit `
+  --mods "$env:USERPROFILE\Downloads\mods\mods" `
+  --output ".\artifacts\minecraft-audit"
+
+# Self-test Minecraft
+dotnet run --project ApexTweaker.csproj -- --minecraft-self-test
+```
+
+Escrita via CLI exige `--yes` e instância válida. Fluxo científico completo:
+[docs/SCIENTIFIC_ENGINE.md](docs/SCIENTIFIC_ENGINE.md).
+
+## Arquitetura e produto
+
+- [Estado atual](docs/architecture/current-state.md)
+- [Estado alvo](docs/architecture/target-state.md)
+- [Estrutura do projeto](docs/PROJECT_STRUCTURE.md)
+- [Coordenação / plano](docs/coordination/master-plan.md)
