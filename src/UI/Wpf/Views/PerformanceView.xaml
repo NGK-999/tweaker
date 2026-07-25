@@ -50,15 +50,26 @@
         <StackPanel MaxWidth="960" HorizontalAlignment="Left">
 
             <TextBlock Style="{StaticResource MacSectionLabel}" Text="DESEMPENHO" />
-            <TextBlock Margin="0,6,0,0"
-                       Style="{StaticResource MacPageTitle}"
-                       FontSize="20"
-                       Text="Desempenho / FPS" />
             <TextBlock Margin="0,4,0,0"
                        Style="{StaticResource MacBodyText}"
                        FontSize="13"
                        TextWrapping="Wrap"
                        Text="Foco em estabilidade: menos stutter e 1% low mais consistente. Nenhum ajuste aqui promete mais FPS." />
+
+            <Border x:Name="ProbeLoadingBanner"
+                    Margin="0,14,0,0"
+                    Padding="12,10"
+                    CornerRadius="8"
+                    Background="{DynamicResource InfoSurfaceBrush}"
+                    BorderBrush="{DynamicResource AccentBrush}"
+                    BorderThickness="1"
+                    Visibility="Collapsed">
+                <TextBlock Style="{StaticResource MacBodyText}"
+                           FontSize="12"
+                           FontWeight="SemiBold"
+                           Foreground="{DynamicResource AccentBrush}"
+                           Text="Lendo status do sistema..." />
+            </Border>
 
             <!-- Status -->
             <TextBlock Margin="0,22,0,10" Style="{StaticResource MacSectionTitle}" Text="Status do sistema" />

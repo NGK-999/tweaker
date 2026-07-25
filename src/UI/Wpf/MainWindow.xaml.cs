@@ -519,6 +519,10 @@ public partial class MainWindow : Window
             var locator = valorantLocator;
             performanceCapture = Task.Run(() =>
                 (service.CaptureGamingPerformanceProbe(), locator.FindExecutable()));
+            if (page is PerformanceView loadingPerformance)
+            {
+                loadingPerformance.SetProbeLoading(true);
+            }
         }
 
         AppThemeManager.Apply(page, AppThemeManager.Current);
@@ -546,7 +550,7 @@ public partial class MainWindow : Window
             UtilitiesPageKey => "Utilidades",
             _ => AppInfo.Name
         };
-        HeaderSubtitleText.Text = pageKey switch
+        var headerSubtitle = pageKey switch
         {
             MinecraftPageKey => "Encontrar, preparar, testar e restaurar sem complexidade",
             TelemetryPageKey => "Frametime, sensores e comparacao antes/depois",
@@ -560,8 +564,9 @@ public partial class MainWindow : Window
         try
         {
             var headerTask = UiMotion.AnimateHeaderAsync(HeaderTitleText, headerTitle, cancellationToken);
+            var subtitleTask = UiMotion.AnimateHeaderAsync(HeaderSubtitleText, headerSubtitle, cancellationToken);
             var pageTask = PageTransitionAnimator.ShowAsync(PageHost, page, cancellationToken, skipAnimation: !animate);
-            await Task.WhenAll(headerTask, pageTask).ConfigureAwait(true);
+            await Task.WhenAll(headerTask, subtitleTask, pageTask).ConfigureAwait(true);
             activePageKey = pageKey;
 
             if (performanceCapture is not null && performanceView is not null)
@@ -589,6 +594,9 @@ public partial class MainWindow : Window
             HeaderTitleText.Text = headerTitle;
             HeaderTitleText.Opacity = 1D;
             HeaderTitleText.RenderTransform = Transform.Identity;
+            HeaderSubtitleText.Text = headerSubtitle;
+            HeaderSubtitleText.Opacity = 1D;
+            HeaderSubtitleText.RenderTransform = Transform.Identity;
         }
     }
 

@@ -1,42 +1,40 @@
-# Frontend handoff — FE-SHELL-FLUENCY-P1
+# Frontend handoff — UI-OUTCOME-P1 + FE-SHELL-POLISH-P1
 
-**Status:** DONE (orquestrador) — Claude Opus indisponível (API limit)  
-**Branch:** `main` (WIP commit nesta entrega)  
-**Worktree Claude:** `agent/claude-fe-shell-fluency-p1` espelha o mesmo esqueleto  
+**Status:** PASS  
+**Branch:** `integration/ui-outcome-polish`  
 **Data:** 2026-07-25  
-
-## Nota sobre Claude
-
-- Subagente [Claude FE](816058bc-ea44-4921-a6cd-6020fedc0d9f): **ERROR** — API usage limit; sem edições.
-- CLI `claude --bg`: instável (truncamento de prompt / permissão / daemon).
-- Entrega mecânica do plano FE-SHELL-FLUENCY-P1 concluída pelo orquestrador.
 
 ## O que mudou
 
-1. **PageTransitionAnimator** — crossfade só opacity (~200 ms); removidos scale/translate e `BitmapCache`.
-2. **UiMotion** — `DesiredFrameRate` 60; header mais curto (120/160 ms).
-3. **CatalogView / CatalogViewModel** — `AnalyzeAsync` com `Task.Run`; status “Analisando…”; geração para cancelar supersedidos.
-4. **MainWindow** — probe de Desempenho capturado em paralelo à transição (`Task.Run`); apply no UI após swap; getter de Performance não bloqueia mais.
+### UI-OUTCOME-P1
+1. `TweakService.LastMutationOutcome` — preenchido só em `RunMutationPipeline`; limpo em `CreateRestorePoint`.
+2. `MainWindow.TrySetStatusFromMutationOutcome` — mapeia `OperationOutcomeKind` → `SnackbarKind` em `RunTweakAsync` e `RunAutoOptimizeAsync`.
+3. TimedOut / Failed / Partial **não** viram Success só porque o log retornou linhas.
+
+### FE-SHELL-POLISH-P1
+1. `Snackbar` — coalesce/cancel; surfaces por kind; `UiMotion.ConfigureStoryboard`.
+2. Catalog / Performance — removido `MacPageTitle` duplicado vs shell header; banners de busy.
+3. Header subtitle anima junto do título; probe loading + fade-in dos status cards.
+4. `UiMotion.FadeIn` aceita `beginTime` (stagger leve).
 
 ## Como testar
 
 ```powershell
 dotnet build ApexTweaker.sln -c Release
 dotnet run --project ApexTweaker.csproj -c Release -- --demo
-# Navegar rápido: Dashboard → Catálogo → Desempenho → Dashboard
+dotnet run --project ApexTweaker.csproj -c Release -- --demo-self-test
+dotnet run --project ApexTweaker.csproj -c Release -- --catalog-feedback-self-test
+dotnet run --project ApexTweaker.csproj -c Release -- --gaming-fps-probe-self-test
 ```
-
-Self-tests: demo / catalog-feedback / gaming-fps-probe — PASS na verificação do orquestrador.
 
 ## Riscos / dívidas
 
-- Elevação “premium” de motion além do P1 ficou para quando Claude/API voltar.
-- `SystemParameters.ClientAnimation` não existe em WPF clássico — skip só via `skipAnimation`.
-- UI-OUTCOME-P1 ainda pendente (timeout pode parecer sucesso na UI).
+- Claude polish paralelo pode trazer commits extras no worktree; revisar antes de cherry-pick.
+- DEMO-INVENTORY-P1 e CI-REQUIRED-P1 ainda no master-plan.
+- `$impeccable init` (PRODUCT.md) ainda sugerido, não bloqueante.
 
 ## Resultado
 
 ```text
-PASS (escopo P1 mecânico)
-Claude elevate: BLOQUEADO (API limit)
+PASS
 ```

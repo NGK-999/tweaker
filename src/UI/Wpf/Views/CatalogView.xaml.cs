@@ -76,14 +76,37 @@ public partial class CatalogView : WpfUserControl
             viewModel.SelectedPreset = preset;
         }
 
-        await viewModel.AnalyzeAsync().ConfigureAwait(true);
-        StatusText.Text = viewModel.StatusText;
-        ApplyFeedbackVisibility();
-
-        if (viewModel.FeedbackKind == CatalogFeedbackKind.Error)
+        SetAnalyzingChrome(true);
+        try
         {
-            FeedbackStatusRequested?.Invoke(viewModel.StatusText, SnackbarKind.Error);
-            RetryErrorButton.Focus();
+            await viewModel.AnalyzeAsync().ConfigureAwait(true);
+            StatusText.Text = viewModel.StatusText;
+            ApplyFeedbackVisibility();
+
+            if (viewModel.FeedbackKind == CatalogFeedbackKind.Error)
+            {
+                FeedbackStatusRequested?.Invoke(viewModel.StatusText, SnackbarKind.Error);
+                RetryErrorButton.Focus();
+            }
+        }
+        finally
+        {
+            SetAnalyzingChrome(false);
+            StatusText.Text = viewModel.StatusText;
+        }
+    }
+
+    private void SetAnalyzingChrome(bool analyzing)
+    {
+        AnalyzingBanner.Visibility = analyzing ? Visibility.Visible : Visibility.Collapsed;
+        AnalyzeButton.IsEnabled = !analyzing;
+        PresetCombo.IsEnabled = !analyzing;
+        if (analyzing)
+        {
+            StatusText.Text = "Analisando catalogo...";
+            EmptyPanel.Visibility = Visibility.Collapsed;
+            ErrorPanel.Visibility = Visibility.Collapsed;
+            PartialPanel.Visibility = Visibility.Collapsed;
         }
     }
 
