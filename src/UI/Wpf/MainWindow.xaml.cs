@@ -468,13 +468,16 @@ public partial class MainWindow : Window
         var hardware = ApplicationWarmup.Hardware;
         var profile = ApplicationWarmup.Profile;
         var alreadyOptimized = ApplicationWarmup.AlreadyOptimized;
+        var freshness = new OptimizationEngine().GetOptimizationFreshness();
 
         Dashboard.SetSummary(
             $"CPU: {hardware.ProcessorName}{Environment.NewLine}" +
             $"N\u00FAcleos: {hardware.PhysicalCoreCount} f\u00EDsicos / {hardware.LogicalCoreCount} l\u00F3gicos{Environment.NewLine}" +
             $"RAM instalada: {hardware.TotalMemoryGb:0.#} GB{Environment.NewLine}" +
             $"Perfil adotado: {profile.AdoptedProfile}");
-        Dashboard.SetAutoOptimizeIdle(alreadyOptimized);
+        Dashboard.SetAutoOptimizeIdle(
+            alreadyOptimized,
+            needsUpgrade: freshness == OptimizationEngine.OptimizationFreshness.NeedsUpgrade);
 
         WriteSection("Diagn\u00F3stico geral iniciado");
         WriteLine($"Windows: {Environment.OSVersion.VersionString}");
@@ -483,14 +486,20 @@ public partial class MainWindow : Window
         WriteLine($"CPU n\u00FAcleos: {hardware.PhysicalCoreCount} f\u00EDsicos / {hardware.LogicalCoreCount} l\u00F3gicos");
         WriteLine($"RAM instalada: {hardware.TotalMemoryGb:0.#} GB");
         WriteLine($"CPU arquitetura heterog\u00EAnea: {(profile.IsHeterogeneousArchitecture ? "sim" : "n\u00E3o")}");
+        WriteLine($"Revisao de otimizacao: instalada={optimizationEngine.ReadInstalledOptimizationRevision()} / atual={OptimizationEngine.CurrentOptimizationRevision} ({freshness})");
         WriteLine(ApplicationPrivilegeService.IsAdministrator
             ? "[PRIVILEGIO] Modo administrador: mutacoes Windows estao disponiveis."
             : "[PRIVILEGIO] Modo normal: Minecraft, auditoria, benchmark e relatorios nao exigem UAC.");
 
-        if (alreadyOptimized)
+        if (freshness == OptimizationEngine.OptimizationFreshness.NeedsUpgrade)
         {
-            WriteLine("[INFO] Sistema j\u00E1 otimizado detectado no startup.");
-            SetStatus("Sistema j\u00E1 otimizado. Voc\u00EA pode medir diretamente na Telemetria.", SnackbarKind.Success);
+            WriteLine("[INFO] Marcadores antigos detectados, mas a revisao Apex esta desatualizada. Use Atualizar otimizacoes (gaps).");
+            SetStatus("Otimizacao antiga detectada. Clique em Atualizar otimizacoes (gaps).", SnackbarKind.Warning);
+        }
+        else if (alreadyOptimized)
+        {
+            WriteLine("[INFO] Sistema j\u00E1 otimizado na revisao atual.");
+            SetStatus("Sistema j\u00E1 otimizado. Voc\u00EA pode reaplicar ou medir na Telemetria.", SnackbarKind.Success);
         }
         else
         {
@@ -635,7 +644,10 @@ public partial class MainWindow : Window
         utilitiesView?.SetBusy(false);
         telemetryView?.SetBusy(false);
         minecraftView?.SetBusy(false);
-        Dashboard.SetAutoOptimizeIdle(optimizationEngine.CheckIfAlreadyOptimized());
+        var freshness = optimizationEngine.GetOptimizationFreshness();
+        Dashboard.SetAutoOptimizeIdle(
+            freshness == OptimizationEngine.OptimizationFreshness.Current,
+            needsUpgrade: freshness == OptimizationEngine.OptimizationFreshness.NeedsUpgrade);
     }
 
     private async Task CreateAutomaticBackupAsync(string section)
@@ -666,18 +678,64 @@ public partial class MainWindow : Window
 
         try
         {
-            if (optimizationEngine.CheckIfAlreadyOptimized())
+            var freshness = optimizationEngine.GetOptimizationFreshness();
+            var forceReapply = false;
+
+            if (freshness == OptimizationEngine.OptimizationFreshness.Current)
             {
-                WriteLine("[INFO] Sistema j\u00E1 est\u00E1 otimizado pelo ApexTweaker. Comandos redundantes foram ignorados.");
-                SetStatus("Auto-Tuning: sistema j\u00E1 otimizado.", SnackbarKind.Success);
-                return;
+                var confirm = System.Windows.MessageBox.Show(
+                    $"Este PC ja esta na revisao {OptimizationEngine.CurrentOptimizationRevision}.\n\n" +
+                    "Reaplicar mesmo assim? Itens iguais serao [SKIP]; novos gaps ainda serao aplicados se faltarem no Auto-Tuning.\n\n" +
+                    "Para pacotes CTT/UI use tambem os botoes em Modulos.",
+                    "Reaplicar otimizacoes",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Question);
+                if (confirm != MessageBoxResult.Yes)
+                {
+                    SetStatus("Auto-Tuning: mantido (ja na revisao atual).", SnackbarKind.Info);
+                    return;
+                }
+
+                forceReapply = true;
+                WriteLine("[INFO] Reaplicacao forcada pelo usuario.");
             }
+            else if (freshness == OptimizationEngine.OptimizationFreshness.NeedsUpgrade)
+            {
+                WriteLine(
+                    $"[INFO] Marcadores legados presentes, mas revisao instalada=" +
+                    $"{optimizationEngine.ReadInstalledOptimizationRevision()} < atual={OptimizationEngine.CurrentOptimizationRevision}. Aplicando gaps.");
+                SetStatus("Auto-Tuning: atualizando gaps da revisao nova...", SnackbarKind.Warning);
+            }
+
+            // Legacy early-exit only when Current and user refused — already handled above.
+            // When NeedsUpgrade or force/NeedsApply, always run the pipeline.
+            _ = forceReapply;
 
             await CreateAutomaticBackupAsync("Auto-Tuning");
             var lines = await Task.Run(() => tweakService.ApplyAutonomousOptimization(valorantLocator.FindExecutable()));
             WriteLines(lines);
 
-            if (!TrySetStatusFromMutationOutcome("Auto-Tuning", tweakService.LastMutationOutcome))
+            // Also apply CTT Essential gaps on upgrade / first apply / forced reapply so new packages land.
+            WriteLine("Aplicando pacote CTT Essential (gaps WinUtil-inspired)...");
+            var cttLines = await Task.Run(() => tweakService.ApplyCttEssentialTweaks());
+            WriteLines(cttLines);
+
+            WriteLine("Aplicando UI noise (gaps)...");
+            var uiLines = await Task.Run(() => tweakService.ApplyUiNoiseTweaks());
+            WriteLines(uiLines);
+
+            var outcome = tweakService.LastMutationOutcome;
+            if (outcome is null ||
+                outcome.Kind is OperationOutcomeKind.Completed
+                    or OperationOutcomeKind.PartiallyCompleted
+                    or OperationOutcomeKind.RestartRequired)
+            {
+                optimizationEngine.MarkOptimizationRevisionApplied();
+                ApplicationWarmup.InvalidateAlreadyOptimized();
+                WriteLine($"[INFO] Revisao de otimizacao gravada: {OptimizationEngine.CurrentOptimizationRevision}.");
+            }
+
+            if (!TrySetStatusFromMutationOutcome("Auto-Tuning", outcome))
             {
                 SetStatus("Auto-Tuning aplicado. Reinicie o PC antes de medir.", SnackbarKind.Warning);
             }
@@ -709,6 +767,10 @@ public partial class MainWindow : Window
         finally
         {
             EndTweaking();
+            var freshness = optimizationEngine.GetOptimizationFreshness();
+            Dashboard.SetAutoOptimizeIdle(
+                freshness == OptimizationEngine.OptimizationFreshness.Current,
+                needsUpgrade: freshness == OptimizationEngine.OptimizationFreshness.NeedsUpgrade);
         }
     }
 
@@ -870,6 +932,13 @@ public partial class MainWindow : Window
                     "CTT Essential",
                     () => tweakService.ApplyCttEssentialTweaks(),
                     "CTT Essential aplicado (WinUtil-inspired). Veja o log.");
+                if (tweakService.LastMutationOutcome is null or
+                    { Kind: OperationOutcomeKind.Completed or OperationOutcomeKind.PartiallyCompleted or OperationOutcomeKind.RestartRequired })
+                {
+                    optimizationEngine.MarkOptimizationRevisionApplied();
+                    ApplicationWarmup.InvalidateAlreadyOptimized();
+                }
+
                 break;
             case "CTT Advanced":
                 if (System.Windows.MessageBox.Show(

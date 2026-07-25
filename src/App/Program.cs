@@ -43,6 +43,12 @@ internal static class Program
             return;
         }
 
+        if (args.Any(a => string.Equals(a, "--optimization-state-audit", StringComparison.OrdinalIgnoreCase)))
+        {
+            Environment.ExitCode = OptimizationStateAudit.Run();
+            return;
+        }
+
         _ = ApplicationPaths.MigrateLegacyMinecraftData();
 
         if (MinecraftCommandLine.TryRun(args, out var exitCode))

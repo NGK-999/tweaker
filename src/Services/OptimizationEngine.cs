@@ -9,10 +9,26 @@ namespace ApexTweaker.Services;
 
 internal sealed class OptimizationEngine
 {
+    /// <summary>
+    /// Bump when Auto-Tuning / Essential packages gain material new work that legacy markers
+    /// (Game Mode + DVR + Win32PrioritySeparation) cannot detect. Machines stamped below this
+    /// revision are treated as needing an upgrade pass.
+    /// </summary>
+    public const int CurrentOptimizationRevision = 2;
+
     private const string GameBarPath = @"Software\Microsoft\GameBar";
     private const string GameDvrPath = @"Software\Microsoft\Windows\CurrentVersion\GameDVR";
     private const string PriorityControlPath = @"SYSTEM\CurrentControlSet\Control\PriorityControl";
+    private const string ApexTweakerUserPath = @"Software\ApexTweaker";
+    private const string OptimizationRevisionValueName = "OptimizationRevision";
     private const double CpuThermalStabilityThresholdC = 80D;
+
+    public enum OptimizationFreshness
+    {
+        NeedsApply,
+        NeedsUpgrade,
+        Current
+    }
 
     public PresetRecommendation Analyze(HardwareInfo hardware)
     {
@@ -77,7 +93,7 @@ internal sealed class OptimizationEngine
         return Classify(hardware) == HardwareTier.HighEnd;
     }
 
-    public bool CheckIfAlreadyOptimized()
+    public bool CheckLegacyOptimizationMarkers()
     {
         return RegistryService.TryReadDword(Registry.CurrentUser, GameBarPath, "AllowAutoGameMode", out var allowAutoGameMode) &&
                RegistryService.TryReadDword(Registry.CurrentUser, GameDvrPath, "AppCaptureEnabled", out var appCaptureEnabled) &&
@@ -85,6 +101,45 @@ internal sealed class OptimizationEngine
                allowAutoGameMode == 1 &&
                appCaptureEnabled == 0 &&
                prioritySeparation == 38;
+    }
+
+    public int ReadInstalledOptimizationRevision()
+    {
+        return RegistryService.TryReadDword(
+                Registry.CurrentUser,
+                ApexTweakerUserPath,
+                OptimizationRevisionValueName,
+                out var revision)
+            ? revision
+            : 0;
+    }
+
+    public OptimizationFreshness GetOptimizationFreshness()
+    {
+        if (!CheckLegacyOptimizationMarkers())
+        {
+            return OptimizationFreshness.NeedsApply;
+        }
+
+        return ReadInstalledOptimizationRevision() >= CurrentOptimizationRevision
+            ? OptimizationFreshness.Current
+            : OptimizationFreshness.NeedsUpgrade;
+    }
+
+    /// <summary>
+    /// True only when legacy markers are present AND this machine was stamped with the current
+    /// (or newer) optimization revision — otherwise new packages (e.g. CTT Essential) would be skipped.
+    /// </summary>
+    public bool CheckIfAlreadyOptimized() =>
+        GetOptimizationFreshness() == OptimizationFreshness.Current;
+
+    public void MarkOptimizationRevisionApplied()
+    {
+        RegistryService.SetDword(
+            Registry.CurrentUser,
+            ApexTweakerUserPath,
+            OptimizationRevisionValueName,
+            CurrentOptimizationRevision);
     }
 
     public ProcessorBoostDecision BuildProcessorBoostDecision(Action<string>? addLog = null)
