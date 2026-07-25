@@ -146,12 +146,23 @@ public partial class MainWindow : Window
             }
 
             performanceView = new PerformanceView();
-            performanceView.SetValorantStatus(valorantLocator.FindExecutable());
+            RefreshPerformanceProbe();
             performanceView.DisableVbsHvciRequested += DisableVbsHvciAsync;
             performanceView.OptimizeFullscreenRequested += OptimizeFullscreenAsync;
             performanceView.CompetitiveModeRequested += RunCompetitiveModeAsync;
             return performanceView;
         }
+    }
+
+    private void RefreshPerformanceProbe()
+    {
+        if (performanceView is null)
+        {
+            return;
+        }
+
+        performanceView.ApplyProbe(windowsOptimizationService.CaptureGamingPerformanceProbe());
+        performanceView.SetValorantStatus(valorantLocator.FindExecutable());
     }
 
     private ModulesView Modules
@@ -473,6 +484,11 @@ public partial class MainWindow : Window
         }
 
         var page = factory();
+        if (string.Equals(pageKey, PerformancePageKey, StringComparison.OrdinalIgnoreCase))
+        {
+            RefreshPerformanceProbe();
+        }
+
         AppThemeManager.Apply(page, AppThemeManager.Current);
 
         if (string.Equals(activePageKey, pageKey, StringComparison.OrdinalIgnoreCase))
@@ -650,7 +666,7 @@ public partial class MainWindow : Window
     }
 
     // Advanced: VBS/HVCI disable requires explicit confirm + restart.
-    private Task DisableVbsHvciAsync()
+    private async Task DisableVbsHvciAsync()
     {
         if (System.Windows.MessageBox.Show(
                 "Desativar VBS/Memory Integrity (HVCI) reduz uma camada de seguranca do Windows " +
@@ -659,16 +675,17 @@ public partial class MainWindow : Window
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Warning) != MessageBoxResult.Yes)
         {
-            return Task.CompletedTask;
+            return;
         }
 
-        return RunTweakAsync(
+        await RunTweakAsync(
             "Desativar VBS/HVCI",
             () => windowsOptimizationService.ApplyVbsMemoryIntegrityDisable(confirmed: true),
             completionStatus: "VBS/HVCI: alteracao aplicada. Reinicio necessario.");
+        RefreshPerformanceProbe();
     }
 
-    private Task OptimizeFullscreenAsync()
+    private async Task OptimizeFullscreenAsync()
     {
         if (System.Windows.MessageBox.Show(
                 "Desliga Fullscreen Optimizations no exe do jogo (Valorant se detectado) e ajusta caminho competitivo. " +
@@ -677,15 +694,16 @@ public partial class MainWindow : Window
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Warning) != MessageBoxResult.Yes)
         {
-            return Task.CompletedTask;
+            return;
         }
 
-        return RunTweakAsync(
+        await RunTweakAsync(
             "Fullscreen optimizations",
             () => windowsOptimizationService.ApplyGameFullscreenOptimizationsOff(valorantLocator.FindExecutable()));
+        RefreshPerformanceProbe();
     }
 
-    private Task RunCompetitiveModeAsync()
+    private async Task RunCompetitiveModeAsync()
     {
         if (System.Windows.MessageBox.Show(
                 "Reduz Game Bar / captura / DVR para menos interferencia na partida. Reversivel.\n\nContinuar?",
@@ -693,12 +711,13 @@ public partial class MainWindow : Window
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Warning) != MessageBoxResult.Yes)
         {
-            return Task.CompletedTask;
+            return;
         }
 
-        return RunTweakAsync(
+        await RunTweakAsync(
             "Modo competitivo (overlays)",
             () => windowsOptimizationService.ApplyCompetitiveCaptureQuiet());
+        RefreshPerformanceProbe();
     }
 
     /// <summary>
@@ -2519,6 +2538,8 @@ public partial class MainWindow : Window
 
     private async void PerformanceButton_OnClick(object sender, RoutedEventArgs e)
     {
+        _ = Performance;
+        RefreshPerformanceProbe();
         await ShowPageAsync(PerformancePageKey, PerformanceButton);
     }
 

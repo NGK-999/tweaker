@@ -1,30 +1,18 @@
 # Frontend Handoff — FE-ALL-P0 (+ integração orquestrador)
 
-**Branch / worktree origem:** `agent/claude-fps-p0` (`Apextweaker-claude`) + merge orquestrador em `main`  
-**Data:** 2026-07-24
+**Branch / worktree origem:** `agent/claude-fps-p0` + merge orquestrador em `main`  
+**Atualizado:** 2026-07-25
 
 ## Resumo
 
-Painel **Desempenho**, maturidade corporativa (Snackbar, RiskBadge, Ctrl+K, badges) e Minecraft opção A, integrados no `main` com Catalog + market utilities + APIs FPS do backend.
+Painel **Desempenho**, maturidade corporativa (Snackbar, RiskBadge, Ctrl+K, badges) e Minecraft opção A, com Catalog + market + APIs FPS.
 
-## Arquivos principais (UI)
+## Wiring BE
 
-| Arquivo | Mudança |
-|---------|---------|
-| `Controls/Snackbar.cs`, `Controls/RiskBadge.cs` | toast + badge tipado |
-| `Views/PerformanceView.*` | status VBS/HVCI/HAGS/GameMode/ReBAR + ações Advanced |
-| `MainWindow.xaml(.cs)` | nav Desempenho + Catalog; Snackbar shell; Ctrl+K; wiring BE FPS |
-| `ModulesView.*` | rows + RiskBadge + Minecraft módulo + Mercado |
-| `DashboardView.*` | CTA Auto-Optimize |
-| `MacTheme.xaml` / `AppThemeManager` | tokens quietos |
-| Animações | race fix L2 |
-
-## Wiring BE (orquestrador)
-
-- `DisableVbsHvci` → `WindowsOptimizationService.ApplyVbsMemoryIntegrityDisable(true)`
+- `DisableVbsHvci` → `ApplyVbsMemoryIntegrityDisable(true)`
 - Fullscreen → `ApplyGameFullscreenOptimizationsOff`
 - Competitivo → `ApplyCompetitiveCaptureQuiet`
-- Probe UI ainda lê registro localmente; upgrade futuro: `CaptureGamingPerformanceProbe()`
+- Status Desempenho → `CaptureGamingPerformanceProbe()` (refresh ao abrir pagina e apos acoes)
 
 ## Como testar
 
@@ -34,9 +22,11 @@ dotnet run --project ApexTweaker.csproj -c Release -- --gaming-fps-probe-self-te
 dotnet run --project ApexTweaker.csproj -c Release -- --demo
 ```
 
-Manual: Ctrl+K, Desempenho (confirms), Catalogo, Módulos→Minecraft one-click, Snackbar após Auto-Optimize.
+## Fechar janela
 
-## Pendências leves
+Close esconde imediatamente, teardown com timeout; segundo clique força `Environment.Exit` se travar.
 
-- Catalog SettingsCard visual mais próximo do Fluent (layout atual do CatalogView mantido)
-- Performance status via probe tipado em vez de leitura registry duplicada
+## Pendencias restantes (fora deste sprint)
+
+- WPF-UI NuGet incremental (P2 opcional)
+- Kernel drivers: **nao**

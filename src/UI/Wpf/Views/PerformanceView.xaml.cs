@@ -1,8 +1,7 @@
 using System;
 using System.Threading.Tasks;
 using System.Windows;
-using Microsoft.Win32;
-using ApexTweaker.Services;
+using ApexTweaker.Models;
 using WpfButton = System.Windows.Controls.Button;
 using WpfUserControl = System.Windows.Controls.UserControl;
 
@@ -35,12 +34,6 @@ internal sealed class PerformanceStatusItem
 
 public partial class PerformanceView : WpfUserControl
 {
-    private const string DeviceGuardPath = @"SYSTEM\CurrentControlSet\Control\DeviceGuard";
-    private const string HvciPath = @"SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity";
-    private const string GraphicsDriversPath = @"SYSTEM\CurrentControlSet\Control\GraphicsDrivers";
-    private const string GameBarPath = @"Software\Microsoft\GameBar";
-    private const string GameConfigStorePath = @"System\GameConfigStore";
-
     public event Func<Task>? DisableVbsHvciRequested;
 
     public event Func<Task>? OptimizeFullscreenRequested;
@@ -50,7 +43,12 @@ public partial class PerformanceView : WpfUserControl
     public PerformanceView()
     {
         InitializeComponent();
-        StatusItemsControl.ItemsSource = BuildStatusItems();
+        StatusItemsControl.ItemsSource = Array.Empty<PerformanceStatusItem>();
+    }
+
+    internal void ApplyProbe(GamingPerformanceProbe probe)
+    {
+        StatusItemsControl.ItemsSource = BuildStatusItems(probe);
     }
 
     public void SetBusy(bool busy)
@@ -63,79 +61,112 @@ public partial class PerformanceView : WpfUserControl
     public void SetValorantStatus(string? valorantExePath)
     {
         ValorantStatusText.Text = string.IsNullOrWhiteSpace(valorantExePath)
-            ? "Ajusta HAGS e caminho de tela cheia exclusiva. Valorant nao detectado; o ajuste geral do Windows ainda sera aplicado."
-            : $"Ajusta HAGS e caminho de tela cheia exclusiva. Valorant detectado: {valorantExePath}";
+            ? "Desliga Fullscreen Optimizations no exe do jogo quando detectado. Valorant nao encontrado; o ajuste geral do Windows ainda pode ser aplicado."
+            : $"Desliga Fullscreen Optimizations no exe detectado: {valorantExePath}";
     }
 
-    // ponytail: probes de leitura reaproveitam as mesmas chaves de registro que
-    // SystemDiagnosticsService ja consulta (nao editado; apenas lido aqui).
-    // ReBAR nao tem probe confiavel sem WMI elevado, entao fica "Unknown" com checklist manual.
-    private static PerformanceStatusItem[] BuildStatusItems()
+    private static PerformanceStatusItem[] BuildStatusItems(GamingPerformanceProbe probe)
     {
         return
         [
-            BuildRequestedStateItem(
+            FromFeature(
                 "VBS",
-                Registry.LocalMachine, DeviceGuardPath, "EnableVirtualizationBasedSecurity",
-                expectedValue: 1,
-                enabledMeaning: "Virtualization Based Security ativa (overhead de virtualização).",
+                probe.VbsState,
+                enabledIsGood: false,
+                enabledMeaning: "Virtualization Based Security ativa (overhead de virtualizacao).",
                 disabledMeaning: "VBS desativada.",
-                unknownMeaning: "Não foi possível ler o estado da VBS neste Windows."),
-            BuildRequestedStateItem(
+                unknownMeaning: "Nao foi possivel ler o estado da VBS."),
+            FromFeature(
                 "Memory Integrity",
-                Registry.LocalMachine, HvciPath, "Enabled",
-                expectedValue: 1,
+                probe.MemoryIntegrityState,
+                enabledIsGood: false,
                 enabledMeaning: "HVCI (Memory Integrity) ativa.",
                 disabledMeaning: "HVCI desativada.",
-                unknownMeaning: "Não foi possível ler o estado do HVCI."),
-            BuildRequestedStateItem(
+                unknownMeaning: "Nao foi possivel ler o estado do HVCI."),
+            FromRequested(
                 "HAGS",
-                Registry.LocalMachine, GraphicsDriversPath, "HwSchMode",
-                expectedValue: 2,
-                enabledMeaning: "Hardware-Accelerated GPU Scheduling solicitado.",
-                disabledMeaning: "HAGS desativado.",
-                unknownMeaning: "Não foi possível ler o estado do HAGS."),
-            BuildRequestedStateItem(
-                "Game Mode / GameDVR",
-                Registry.CurrentUser, GameConfigStorePath, "GameDVR_Enabled",
-                expectedValue: 0,
-                enabledMeaning: "Game DVR desativado (recomendado para competitivo).",
-                disabledMeaning: "Game DVR ativo; pode gerar overhead durante a partida.",
-                unknownMeaning: "Não foi possível ler o estado do Game DVR."),
-            new PerformanceStatusItem(
-                "ReBAR",
-                "Desconhecido",
-                "?",
-                "unknown",
-                "Resizable BAR depende de configuração de BIOS; sem leitura confiável via software.",
-                "Verifique no BIOS: habilite 'Above 4G Decoding' e 'Resizable BAR Support'. " +
-                "Confirme depois em Gerenciador de Dispositivos > Placas de vídeo > Propriedades, " +
-                "ou executando dxdiag e checando a seção de exibição.")
+                probe.HagsState,
+                requestedMeaning: "Hardware-Accelerated GPU Scheduling solicitado.",
+                notRequestedMeaning: "HAGS nao solicitado.",
+                unknownMeaning: "Nao foi possivel ler o estado do HAGS."),
+            FromFeature(
+                "Game Mode",
+                probe.GameModeState,
+                enabledIsGood: true,
+                enabledMeaning: "Game Mode ativo.",
+                disabledMeaning: "Game Mode inativo.",
+                unknownMeaning: "Nao foi possivel ler o Game Mode."),
+            FromFeature(
+                "Game DVR",
+                probe.GameDvrState,
+                enabledIsGood: false,
+                enabledMeaning: "Game DVR/captura ativa; pode gerar overhead.",
+                disabledMeaning: "Game DVR desativado (melhor para competitivo).",
+                unknownMeaning: "Nao foi possivel ler o Game DVR."),
+            FromRebar(probe.ResizableBar)
         ];
     }
 
-    private static PerformanceStatusItem BuildRequestedStateItem(
+    private static PerformanceStatusItem FromFeature(
         string name,
-        RegistryKey root,
-        string path,
-        string valueName,
-        int expectedValue,
+        FeatureState state,
+        bool enabledIsGood,
         string enabledMeaning,
         string disabledMeaning,
         string unknownMeaning)
     {
-        var value = RegistryService.GetDword(root, path, valueName, -1);
-        if (value < 0)
+        return state switch
         {
-            return new PerformanceStatusItem(name, "Desconhecido", "?", "unknown", unknownMeaning, $"{root}\\{path}\\{valueName}: indisponível");
-        }
+            FeatureState.Enabled => new PerformanceStatusItem(
+                name,
+                "Ativo",
+                enabledIsGood ? "OK" : "!",
+                enabledIsGood ? "good" : "warn",
+                enabledMeaning,
+                $"{name}: Enabled"),
+            FeatureState.Disabled => new PerformanceStatusItem(
+                name,
+                "Inativo",
+                enabledIsGood ? "!" : "OK",
+                enabledIsGood ? "warn" : "good",
+                disabledMeaning,
+                $"{name}: Disabled"),
+            _ => new PerformanceStatusItem(name, "Desconhecido", "?", "unknown", unknownMeaning, $"{name}: Unknown")
+        };
+    }
 
-        var isExpected = value == expectedValue;
-        var label = isExpected ? "Ativo" : "Inativo";
-        var glyph = isExpected ? "✓" : "✕";
-        var statusKey = isExpected ? "good" : "warn";
-        var description = isExpected ? enabledMeaning : disabledMeaning;
-        return new PerformanceStatusItem(name, label, glyph, statusKey, description, $"{root}\\{path}\\{valueName} = {value}");
+    private static PerformanceStatusItem FromRequested(
+        string name,
+        RequestedFeatureState state,
+        string requestedMeaning,
+        string notRequestedMeaning,
+        string unknownMeaning)
+    {
+        return state switch
+        {
+            RequestedFeatureState.Requested => new PerformanceStatusItem(
+                name, "Solicitado", "OK", "good", requestedMeaning, $"{name}: Requested"),
+            RequestedFeatureState.NotRequested => new PerformanceStatusItem(
+                name, "Nao solicitado", "!", "warn", notRequestedMeaning, $"{name}: NotRequested"),
+            _ => new PerformanceStatusItem(name, "Desconhecido", "?", "unknown", unknownMeaning, $"{name}: Unknown")
+        };
+    }
+
+    private static PerformanceStatusItem FromRebar(ResizableBarProbe rebar)
+    {
+        var checklist = rebar.Checklist is null
+            ? "Checklist BIOS: Above 4G Decoding + Resizable BAR Support."
+            : $"{rebar.Checklist.Title}: {rebar.Checklist.Guidance}";
+
+        return rebar.Status switch
+        {
+            ResizableBarStatus.Enabled => new PerformanceStatusItem(
+                "ReBAR", "Ativo", "OK", "good", rebar.Summary, checklist),
+            ResizableBarStatus.DisabledOrUnsupported => new PerformanceStatusItem(
+                "ReBAR", "Inativo", "!", "warn", rebar.Summary, checklist),
+            _ => new PerformanceStatusItem(
+                "ReBAR", "Desconhecido", "?", "unknown", rebar.Summary, checklist)
+        };
     }
 
     private void AdvancedButton_OnClick(object sender, RoutedEventArgs e)

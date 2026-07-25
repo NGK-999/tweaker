@@ -1,11 +1,13 @@
 ﻿# Master plan — status
 
-**Atualizado:** 2026-07-24
+**Atualizado:** 2026-07-25
 
 | Task | Status |
 |------|--------|
-| FPS-P0-P1-BE | **DONE** no main (self-test PASS) |
-| FE-ALL-P0 | **DONE** integrado no main (build OK); Catalog SettingsCard polish = pendente leve |
+| FPS-P0-P1-BE | **DONE** |
+| FE-ALL-P0 | **DONE** (Catalog rows + sidebar + Snackbar/Ctrl+K) |
+| Performance probe UI | **DONE** (`CaptureGamingPerformanceProbe`) |
+| Close hang fix | **DONE** |
 | Kernel | **fora** |
 
-Proximo: smoke UI `--demo`; commit quando usuario pedir.
+Proximo opcional: WPF-UI NuGet incremental; polish visual fino apos feedback de `--demo`.
