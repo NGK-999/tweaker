@@ -327,6 +327,8 @@ task_bindings:
   L5_ui_bind_facade: frontend-risk-ux
   L6_lgpo_design: windows-safety-critical
   L7_integration: integration-review
+  P0.2-BLOCKERS: integration-review
+  "docs/coordination/p0.2-task.md": integration-review
 
 decision_template: |
   ROUTING DECISION

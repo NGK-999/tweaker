@@ -1,10 +1,10 @@
 # Backend task
 
-**Task ID:** BE-DEMO-OUTCOME-P0
-**Status:** RELEASED — em execução
-**Worktree:** `C:\projetos\Apextweaker-codex`
-**Branch:** `agent/codex-be-demo-outcome-p0`
-**Prompt:** `docs/coordination/prompts/BE-DEMO-OUTCOME-P0-codex.md`
-**Routing:** `docs/coordination/prompts/BE-DEMO-OUTCOME-P0-routing.md`
+**Task ID:** P0.2-BLOCKERS (BE slice)  
+**Status:** IN PROGRESS — branch de integração  
+**Worktree:** `C:\projetos\Apextweaker`  
+**Branch:** `integration/p0-demo-outcome-feedback`  
+**Task:** `docs/coordination/p0.2-task.md`  
+**Prompt:** `docs/coordination/prompts/P0.2-BLOCKERS.md`
 
-Contratos `Models`/`Contracts` congelados. `Program.cs` exclusivo BE nesta rodada.
+Contratos `Models`/`Contracts` congelados. Escopo: outcome/cancel/ledger/classificador + self-test.

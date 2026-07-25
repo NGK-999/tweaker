@@ -1,7 +1,10 @@
 # Frontend task
 
-**Task ID:** FE-FEEDBACK-SHELL-P0
-**Status:** DONE — handoff pronto; integração pendente
-**Worktree:** `C:\projetos\Apextweaker-claude`
-**Branch:** `agent/claude-fe-feedback-shell-p0`
-**Handoff:** `docs/coordination/frontend-handoff.md`
+**Task ID:** P0.2-BLOCKERS (FE slice)  
+**Status:** IN PROGRESS — branch de integração  
+**Worktree:** `C:\projetos\Apextweaker`  
+**Branch:** `integration/p0-demo-outcome-feedback`  
+**Task:** `docs/coordination/p0.2-task.md`  
+**Prompt:** `docs/coordination/prompts/P0.2-BLOCKERS.md`
+
+Escopo FE: SnackbarKind explícito nos call sites críticos; CatalogView análise em Loaded; sem `ex.Message` na UI principal; sem heurística por substring.

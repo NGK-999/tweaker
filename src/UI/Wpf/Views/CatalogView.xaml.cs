@@ -28,11 +28,11 @@ public partial class CatalogView : WpfUserControl
         viewModel.LoadBios();
         BiosList.ItemsSource = viewModel.BiosItems;
         RulesList.ItemsSource = viewModel.Rows;
-        // Defer Analyze until shell wires FeedbackStatusRequested.
+        // Analyze on Loaded so MainWindow can subscribe FeedbackStatusRequested first.
+        Loaded += CatalogView_OnLoaded;
     }
 
-    /// <summary>Run once after event handlers are attached by MainWindow.</summary>
-    public void EnsureInitialAnalyze()
+    private void CatalogView_OnLoaded(object sender, RoutedEventArgs e)
     {
         if (initialAnalyzeDone)
         {

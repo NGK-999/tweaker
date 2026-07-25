@@ -205,9 +205,9 @@ public partial class MainWindow : Window
             }
 
             catalogView = new CatalogView();
+            // Subscribe before the control enters the visual tree so Loaded analyze can raise snackbars.
             catalogView.GoToAutoOptimizeNavigationRequested += () => _ = ShowPageAsync(DashboardPageKey, DashboardButton);
             catalogView.FeedbackStatusRequested += (message, kind) => SetStatus(message, kind);
-            catalogView.EnsureInitialAnalyze();
             return catalogView;
         }
     }
