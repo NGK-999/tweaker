@@ -19,7 +19,8 @@ internal static class RegistryService
     public static void SetString(RegistryKey root, string path, string name, string value)
     {
         using var key = root.CreateSubKey(path);
-        key?.SetValue(name, value, RegistryValueKind.String);
+        // Empty/null name writes the key's default (unnamed) value — used by Win11 classic menu trick.
+        key?.SetValue(string.IsNullOrEmpty(name) ? null : name, value, RegistryValueKind.String);
     }
 
     public static bool TryReadValue(RegistryKey root, string path, string name, out object? value)
@@ -27,7 +28,7 @@ internal static class RegistryService
         try
         {
             using var key = root.OpenSubKey(path);
-            value = key?.GetValue(name);
+            value = key?.GetValue(string.IsNullOrEmpty(name) ? null : name);
             return key is not null;
         }
         catch

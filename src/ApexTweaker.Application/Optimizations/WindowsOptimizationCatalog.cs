@@ -484,6 +484,67 @@ internal static class WindowsOptimizationCatalog
             requiresBenchmark: true,
             requiresRestart: true),
 
+        Rule(
+            "ctt.essential-bundle",
+            "Pacote Essential (WinUtil-inspired)",
+            "CTT / WinUtil",
+            WindowsOptimizationRisk.Safe,
+            SafePresets,
+            WindowsOptimizationPurpose.Privacy,
+            PerformanceEvidence.Plausible,
+            EvidenceLevel.OfficialDocumentation,
+            "Telemetria leve, widgets, location, WPBT, DO, hibernate (AC) e limpeza — pipeline Apex, nao script CTT.",
+            "none",
+            ["Activity History", "Widgets", "Location"]),
+
+        Rule(
+            "ctt.ultimate-performance",
+            "Ultimate Performance (WinUtil Performance Plans)",
+            "CTT / WinUtil",
+            WindowsOptimizationRisk.Safe,
+            DesktopPresets,
+            WindowsOptimizationPurpose.FrameTime,
+            PerformanceEvidence.Plausible,
+            EvidenceLevel.OfficialDocumentation,
+            "Ativa Desempenho Maximo / overlay moderno — ja coberto por Energia.",
+            "none",
+            [],
+            requirements: Set(OptimizationRequirement.DesktopOnly)),
+
+        Rule(
+            "ctt.advanced-bundle",
+            "Pacote Advanced CAUTION (WinUtil-inspired)",
+            "CTT / WinUtil",
+            WindowsOptimizationRisk.Conditional,
+            CompetitivePresets,
+            WindowsOptimizationPurpose.Privacy,
+            PerformanceEvidence.Plausible,
+            EvidenceLevel.OfficialDocumentation,
+            "Background apps, notificacoes, Explorer Home/Gallery, menu classico, IPv4 preferido, AI pages. Exige confirmacao.",
+            "Pode ocultar UI do Windows e alterar rede IPv6/Teredo.",
+            ["Notification Center", "Teredo", "OneDrive sync"],
+            requiresBenchmark: false),
+
+        Rule(
+            "ctt.disable-ipv6-full",
+            "Desativar IPv6 completamente",
+            "CTT / WinUtil",
+            WindowsOptimizationRisk.Dangerous,
+            ExperimentalPreset,
+            WindowsOptimizationPurpose.Network,
+            PerformanceEvidence.Conflicting,
+            EvidenceLevel.Experimental,
+            "DisabledComponents=255 — fora do pacote Advanced; so laboratorio.",
+            "Pode quebrar VPN/IPv6-only.",
+            ["IPv6"],
+            requiresBenchmark: true),
+
+        Dangerous(
+            "dangerous.ctt-disable-bitlocker",
+            "Desativar BitLocker (CTT Essential no WinUtil)",
+            "Security",
+            "No Apex: Dangerous + confirm. Nunca no Auto / Essential bundle."),
+
         Dangerous(
             "dangerous.disable-defender",
             "Desativar Microsoft Defender",

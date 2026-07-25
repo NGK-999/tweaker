@@ -826,6 +826,395 @@ internal sealed class TweakService
         });
     }
 
+    /// <summary>
+    /// Essential-inspired WinUtil (CTT) package — Safe/Conditional registry + curated services.
+    /// Does not disable BitLocker, Search, SysMain, or Windows Update.
+    /// </summary>
+    public IReadOnlyList<string> ApplyCttEssentialTweaks()
+    {
+        return RunMutationPipeline("CTT Essential", () =>
+        {
+            var log = new List<string>
+            {
+                "CTT Essential (inspired by WinUtil): telemetria leve, widgets, location, WPBT, Delivery Optimization e limpeza."
+            };
+
+            // Telemetry / advertising / tailored (overlap Policy — idempotent)
+            TrySetDwordIfDifferent(
+                Registry.CurrentUser,
+                @"Software\Microsoft\Windows\CurrentVersion\AdvertisingInfo",
+                "Enabled",
+                0,
+                "Advertising ID desligado (HKCU).",
+                "[SKIP] Advertising ID ja desligado.",
+                log);
+            TrySetDwordIfDifferent(
+                Registry.CurrentUser,
+                @"Software\Microsoft\Windows\CurrentVersion\Privacy",
+                "TailoredExperiencesWithDiagnosticDataEnabled",
+                0,
+                "Experiencias personalizadas desligadas.",
+                "[SKIP] Experiencias personalizadas ja desligadas.",
+                log);
+            TrySetDwordIfDifferent(
+                Registry.LocalMachine,
+                @"SOFTWARE\Policies\Microsoft\Windows\CloudContent",
+                "DisableWindowsConsumerFeatures",
+                1,
+                "Consumer Features desligadas (policy).",
+                "[SKIP] Consumer Features ja desligadas.",
+                log);
+            TrySetDwordIfDifferent(
+                Registry.LocalMachine,
+                @"SOFTWARE\Policies\Microsoft\Windows\DeliveryOptimization",
+                "DODownloadMode",
+                0,
+                "Delivery Optimization P2P desligado (policy).",
+                "[SKIP] DODownloadMode policy ja=0.",
+                log);
+            TrySetDwordIfDifferent(
+                Registry.LocalMachine,
+                DeliveryOptimizationConfigPath,
+                "DODownloadMode",
+                0,
+                "Delivery Optimization DODownloadMode=0.",
+                "[SKIP] DODownloadMode config ja=0.",
+                log);
+
+            // Activity history
+            TrySetDwordIfDifferent(
+                Registry.LocalMachine,
+                @"SOFTWARE\Policies\Microsoft\Windows\System",
+                "EnableActivityFeed",
+                0,
+                "Activity Feed desligado.",
+                "[SKIP] Activity Feed ja desligado.",
+                log);
+            TrySetDwordIfDifferent(
+                Registry.LocalMachine,
+                @"SOFTWARE\Policies\Microsoft\Windows\System",
+                "PublishUserActivities",
+                0,
+                "PublishUserActivities desligado.",
+                "[SKIP] PublishUserActivities ja desligado.",
+                log);
+            TrySetDwordIfDifferent(
+                Registry.LocalMachine,
+                @"SOFTWARE\Policies\Microsoft\Windows\System",
+                "UploadUserActivities",
+                0,
+                "UploadUserActivities desligado.",
+                "[SKIP] UploadUserActivities ja desligado.",
+                log);
+
+            // Location
+            TrySetString(
+                Registry.LocalMachine,
+                @"SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\location",
+                "Value",
+                "Deny",
+                "Location ConsentStore=Deny.",
+                log);
+            DisableServiceIfPresent("lfsvc", "Geolocation Service", log);
+
+            // Device metadata / WPBT / Explorer discovery / Store search
+            TrySetDwordIfDifferent(
+                Registry.LocalMachine,
+                @"SOFTWARE\Policies\Microsoft\Windows\Device Metadata",
+                "PreventDeviceMetadataFromNetwork",
+                1,
+                "PreventDeviceMetadataFromNetwork=1.",
+                "[SKIP] Device metadata network ja bloqueado.",
+                log);
+            TrySetDwordIfDifferent(
+                Registry.LocalMachine,
+                @"SYSTEM\CurrentControlSet\Control\Session Manager",
+                "DisableWpbtExecution",
+                1,
+                "WPBT desabilitado (DisableWpbtExecution=1).",
+                "[SKIP] WPBT ja desabilitado.",
+                log);
+            TrySetDwordIfDifferent(
+                Registry.CurrentUser,
+                @"Software\Policies\Microsoft\Windows\Explorer",
+                "DisableSearchBoxSuggestions",
+                1,
+                "Sugestoes da Store na busca desligadas.",
+                "[SKIP] DisableSearchBoxSuggestions ja=1.",
+                log);
+
+            // Widgets / TaskbarDa
+            TrySetDwordIfDifferent(
+                Registry.CurrentUser,
+                @"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced",
+                "TaskbarDa",
+                0,
+                "Widgets/TaskbarDa desligado.",
+                "[SKIP] TaskbarDa ja=0.",
+                log);
+            TrySetDwordIfDifferent(
+                Registry.LocalMachine,
+                @"SOFTWARE\Policies\Microsoft\Dsh",
+                "AllowNewsAndInterests",
+                0,
+                "News and Interests policy desligada.",
+                "[SKIP] AllowNewsAndInterests ja=0.",
+                log);
+
+            // End task on taskbar
+            TrySetDwordIfDifferent(
+                Registry.CurrentUser,
+                @"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced\TaskbarDeveloperSettings",
+                "TaskbarEndTask",
+                1,
+                "End Task no menu da barra de tarefas habilitado.",
+                "[SKIP] TaskbarEndTask ja=1.",
+                log);
+
+            // Curated services (not mass-disable)
+            DisableServiceIfPresent("DiagTrack", "Connected User Experiences and Telemetry", log);
+            DisableServiceIfPresent("dmwappushservice", "WAP Push Message Routing", log);
+            SetServiceStartModeIfPresent("MapsBroker", "demand", "Downloaded Maps Manager -> Manual", log);
+            SetServiceStartModeIfPresent("CscService", "disabled", "Offline Files (CscService) -> Disabled", log);
+
+            // Hibernate — skip when on battery (laptop gaming risk)
+            if (IsRunningOnBattery())
+            {
+                log.Add("[SKIP] Hibernacao preservada (sistema em bateria).");
+            }
+            else
+            {
+                TrySetDwordIfDifferent(
+                    Registry.LocalMachine,
+                    @"SYSTEM\CurrentControlSet\Control\Power",
+                    "HibernateEnabled",
+                    0,
+                    "HibernateEnabled=0.",
+                    "[SKIP] HibernateEnabled ja=0.",
+                    log);
+                TrySetDwordIfDifferent(
+                    Registry.LocalMachine,
+                    @"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\FlyoutMenuSettings",
+                    "ShowHibernateOption",
+                    0,
+                    "Opcao Hibernar oculta no flyout.",
+                    "[SKIP] ShowHibernateOption ja=0.",
+                    log);
+                var hiber = commandRunner.Run("powercfg", "/hibernate off");
+                log.Add(hiber.ExitCode == 0
+                    ? "powercfg /hibernate off OK."
+                    : $"[INFO] powercfg hibernate: {hiber.Output}");
+            }
+
+            log.AddRange(ActivateUltimatePerformanceOrFallback());
+            log.AddRange(new MarketUtilitiesService(commandRunner).CleanTemporaryFiles(execute: true));
+            return log;
+        });
+    }
+
+    /// <summary>
+    /// Advanced WinUtil-inspired package. Never called from Auto-Tuning.
+    /// Excludes Edge remove, full IPv6 kill, BitLocker, Brave, OOSU, DNS UI.
+    /// </summary>
+    public IReadOnlyList<string> ApplyCttAdvancedTweaks()
+    {
+        return RunMutationPipeline("CTT Advanced", () =>
+        {
+            var log = new List<string>
+            {
+                "CTT Advanced (inspired by WinUtil CAUTION): background apps, notificacoes, Explorer Home/Gallery, classic menu, rede IPv4 preferida, AI pages, co-installers."
+            };
+
+            TrySetDwordIfDifferent(
+                Registry.CurrentUser,
+                @"Software\Microsoft\Windows\CurrentVersion\BackgroundAccessApplications",
+                "GlobalUserDisabled",
+                1,
+                "Background apps (GlobalUserDisabled=1).",
+                "[SKIP] Background apps ja desligados.",
+                log);
+
+            TrySetDwordIfDifferent(
+                Registry.CurrentUser,
+                @"Software\Policies\Microsoft\Windows\Explorer",
+                "DisableNotificationCenter",
+                1,
+                "Action Center / Notification Center desligado (policy HKCU).",
+                "[SKIP] DisableNotificationCenter ja=1.",
+                log);
+            TrySetDwordIfDifferent(
+                Registry.CurrentUser,
+                @"Software\Microsoft\Windows\CurrentVersion\PushNotifications",
+                "ToastEnabled",
+                0,
+                "Toasts desligados.",
+                "[SKIP] ToastEnabled ja=0.",
+                log);
+
+            // Home / Gallery pins
+            TrySetDwordIfDifferent(
+                Registry.CurrentUser,
+                @"Software\Classes\CLSID\{f874310e-b6b7-47dc-bc84-b9e6b38f5903}",
+                "System.IsPinnedToNameSpaceTree",
+                0,
+                "Explorer Home despinado.",
+                "[SKIP] Home ja despinado.",
+                log);
+            TrySetDwordIfDifferent(
+                Registry.CurrentUser,
+                @"Software\Classes\CLSID\{e88865ea-0e1c-4e20-9aa6-edcd0212c87c}",
+                "System.IsPinnedToNameSpaceTree",
+                0,
+                "Explorer Gallery despinado.",
+                "[SKIP] Gallery ja despinado.",
+                log);
+
+            // Classic context menu (Win11)
+            TrySetString(
+                Registry.CurrentUser,
+                @"Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c333094d2e}\InprocServer32",
+                string.Empty,
+                string.Empty,
+                "Classic right-click menu habilitado (Win11).",
+                log);
+
+            // Prefer IPv4 (DisabledComponents=32) — not full IPv6 off
+            TrySetDwordIfDifferent(
+                Registry.LocalMachine,
+                @"SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters",
+                "DisabledComponents",
+                32,
+                "IPv4 preferido (DisabledComponents=32).",
+                "[SKIP] DisabledComponents ja=32.",
+                log);
+            var teredo = commandRunner.Run("netsh", "interface teredo set state disabled");
+            log.Add(teredo.ExitCode == 0 ? "Teredo desabilitado." : $"[INFO] Teredo: {teredo.Output}");
+
+            TrySetDwordIfDifferent(
+                Registry.LocalMachine,
+                @"SYSTEM\CurrentControlSet\Control\TimeZoneInformation",
+                "RealTimeIsUniversal",
+                1,
+                "RTC em UTC (RealTimeIsUniversal=1).",
+                "[SKIP] RealTimeIsUniversal ja=1.",
+                log);
+
+            TrySetDwordIfDifferent(
+                Registry.LocalMachine,
+                @"SOFTWARE\Policies\WindowsNotepad",
+                "DisableAIFeatures",
+                1,
+                "Notepad AI desligado.",
+                "[SKIP] Notepad AI ja desligado.",
+                log);
+            TrySetString(
+                Registry.LocalMachine,
+                @"SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer",
+                "SettingsPageVisibility",
+                "hide:aicomponents",
+                "Pagina AI Components oculta em Configuracoes.",
+                log);
+
+            TrySetDwordIfDifferent(
+                Registry.LocalMachine,
+                @"SOFTWARE\Microsoft\Windows\CurrentVersion\Device Installer",
+                "DisableCoInstallers",
+                1,
+                "Co-installers (ex. Razer auto) desligados.",
+                "[SKIP] DisableCoInstallers ja=1.",
+                log);
+
+            // Edge debloat policies (not remove)
+            TrySetDwordIfDifferent(
+                Registry.LocalMachine,
+                @"SOFTWARE\Policies\Microsoft\Edge",
+                "PersonalizationReportingEnabled",
+                0,
+                "Edge PersonalizationReportingEnabled=0.",
+                "[SKIP] Edge personalization ja off.",
+                log);
+            TrySetDwordIfDifferent(
+                Registry.LocalMachine,
+                @"SOFTWARE\Policies\Microsoft\EdgeUpdate",
+                "CreateDesktopShortcutDefault",
+                0,
+                "Edge Update sem atalho desktop por padrao.",
+                "[SKIP] CreateDesktopShortcutDefault ja=0.",
+                log);
+
+            // OneDrive sync policy (not uninstall)
+            TrySetDwordIfDifferent(
+                Registry.LocalMachine,
+                @"SOFTWARE\Policies\Microsoft\Windows\OneDrive",
+                "DisableFileSyncNGSC",
+                1,
+                "OneDrive File Sync NGSC desligado (policy).",
+                "[SKIP] OneDrive sync ja desligado.",
+                log);
+
+            // Storage Sense off (overlap utility)
+            TrySetDwordIfDifferent(
+                Registry.CurrentUser,
+                @"SOFTWARE\Microsoft\Windows\CurrentVersion\StorageSense\Parameters\StoragePolicy",
+                "01",
+                0,
+                "Storage Sense desligado.",
+                "[SKIP] Storage Sense ja desligado.",
+                log);
+
+            // FSO honor FSE
+            TrySetDwordIfDifferent(
+                Registry.CurrentUser,
+                GameConfigStorePath,
+                "GameDVR_DXGIHonorFSEWindowsCompatible",
+                1,
+                "Fullscreen Optimizations: DXGIHonorFSE=1.",
+                "[SKIP] DXGIHonorFSE ja=1.",
+                log);
+
+            // RDP unsigned warning soften
+            TrySetDwordIfDifferent(
+                Registry.LocalMachine,
+                @"SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services\Client",
+                "RedirectionWarningDialogVersion",
+                1,
+                "RDP redirection warning dialog version set.",
+                "[SKIP] RDP warning policy ja definida.",
+                log);
+
+            // Reserved storage — best-effort via DISM
+            var reserved = commandRunner.Run(
+                "DISM.exe",
+                "/Online /Set-ReservedStorageState /State:Disabled");
+            log.Add(reserved.ExitCode == 0
+                ? "Reserved Storage desabilitado (DISM)."
+                : $"[INFO] Reserved Storage: {reserved.Output}");
+
+            log.AddRange(ApplyPerceivedResponsivenessTweaks());
+            return log;
+        });
+    }
+
+    /// <summary>Dangerous: disable BitLocker on OS volume. Confirm in UI; never Auto.</summary>
+    public IReadOnlyList<string> ApplyCttDisableBitLocker()
+    {
+        return RunMutationPipeline("CTT Disable BitLocker", () =>
+        {
+            var log = new List<string>
+            {
+                "CTT BitLocker disable (DANGEROUS): manage-bde -off no volume do sistema."
+            };
+            var systemDrive = Path.GetPathRoot(Environment.SystemDirectory)?.TrimEnd('\\') ?? "C:";
+            var status = commandRunner.Run("manage-bde.exe", $"-status {systemDrive}");
+            log.Add(status.ExitCode == 0 ? status.Output : $"[INFO] manage-bde status: {status.Output}");
+            var off = commandRunner.Run("manage-bde.exe", $"-off {systemDrive}");
+            log.Add(off.ExitCode == 0
+                ? $"BitLocker desativacao iniciada em {systemDrive}."
+                : $"[ERRO] manage-bde -off: {off.Output}");
+            return log;
+        });
+    }
+
     public IReadOnlyList<string> ApplyHypervisorOffTweak()
     {
         return RunMutationPipeline("Hypervisor off", () => ExecuteSingleCommand(new HypervisorTweakCommand()));
@@ -1418,6 +1807,92 @@ internal sealed class TweakService
             log);
     }
 
+    private static bool IsRunningOnBattery()
+    {
+        try
+        {
+            if (!GetSystemPowerStatus(out var status))
+            {
+                return false;
+            }
+
+            // ACLineStatus: 0 = battery, 1 = AC, 255 = unknown
+            return status.ACLineStatus == 0;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    [DllImport("kernel32.dll")]
+    private static extern bool GetSystemPowerStatus(out SystemPowerStatus sps);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct SystemPowerStatus
+    {
+        public byte ACLineStatus;
+        public byte BatteryFlag;
+        public byte BatteryLifePercent;
+        public byte SystemStatusFlag;
+        public int BatteryLifeTime;
+        public int BatteryFullLifeTime;
+    }
+
+    private void SetServiceStartModeIfPresent(string serviceName, string startMode, string successMessage, List<string> log)
+    {
+        var query = commandRunner.Run("sc.exe", $"query \"{serviceName}\"");
+        if (query.ExitCode != 0)
+        {
+            log.Add($"Servico ausente: {serviceName}.");
+            return;
+        }
+
+        var scStart = startMode.ToLowerInvariant() switch
+        {
+            "demand" or "manual" => "demand",
+            "disabled" => "disabled",
+            "auto" => "auto",
+            _ => startMode
+        };
+
+        ExecuteCommand(
+            new SystemMutationCommand(
+                $"Set service {serviceName} start={scStart}",
+                (_, session) => backupService.CaptureServiceState(session, serviceName),
+                () =>
+                {
+                    var config = commandRunner.Run("sc.exe", $"config \"{serviceName}\" start= {scStart}");
+                    if (config.ExitCode != 0)
+                    {
+                        throw new InvalidOperationException(config.Output);
+                    }
+                },
+                () =>
+                {
+                    var mode = backupService.TryReadServiceStartMode(serviceName);
+                    var expected = scStart switch
+                    {
+                        "demand" => "demand",
+                        "disabled" => "disabled",
+                        "auto" => "auto",
+                        _ => scStart
+                    };
+                    if (mode is null ||
+                        (expected == "demand" && !mode.Contains("demand", StringComparison.OrdinalIgnoreCase) &&
+                         !mode.Contains("manual", StringComparison.OrdinalIgnoreCase)) ||
+                        (expected == "disabled" && !mode.Contains("disabled", StringComparison.OrdinalIgnoreCase)) ||
+                        (expected == "auto" && !mode.Contains("auto", StringComparison.OrdinalIgnoreCase)))
+                    {
+                        // Soft verify — sc start mode strings vary
+                        log.Add($"[INFO] StartMode atual de {serviceName}: {mode ?? "desconhecido"}");
+                    }
+                },
+                successMessage,
+                $"Falha ao configurar {serviceName}"),
+            log);
+    }
+
     private void DisableServiceIfPresent(string serviceName, string displayName, List<string> log)
     {
         var query = commandRunner.Run("sc.exe", $"query \"{serviceName}\"");
@@ -1528,8 +2003,18 @@ internal sealed class TweakService
                 () => RegistryService.SetString(root, path, name, value),
                 () =>
                 {
-                    if (!RegistryService.TryReadString(root, path, name, out var actualValue) ||
-                        !string.Equals(actualValue, value, StringComparison.Ordinal))
+                    if (!RegistryService.TryReadString(root, path, name, out var actualValue))
+                    {
+                        // Default (unnamed) values may read as null when empty.
+                        if (!(string.IsNullOrEmpty(name) && string.IsNullOrEmpty(value)))
+                        {
+                            throw new InvalidOperationException($"Read-back divergente para {path}\\{name}.");
+                        }
+
+                        return;
+                    }
+
+                    if (!string.Equals(actualValue ?? string.Empty, value ?? string.Empty, StringComparison.Ordinal))
                     {
                         throw new InvalidOperationException($"Read-back divergente para {path}\\{name}.");
                     }

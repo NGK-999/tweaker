@@ -14,6 +14,7 @@
 | FE-SHELL-FLUENCY-P1 | **DONE** — transition leve + Analyze/probe off UI thread |
 | UI-OUTCOME-P1 | **DONE** (branch `integration/ui-outcome-polish`) |
 | FE-SHELL-POLISH-P1 | **DONE** (Snackbar/headers/busy/motion) |
+| CTT-WINUTIL-PARITY | **DONE** (branch `integration/ctt-winutil-parity`) |
 
 **PR #2:** MERGED (merge commit, sem squash). Stash WIP **não** aplicado.
 
@@ -21,5 +22,6 @@
 
 1. **DEMO-INVENTORY-P1** — Secure Boot/TPM sem PowerShell em Demo (API tipada ou coletor dedicado).
 2. **CI-REQUIRED-P1** — GitHub Actions obrigatório no HEAD (build + self-tests).
+3. Merge PR #3 (UI-OUTCOME/polish) se ainda aberto, depois CTT parity.
 
 Opcional depois: WPF-UI NuGet incremental; `$impeccable init`; restaurar stash `wip-pre-p0-integration-*` só com cuidado consciente.

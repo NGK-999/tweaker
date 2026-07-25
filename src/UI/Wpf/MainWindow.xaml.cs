@@ -865,6 +865,28 @@ public partial class MainWindow : Window
 
                 await RunTweakAsync("Timer resolution", () => tweakService.ApplyTimerResolutionTweak());
                 break;
+            case "CTT Essential":
+                await RunTweakAsync(
+                    "CTT Essential",
+                    () => tweakService.ApplyCttEssentialTweaks(),
+                    "CTT Essential aplicado (WinUtil-inspired). Veja o log.");
+                break;
+            case "CTT Advanced":
+                if (System.Windows.MessageBox.Show(
+                        "Pacote Advanced (WinUtil-inspired) altera notificacoes, Explorer, Teredo/IPv4 preferido e politicas AI.\n\n" +
+                        "Nao remove Edge nem desliga BitLocker/IPv6 total. Continuar?",
+                        "Confirmacao CTT Advanced",
+                        MessageBoxButton.YesNo,
+                        MessageBoxImage.Warning) != MessageBoxResult.Yes)
+                {
+                    return;
+                }
+
+                await RunTweakAsync(
+                    "CTT Advanced",
+                    () => tweakService.ApplyCttAdvancedTweaks(),
+                    "CTT Advanced aplicado. Revise o log.");
+                break;
         }
     }
 
@@ -2534,6 +2556,8 @@ public partial class MainWindow : Window
             new CommandPaletteItem("Rede avancada", "Tweak mercado: rede avancada", () => HandleModuleRequestedAsync("Rede avancada")),
             new CommandPaletteItem("Debloat", "Tweak mercado: debloat condicional", () => HandleModuleRequestedAsync("Debloat")),
             new CommandPaletteItem("Timer resolution", "Tweak avancado: BCD timer (reinicio)", () => HandleModuleRequestedAsync("Timer resolution")),
+            new CommandPaletteItem("CTT Essential", "WinUtil-inspired: pacote Essential no pipeline Apex", () => HandleModuleRequestedAsync("CTT Essential")),
+            new CommandPaletteItem("CTT Advanced", "WinUtil-inspired: pacote Advanced (confirmacao)", () => HandleModuleRequestedAsync("CTT Advanced")),
             new CommandPaletteItem("Minecraft / Cobblemon", "Detectar, auditar e otimizar em um clique", () => HandleModuleRequestedAsync(MinecraftPageKey))
         ]);
     }
