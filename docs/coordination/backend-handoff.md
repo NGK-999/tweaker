@@ -1,76 +1,116 @@
 # Backend handoff
 
-Status: **concluido em 2026-07-24**
+Status: **BE-DEMO-OUTCOME-P0 concluido em 2026-07-25**
 
-## Resumo
+## Escopo executado
 
-Implementado o escopo `FPS-P0-P1-BE` com probe tipado de gaming performance, novas APIs explicitas para VBS/HVCI, fullscreen optimizations por jogo e quiet mode de overlays/captura, alem de CLI self-test read-only e atualizacao do catalogo.
+- RuntimeMode fail-closed introduzido no backend, com default explicito nao-demo em `Program.cs` e bloqueio se o modo estiver incerto.
+- Gate central de mutacao aplicado em duas fronteiras:
+  - `src/Services/MutationExecutor.cs`
+  - `src/Infrastructure/CommandRunner.cs`
+- `OperationOutcome` interno implementado em `src/Infrastructure/**` com:
+  - `OutcomeKind`
+  - `correlationId`
+  - `messages`
+  - timestamps
+  - flags de runtime/cancelamento/timeout/restart/rollback/bloqueio
+  - resultados por etapa (`OperationStepResult`)
+- Novo self-test backend `--demo-self-test` cobrindo:
+  - demo bloqueando mutacao
+  - modo incerto fail-closed
+  - caminho legado `TweakService` nao contornando o gate
+  - outcomes distintos `COMPLETED`, `PARTIALLY_COMPLETED`, `CANCELLED`, `TIMEDOUT`, `ROLLBACK_REQUIRED`, `ROLLED_BACK`, `RESTART_REQUIRED`
+- `graphify update .` executado ao final.
 
-## Arquivos criados
+## Arquivos alterados
 
-- `src/App/GamingFpsProbeSelfTest.cs`
-
-## Arquivos modificados
-
-- `src/ApexTweaker.Contracts/Optimizations/WindowsOptimizationModels.cs`
-- `src/ApexTweaker.Contracts/Inventory/IWindowsOptimizationInventory.cs`
-- `src/ApexTweaker.Application/Optimizations/WindowsOptimizationApplicationFacade.cs`
-- `src/ApexTweaker.Application/Optimizations/WindowsOptimizationCatalog.cs`
-- `src/ApexTweaker.Application/Optimizations/WindowsOptimizationSelfTest.cs`
-- `src/ApexTweaker.Windows/Inventory/WindowsOptimizationInventoryService.cs`
 - `src/App/Program.cs`
-- `src/App/WindowsOptimizationService.cs`
-- `src/Services/SystemDiagnosticsService.cs`
-- `src/Services/TweakService.cs`
-- `graphify-out/*` via `graphify update .`
+- `src/App/DemoSafetySelfTest.cs`
+- `src/Infrastructure/CommandRunner.cs`
+- `src/Infrastructure/OperationOutcome.cs`
+- `src/Infrastructure/RuntimeModeContext.cs`
+- `src/Services/MutationExecutor.cs`
+- `docs/coordination/backend-handoff.md`
 
-## Arquivos removidos
+## Diff resumido
 
-- nenhum
+- `Program.cs`
+  - passa a configurar `RuntimeMode.Standard` por default
+  - reconhece `--demo`
+  - adiciona `--demo-self-test`
+  - executa self-tests antes de qualquer migracao incidental
+- `RuntimeModeContext`
+  - contexto global simples para `Unknown` / `Standard` / `Demo`
+  - politica fail-closed central para mutacoes
+- `CommandRunner`
+  - classificador conservador de comandos mutadores vs leitura
+  - bloqueio automatico de comandos mutadores em `Demo` ou `Unknown`
+- `OperationOutcome`
+  - tipos internos novos sob `Infrastructure`, sem tocar `Models` ou `Contracts`
+- `MutationExecutor`
+  - gate antes de abrir sessao mutadora
+  - captura `OperationOutcome` interno por execucao
+  - rastreio de etapas `Validate`, `Snapshot`, `Execute`, `Verify`
+  - distincao entre `Failed`, `PartiallyCompleted`, `Cancelled`, `TimedOut`, `RollbackRequired`, `RolledBack`, `RestartRequired`
+  - resumo de outcome anexado ao log legado para o caminho atual via `TweakService`
+- `DemoSafetySelfTest`
+  - prova que `powercfg /list` segue permitido em demo
+  - prova que mutacao direta no `CommandRunner` e caminho legado via `TweakService` sao bloqueados
+  - valida os kinds de outcome sem tocar Registro, GPO, servicos, BCD ou power plan reais
 
-## Decisoes tomadas
+## Contratos / Models
 
-- `GamingPerformanceProbe` ficou no contrato compartilhado e eh capturado por `WindowsOptimizationInventoryService`, para manter leitura separada das mutacoes.
-- ReBAR ficou como `best effort`: o probe retorna `Unknown` com ponteiro para `bios.resizable-bar` quando nao ha sinal confiavel no inventario Windows.
-- `ApplyVbsMemoryIntegrityDisable(bool confirmed)` so muta quando `confirmed == true`; sem confirmacao retorna `[SKIP]`.
-- As novas mutacoes usam read-back previo para registrar `[SKIP]` quando o valor alvo ja esta aplicado.
-- O self-test `--gaming-fps-probe-self-test` nao chama nenhuma API de mutacao; ele valida probe, diagnostico e catalogo apenas por leitura.
+- Nenhum arquivo em `src/Models/**` foi alterado.
+- Nenhum arquivo em `src/ApexTweaker.Contracts/**` foi alterado.
+- `OperationOutcome` ficou interno ao backend, conforme o routing.
 
-## Contratos afetados
+```text
+Tipo interno criado: OperationOutcome (+ OperationOutcomeKind, OperationStepResult, OperationStepStatus)
+Localização: src/Infrastructure/OperationOutcome.cs
+Consumidores: MutationExecutor (pipeline); resumo em logs legados via TweakService
+Pretende virar contrato compartilhado: SIM (fase futura, se UI consumir resultado tipado)
+Mudança proposta: promover OperationOutcome/StepResult/Kind (+ ErrorDescriptor) para Contracts/Models sob aprovação do orquestrador — não feito nesta task
+```
 
-- `IWindowsOptimizationInventory` agora expõe `CaptureGamingPerformanceProbe()`.
-- `WindowsOptimizationModels` ganhou `FeatureState`, `RequestedFeatureState`, `ResizableBarStatus`, `ResizableBarProbe` e `GamingPerformanceProbe`.
-- `WindowsOptimizationService` agora expõe:
-  - `CaptureGamingPerformanceProbe()`
-  - `ApplyVbsMemoryIntegrityDisable(bool confirmed)`
-  - `ApplyGameFullscreenOptimizationsOff(string? exePath)`
-  - `ApplyCompetitiveCaptureQuiet()`
+Dívida temporária aceitável: tipos públicos *internos ao assembly* em `Infrastructure`, não em `Services` como contrato de produto.
 
-## Testes executados
+## Propostas de contrato para fase futura
 
-| Comando | Exit code | Notas |
-|---------|-----------|-------|
-| `dotnet build ApexTweaker.sln -c Release` | `0` | build Release completo ok |
-| `dotnet run --project ApexTweaker.csproj -c Release -- --gaming-fps-probe-self-test` | `1` | falhou por `NU1301` ao consultar `api.nuget.org` para repository signatures, apesar do build ja estar pronto |
-| `dotnet run --project ApexTweaker.csproj -c Release --no-build --no-restore -- --gaming-fps-probe-self-test` | `0` | self-test novo passou sem rebuild |
-| `dotnet .\bin\Release\net10.0-windows\ApexTweaker.dll --gaming-fps-probe-self-test` | `0` | self-test novo passou no artefato Release |
-| `dotnet .\bin\Release\net10.0-windows\ApexTweaker.dll --market-coverage-self-test` | `0` | regressao basica do catalogo tambem passou |
-| `graphify update .` | `0` | grafo AST atualizado; `graph.json`, `graph.html` e `GRAPH_REPORT.md` regenerados |
+- Se a UI for consumir o resultado tipado, propor ao orquestrador um contrato publico compartilhado para:
+  - `OperationOutcome`
+  - `OperationStepResult`
+  - `OutcomeKind`
+  - `ErrorDescriptor`
+- Esta task nao faz essa promocao para `Models/Contracts`.
 
-## Erros restantes
+## Verificacoes executadas
 
-- `dotnet run` sem `--no-build --no-restore` continua vulneravel ao erro local de rede/assinatura `NU1301` com NuGet.
+| Comando | Exit code | Resultado |
+|---|---:|---|
+| `dotnet build ApexTweaker.sln -c Release` | `0` | build Release ok |
+| `dotnet run --project ApexTweaker.csproj -c Release -- --demo-self-test` | `1` | falhou na sandbox por `NU1301` ao consultar assinaturas do NuGet |
+| `dotnet run --project ApexTweaker.csproj -c Release --no-build --no-restore -- --demo-self-test` | `0` | `Demo safety self-test: ALL PASS` |
+| `dotnet run --project ApexTweaker.csproj -c Release -- --gaming-fps-probe-self-test` | `1` | falhou na sandbox por `NU1301` ao consultar assinaturas do NuGet |
+| `dotnet run --project ApexTweaker.csproj -c Release --no-build --no-restore -- --gaming-fps-probe-self-test` | `0` | `Gaming FPS probe self-test: ALL PASS` |
+| `graphify update .` | `0` | AST graph atualizado com `graph.json`, `graph.html` e `GRAPH_REPORT.md` regenerados |
 
-## Riscos
+## Observado vs inferido
 
-- O probe de ReBAR nao afirma `Enabled/Disabled`; ele assume `Unknown` quando o Windows nao entrega um sinal confiavel e delega a confirmacao final ao checklist BIOS/driver.
-- As novas APIs de mutacao foram adicionadas no backend, mas este handoff nao inclui ligacao de UI/WPF para botoes dedicados.
-- O worktree ja tinha mudancas nao relacionadas em `docs/coordination/backend-task.md` e arquivos fora do escopo; elas nao foram alteradas por esta entrega.
+- Observado:
+  - `MutationExecutor` era a fronteira central do pipeline mutador usado por `TweakService`.
+  - `CommandRunner` executava comandos sem contexto de runtime.
+  - O caminho legado de `TweakService` continuou passando pelo gate novo sem edicao em UI.
+  - Os self-tests novos e o self-test legado de gaming passaram quando executados com `--no-build --no-restore`.
+- Inferido:
+  - A falha dos `dotnet run` exatos decorre do ambiente/sandbox consultando metadata de assinatura do NuGet, nao de regressao funcional do app, porque o build Release e as execucoes `--no-build --no-restore` passaram na mesma revisao.
 
-## Itens nao concluidos
+## Pendencias
 
-- Nenhum dentro do escopo pedido em `backend-task.md`.
+- Nenhuma pendencia obrigatoria dentro do escopo aprovado.
+- Se o orquestrador exigir consumo de outcome pela UI, isso depende de uma task separada de contrato + FE.
 
-## Commit
+## Riscos / limites conhecidos
 
-nao commitado / hash: `git rev-parse HEAD` nao executado
+- O classificador de mutacao do `CommandRunner` e deliberadamente conservador. Isso reduz risco de bypass, mas novos comandos mutadores/read-only fora dos padroes atuais podem exigir ajuste futuro.
+- O outcome tipado ainda nao e consumido pela UI; hoje ele fica disponivel no backend e resumido nas mensagens legadas.
+- `ROLLED_BACK` hoje depende de marcacao explicita do executor; o fluxo de restore legado ainda nao foi migrado para produzir esse outcome automaticamente.
