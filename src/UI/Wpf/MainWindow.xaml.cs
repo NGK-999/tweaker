@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -146,7 +146,6 @@ public partial class MainWindow : Window
             }
 
             performanceView = new PerformanceView();
-            RefreshPerformanceProbe();
             performanceView.DisableVbsHvciRequested += DisableVbsHvciAsync;
             performanceView.OptimizeFullscreenRequested += OptimizeFullscreenAsync;
             performanceView.CompetitiveModeRequested += RunCompetitiveModeAsync;
@@ -154,15 +153,28 @@ public partial class MainWindow : Window
         }
     }
 
-    private void RefreshPerformanceProbe()
+    private void RefreshPerformanceProbe() => _ = RefreshPerformanceProbeAsync();
+
+    private async Task RefreshPerformanceProbeAsync()
     {
         if (performanceView is null)
         {
             return;
         }
 
-        performanceView.ApplyProbe(windowsOptimizationService.CaptureGamingPerformanceProbe());
-        performanceView.SetValorantStatus(valorantLocator.FindExecutable());
+        var service = windowsOptimizationService;
+        var locator = valorantLocator;
+        var (probe, valorantPath) = await Task.Run(() =>
+                (service.CaptureGamingPerformanceProbe(), locator.FindExecutable()))
+            .ConfigureAwait(true);
+
+        if (performanceView is null)
+        {
+            return;
+        }
+
+        performanceView.ApplyProbe(probe);
+        performanceView.SetValorantStatus(valorantPath);
     }
 
     private ModulesView Modules
@@ -499,9 +511,13 @@ public partial class MainWindow : Window
         }
 
         var page = factory();
+        Task<(GamingPerformanceProbe Probe, string? ValorantPath)>? performanceCapture = null;
         if (string.Equals(pageKey, PerformancePageKey, StringComparison.OrdinalIgnoreCase))
         {
-            RefreshPerformanceProbe();
+            var service = windowsOptimizationService;
+            var locator = valorantLocator;
+            performanceCapture = Task.Run(() =>
+                (service.CaptureGamingPerformanceProbe(), locator.FindExecutable()));
         }
 
         AppThemeManager.Apply(page, AppThemeManager.Current);
@@ -546,6 +562,13 @@ public partial class MainWindow : Window
             var pageTask = PageTransitionAnimator.ShowAsync(PageHost, page, cancellationToken, skipAnimation: !animate);
             await Task.WhenAll(headerTask, pageTask).ConfigureAwait(true);
             activePageKey = pageKey;
+
+            if (performanceCapture is not null && performanceView is not null)
+            {
+                var (probe, valorantPath) = await performanceCapture.ConfigureAwait(true);
+                performanceView.ApplyProbe(probe);
+                performanceView.SetValorantStatus(valorantPath);
+            }
 
             if (string.Equals(pageKey, TelemetryPageKey, StringComparison.OrdinalIgnoreCase) &&
                 PageHost.Content is TelemetryView telemetryPage)
@@ -2542,8 +2565,6 @@ public partial class MainWindow : Window
 
     private async void PerformanceButton_OnClick(object sender, RoutedEventArgs e)
     {
-        _ = Performance;
-        RefreshPerformanceProbe();
         await ShowPageAsync(PerformancePageKey, PerformanceButton);
     }
 

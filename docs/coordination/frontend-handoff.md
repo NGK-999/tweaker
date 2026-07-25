@@ -1,63 +1,42 @@
-# Frontend handoff — FE-FEEDBACK-SHELL-P0
+# Frontend handoff — FE-SHELL-FLUENCY-P1
 
-**Status:** DONE (worktree) — aguarda revisão do orquestrador
-**Branch:** `agent/claude-fe-feedback-shell-p0`
-**Worktree:** `C:\projetos\Apextweaker-claude`
-**Executor:** Orquestrador (recuperação após falha do subagent Claude por limite de API)
-**Data:** 2026-07-25
+**Status:** DONE (orquestrador) — Claude Opus indisponível (API limit)  
+**Branch:** `main` (WIP commit nesta entrega)  
+**Worktree Claude:** `agent/claude-fe-shell-fluency-p1` espelha o mesmo esqueleto  
+**Data:** 2026-07-25  
 
-## Escopo entregue
+## Nota sobre Claude
 
-1. `SnackbarKind.Error` + borda `ErrorBrush`
-2. Removido `ClassifySnackbarKind` (sem substring no shell SetStatus)
-3. Estados distintos Empty / Partial / Error / Ready via `CatalogFeedbackKind`
-4. CTA: “Ir ao Dashboard para usar Auto-Optimize” (navegação; tooltip deixa claro que não inicia apply)
-5. `AutomationProperties.Name` em Analisar / Retry / GoToAuto
-6. Sem contrato `OperationOutcome` no FE
+- Subagente [Claude FE](816058bc-ea44-4921-a6cd-6020fedc0d9f): **ERROR** — API usage limit; sem edições.
+- CLI `claude --bg`: instável (truncamento de prompt / permissão / daemon).
+- Entrega mecânica do plano FE-SHELL-FLUENCY-P1 concluída pelo orquestrador.
 
-## Arquivos alterados (allowed)
+## O que mudou
 
-| Arquivo | Mudança |
-|---------|---------|
-| `src/UI/Wpf/Controls/Snackbar.cs` | +Error |
-| `src/UI/Wpf/ViewModels/CatalogFeedbackState.cs` | **novo** máquina de estado UI |
-| `src/UI/Wpf/ViewModels/CatalogViewModel.cs` | feedback + catch Analyze |
-| `src/UI/Wpf/Views/CatalogView.xaml` | painéis Empty/Partial/Error + CTA |
-| `src/UI/Wpf/Views/CatalogView.xaml.cs` | eventos shell + focus retry |
-| `src/UI/Wpf/Testing/CatalogFeedbackSelfTest.cs` | **novo** asserts |
-| `src/UI/Wpf/MainWindow.xaml.cs` | Catalog wiring; `SetStatus(msg, kind)`; remove classifier |
+1. **PageTransitionAnimator** — crossfade só opacity (~200 ms); removidos scale/translate e `BitmapCache`.
+2. **UiMotion** — `DesiredFrameRate` 60; header mais curto (120/160 ms).
+3. **CatalogView / CatalogViewModel** — `AnalyzeAsync` com `Task.Run`; status “Analisando…”; geração para cancelar supersedidos.
+4. **MainWindow** — probe de Desempenho capturado em paralelo à transição (`Task.Run`); apply no UI após swap; getter de Performance não bloqueia mais.
 
-## Testes
+## Como testar
 
-| Item | Status |
-|------|--------|
-| Build Release | **EXECUTADO** — PASS (0 erros) |
-| `CatalogFeedbackSelfTest` compile | **COMPILADO** |
-| `CatalogFeedbackSelfTest.Run()` via Program | **NÃO EXECUTADO — AGUARDA HARNESS** (`Program.cs` congelado nesta rodada) |
-| Anti-substring `ClassifySnackbarKind` | **EXECUTADO** — removido de MainWindow |
-| rg Contains erro no escopo FE desta task | MainWindow limpo; `TelemetryView.xaml.cs` ainda tem heurística **fora do escopo** |
-
-### Proposta (não aplicada)
-
-```text
-Program.cs: if args --catalog-feedback-self-test → Environment.Exit(CatalogFeedbackSelfTest.Run());
+```powershell
+dotnet build ApexTweaker.sln -c Release
+dotnet run --project ApexTweaker.csproj -c Release -- --demo
+# Navegar rápido: Dashboard → Catálogo → Desempenho → Dashboard
 ```
 
-## Evidências git (UI)
+Self-tests: demo / catalog-feedback / gaming-fps-probe — PASS na verificação do orquestrador.
+
+## Riscos / dívidas
+
+- Elevação “premium” de motion além do P1 ficou para quando Claude/API voltar.
+- `SystemParameters.ClientAnimation` não existe em WPF clássico — skip só via `skipAnimation`.
+- UI-OUTCOME-P1 ainda pendente (timeout pode parecer sucesso na UI).
+
+## Resultado
 
 ```text
-git diff --stat (UI + handoff): ver worktree
-git diff --check: limpo nos arquivos UI
+PASS (escopo P1 mecânico)
+Claude elevate: BLOQUEADO (API limit)
 ```
-
-## Pendências
-
-- Wire `--catalog-feedback-self-test` no integrate (orquestrador)
-- Migrar call sites legados de `SetStatus` que hoje caem em Info (antes Warning via substring) — task futura
-- TelemetryView Contains("erro") — dívida fora desta task
-
-## Não feito / respeitado
-
-- Sem redesign amplo
-- Sem Models/Contracts/Services/App/Program
-- Sem OperationOutcome compartilhado

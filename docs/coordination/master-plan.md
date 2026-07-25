@@ -1,4 +1,4 @@
-﻿# Master plan — status
+# Master plan — status
 
 **Atualizado:** 2026-07-25
 
@@ -19,5 +19,7 @@
 1. **UI-OUTCOME-P1** — consumir `OperationOutcome` na UI (`RunTweakAsync` / Auto-Tuning); timeout/cancel não podem parecer sucesso.
 2. **DEMO-INVENTORY-P1** — Secure Boot/TPM sem PowerShell em Demo (API tipada ou coletor dedicado).
 3. **CI-REQUIRED-P1** — GitHub Actions obrigatório no HEAD (build + self-tests).
+
+| FE-SHELL-FLUENCY-P1 | **DONE** — transition leve + Analyze/probe off UI thread |
 
 Opcional depois: WPF-UI NuGet incremental / polish; restaurar stash `wip-pre-p0-integration-*` só com cuidado consciente.

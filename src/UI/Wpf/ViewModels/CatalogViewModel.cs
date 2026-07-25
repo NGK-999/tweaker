@@ -1,6 +1,8 @@
 using System;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using ApexTweaker.Models;
 using ApexTweaker.Services;
 using ApexTweaker.UI.Wpf.Controls;
@@ -11,6 +13,7 @@ namespace ApexTweaker.UI.Wpf.ViewModels;
 internal sealed partial class CatalogViewModel : ObservableObject
 {
     private readonly WindowsOptimizationService optimizationService = new();
+    private int analyzeGeneration;
 
     public ObservableCollection<CatalogRowViewModel> Rows { get; } = new();
 
@@ -57,15 +60,30 @@ internal sealed partial class CatalogViewModel : ObservableObject
         }
     }
 
-    public void Analyze()
+    public async Task AnalyzeAsync()
     {
+        var generation = Interlocked.Increment(ref analyzeGeneration);
+        var preset = SelectedPreset;
+
         Rows.Clear();
         UsageUnknown = true;
+        FeedbackKind = CatalogFeedbackKind.Idle;
+        FeedbackTitle = string.Empty;
+        FeedbackDetail = string.Empty;
+        StatusText = "Analisando catalogo...";
+        NotifyFeedbackVisibility();
 
         try
         {
-            // Usage profile UI not wired yet — Unknown is intentional Partial signal.
-            var plan = optimizationService.Analyze(SelectedPreset, WindowsUsageProfile.Unknown);
+            var plan = await Task.Run(() =>
+                    optimizationService.Analyze(preset, WindowsUsageProfile.Unknown))
+                .ConfigureAwait(true);
+
+            if (generation != Volatile.Read(ref analyzeGeneration))
+            {
+                return;
+            }
+
             foreach (var decision in plan.Decisions.OrderBy(d => d.Rule.Category).ThenBy(d => d.Rule.Name))
             {
                 Rows.Add(new CatalogRowViewModel(decision));
@@ -74,20 +92,21 @@ internal sealed partial class CatalogViewModel : ObservableObject
             ApplyFeedback(rowCount: Rows.Count, analyzeFailed: false, usageUnknown: true);
 
             StatusText =
-                $"{SelectedPreset}: {plan.Recommended.Count} recomendados, " +
+                $"{preset}: {plan.Recommended.Count} recomendados, " +
                 $"{plan.RequiringConfirmation.Count} confirmacao, {plan.Blocked.Count} bloqueados. " +
                 "Esta tela so analisa; aplicacao e no Dashboard (Auto-Optimize).";
         }
         catch (Exception ex)
         {
+            if (generation != Volatile.Read(ref analyzeGeneration))
+            {
+                return;
+            }
+
             HandleAnalyzeFailure(ex);
         }
 
-        OnPropertyChanged(nameof(ShowEmptyPanel));
-        OnPropertyChanged(nameof(ShowPartialPanel));
-        OnPropertyChanged(nameof(ShowErrorPanel));
-        OnPropertyChanged(nameof(ShowRulesList));
-        OnPropertyChanged(nameof(ShowGoToAutoCta));
+        NotifyFeedbackVisibility();
     }
 
     /// <summary>Last technical diagnostic from Analyze (not shown as primary UI copy).</summary>
@@ -105,6 +124,16 @@ internal sealed partial class CatalogViewModel : ObservableObject
         FeedbackDetail =
             "Nao foi possivel gerar o plano. Nenhuma otimizacao foi aplicada. " +
             "Abra Detalhes no log se precisar de diagnostico tecnico.";
+        NotifyFeedbackVisibility();
+    }
+
+    private void NotifyFeedbackVisibility()
+    {
+        OnPropertyChanged(nameof(ShowEmptyPanel));
+        OnPropertyChanged(nameof(ShowPartialPanel));
+        OnPropertyChanged(nameof(ShowErrorPanel));
+        OnPropertyChanged(nameof(ShowRulesList));
+        OnPropertyChanged(nameof(ShowGoToAutoCta));
     }
 
     private void ApplyFeedback(int rowCount, bool analyzeFailed, bool usageUnknown)
@@ -128,7 +157,6 @@ internal sealed partial class CatalogViewModel : ObservableObject
                 break;
             case CatalogFeedbackKind.Error:
                 FeedbackTitle = "Falha na analise";
-                // Detail set by caller when exception message available.
                 if (string.IsNullOrWhiteSpace(FeedbackDetail))
                 {
                     FeedbackDetail = "A analise falhou. Nenhuma otimizacao foi aplicada.";

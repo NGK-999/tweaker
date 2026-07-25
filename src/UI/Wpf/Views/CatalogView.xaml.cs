@@ -1,4 +1,5 @@
 using System;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using ApexTweaker.Models;
@@ -32,7 +33,7 @@ public partial class CatalogView : WpfUserControl
         Loaded += CatalogView_OnLoaded;
     }
 
-    private void CatalogView_OnLoaded(object sender, RoutedEventArgs e)
+    private async void CatalogView_OnLoaded(object sender, RoutedEventArgs e)
     {
         if (initialAnalyzeDone)
         {
@@ -40,15 +41,16 @@ public partial class CatalogView : WpfUserControl
         }
 
         initialAnalyzeDone = true;
-        RunAnalyzeAndRefreshUi();
+        await RunAnalyzeAndRefreshUiAsync().ConfigureAwait(true);
     }
 
-    private void AnalyzeButton_OnClick(object sender, RoutedEventArgs e) => RunAnalyzeAndRefreshUi();
+    private async void AnalyzeButton_OnClick(object sender, RoutedEventArgs e) =>
+        await RunAnalyzeAndRefreshUiAsync().ConfigureAwait(true);
 
-    private void RetryAnalyze_OnClick(object sender, RoutedEventArgs e)
+    private async void RetryAnalyze_OnClick(object sender, RoutedEventArgs e)
     {
         RetryEmptyButton.Focus();
-        RunAnalyzeAndRefreshUi();
+        await RunAnalyzeAndRefreshUiAsync().ConfigureAwait(true);
     }
 
     private void GoToAuto_OnClick(object sender, RoutedEventArgs e)
@@ -67,14 +69,14 @@ public partial class CatalogView : WpfUserControl
         }
     }
 
-    private void RunAnalyzeAndRefreshUi()
+    private async Task RunAnalyzeAndRefreshUiAsync()
     {
         if (PresetCombo.SelectedItem is WindowsOptimizationPreset preset)
         {
             viewModel.SelectedPreset = preset;
         }
 
-        viewModel.Analyze();
+        await viewModel.AnalyzeAsync().ConfigureAwait(true);
         StatusText.Text = viewModel.StatusText;
         ApplyFeedbackVisibility();
 

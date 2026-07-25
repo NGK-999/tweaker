@@ -10,14 +10,14 @@ namespace ApexTweaker.UI.Wpf.Animations;
 
 internal static class UiMotion
 {
-    public static readonly TimeSpan Quick = TimeSpan.FromMilliseconds(160);
-    public static readonly TimeSpan Standard = TimeSpan.FromMilliseconds(240);
+    public static readonly TimeSpan Quick = TimeSpan.FromMilliseconds(120);
+    public static readonly TimeSpan Standard = TimeSpan.FromMilliseconds(160);
 
     public static readonly IEasingFunction EaseOut = new PowerEase { Power = 4, EasingMode = EasingMode.EaseOut };
     public static readonly IEasingFunction EaseIn = new PowerEase { Power = 3, EasingMode = EasingMode.EaseIn };
     public static readonly IEasingFunction EaseInOut = new CubicEase { EasingMode = EasingMode.EaseInOut };
 
-    public static void ConfigureStoryboard(Storyboard storyboard, int desiredFrameRate = 120)
+    public static void ConfigureStoryboard(Storyboard storyboard, int desiredFrameRate = 60)
     {
         Timeline.SetDesiredFrameRate(storyboard, desiredFrameRate);
     }
@@ -91,13 +91,13 @@ internal static class UiMotion
         ConfigureStoryboard(storyboard);
 
         storyboard.Children.Add(CreateDoubleAnimation(target, UIElement.OpacityProperty, 0D, Quick, EaseIn));
-        storyboard.Children.Add(CreateDoubleAnimation(transform, TranslateTransform.YProperty, -6D, Quick, EaseIn));
+        storyboard.Children.Add(CreateDoubleAnimation(transform, TranslateTransform.YProperty, -4D, Quick, EaseIn));
 
         void OnFirstCompleted(object? sender, EventArgs args)
         {
             storyboard.Completed -= OnFirstCompleted;
             target.Text = newText;
-            transform.Y = 8D;
+            transform.Y = 4D;
             target.Opacity = 0D;
 
             var enter = new Storyboard { FillBehavior = FillBehavior.Stop };
@@ -119,10 +119,6 @@ internal static class UiMotion
 
         storyboard.Completed += OnFirstCompleted;
 
-        // Runs synchronously as part of the caller's Cancel() call (CancellationToken.Register
-        // callbacks execute on the cancelling thread) — deferring this via Dispatcher.BeginInvoke
-        // let a superseding AnimateHeaderAsync call start first and then get its text/transform
-        // stomped by this stale cleanup on the next dispatcher tick.
         using var registration = cancellationToken.Register(() =>
         {
             storyboard.Stop();

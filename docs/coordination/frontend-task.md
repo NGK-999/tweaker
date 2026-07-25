@@ -1,8 +1,8 @@
 # Frontend task
 
-**Task ID:** *(próximo lote)* UI-OUTCOME-P1  
-**Status:** IDLE — P0 merged  
-**Branch:** `main` @ `de49cc3`  
-**Anterior:** FE-FEEDBACK-SHELL-P0 + Snackbar P0.2 MERGED via PR #2
+**Task ID:** FE-SHELL-FLUENCY-P1  
+**Status:** DONE (orquestrador) — Claude API limit  
+**Branch:** `main`  
+**Handoff:** `docs/coordination/frontend-handoff.md`  
 
-Próximo foco sugerido: consumir `OperationOutcome` tipado no shell (não classificar logs por substring).
+Claude Opus ([Claude FE](816058bc-ea44-4921-a6cd-6020fedc0d9f)) não executou. P1 mecânico entregue: transition leve + AnalyzeAsync + probe async.
