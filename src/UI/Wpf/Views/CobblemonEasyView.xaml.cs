@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Automation;
+using System.Windows.Controls;
 using ApexTweaker.Minecraft.Models;
 using ApexTweaker.UI.Wpf.ViewModels;
 using WpfUserControl = System.Windows.Controls.UserControl;
@@ -19,6 +20,7 @@ public partial class CobblemonEasyView : WpfUserControl
 
     private readonly CobblemonEasyViewModel viewModel = new();
     private EasyPrimaryAction primaryAction;
+    private bool hookModeConfirmEnabled;
 
     public CobblemonEasyView()
     {
@@ -28,6 +30,7 @@ public partial class CobblemonEasyView : WpfUserControl
         EasyFpsComboBox.SelectedItem = 24;
         EasyHookModeComboBox.ItemsSource = CobblemonEasyViewModel.HookModeChoices;
         EasyPlayTargetComboBox.ItemsSource = CobblemonEasyViewModel.PlayTargetChoices;
+        Loaded += (_, _) => hookModeConfirmEnabled = true;
         UpdateActions();
     }
 
@@ -235,8 +238,25 @@ public partial class CobblemonEasyView : WpfUserControl
 
     private async Task TestAsync()
     {
+        if (viewModel.SessionHookMode == MinecraftSessionHookMode.Extreme)
+        {
+            if (MessageBox.Show(
+                    "Hooks EXTREMOS nesta sessao:\n\n" +
+                    "- Prioridade High (nunca RealTime)\n" +
+                    "- Afinidade P-cores se CPU hibrida\n" +
+                    "- Power Mode Best Performance (com rollback)\n\n" +
+                    "Alteracoes sao so no processo Java do Minecraft e revertem ao terminar.\nContinuar?",
+                    "Hooks extremos",
+                    MessageBoxButton.OKCancel,
+                    MessageBoxImage.Warning) != MessageBoxResult.OK)
+            {
+                return;
+            }
+        }
+
         if (MessageBox.Show(
                 $"Abra o Minecraft, chegue ao menu e entre no {(viewModel.PlayTarget == MinecraftPlayTargetKind.Server ? "servidor" : "mundo local")}.\n\n" +
+                $"Hooks: {viewModel.SelectedHookMode}.\n" +
                 "Depois clique OK. O ApexTweaker observara o processo Java por 60 segundos. FPS nao e medido automaticamente.",
                 "Testar Minecraft",
                 MessageBoxButton.OKCancel,
@@ -248,6 +268,32 @@ public partial class CobblemonEasyView : WpfUserControl
         if (TestRequested is not null)
         {
             await TestRequested.Invoke(viewModel.SelectedPath);
+        }
+    }
+
+    private void EasyHookModeComboBox_OnSelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!hookModeConfirmEnabled || e.AddedItems.Count == 0)
+        {
+            return;
+        }
+
+        if (e.AddedItems[0] is not string mode ||
+            !string.Equals(mode, "Extremo", StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        // Confirm switching into Extreme; revert to Safe if cancelled.
+        if (MessageBox.Show(
+                "Ativar hooks EXTREMOS?\n\nPrioridade High + P-cores (se hibrido) + Best Performance.\nSem RealTime / kernel / injecao. Rollback ao fim do teste.",
+                "Confirmar Extremo",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning) != MessageBoxResult.Yes)
+        {
+            hookModeConfirmEnabled = false;
+            viewModel.SelectedHookMode = "Seguro";
+            hookModeConfirmEnabled = true;
         }
     }
 
