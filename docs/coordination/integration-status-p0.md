@@ -13,7 +13,7 @@
 | Frontend | `787e649` (cherry-pick de `97b38e5`) | FE-FEEDBACK-SHELL-P0 |
 | Harness | `70411ae` | `test: wire catalog feedback self-test` |
 | Docs | `eb25c82` | consolidate P0 status |
-| P0.1 fail-closed | *(este commit)* | `CommandIntent` ReadOnly\|Mutation\|Unknown |
+| P0.1 fail-closed | `6fc38c7` | `CommandIntent` ReadOnly\|Mutation\|Unknown |
 
 ## Resultados
 
