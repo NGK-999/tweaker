@@ -1,10 +1,8 @@
 # Backend task
 
-**Task ID:** P0.2-BLOCKERS (BE slice)  
-**Status:** READY FOR RE-REVIEW — merge bloqueado  
-**Worktree:** `C:\projetos\Apextweaker`  
-**Branch:** `integration/p0-demo-outcome-feedback`  
-**Task:** `docs/coordination/p0.2-task.md`  
-**Prompt:** `docs/coordination/prompts/P0.2-BLOCKERS.md`
+**Task ID:** *(próximo lote)* UI-OUTCOME-P1 / DEMO-INVENTORY-P1 / CI-REQUIRED-P1  
+**Status:** IDLE — P0 merged  
+**Branch:** `main` @ `de49cc3`  
+**Anterior:** P0.2.1 MERGED via PR #2
 
-Contratos `Models`/`Contracts` congelados. Escopo: outcome/cancel/ledger/classificador + self-test.
+Contratos `Models`/`Contracts` continuam congelados até nova tarefa liberar.
