@@ -29,7 +29,7 @@ dotnet run --project ApexTweaker.csproj -c Release -- --gaming-fps-probe-self-te
 
 ## Riscos / dívidas
 
-- Claude polish paralelo pode trazer commits extras no worktree; revisar antes de cherry-pick.
+- Claude polish paralelo: **API limit** — sem commits no worktree; elevação futura quando a quota voltar.
 - DEMO-INVENTORY-P1 e CI-REQUIRED-P1 ainda no master-plan.
 - `$impeccable init` (PRODUCT.md) ainda sugerido, não bloqueante.
 
