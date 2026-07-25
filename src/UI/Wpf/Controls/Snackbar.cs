@@ -10,7 +10,8 @@ public enum SnackbarKind
 {
     Info,
     Success,
-    Warning
+    Warning,
+    Error
 }
 
 /// <summary>
@@ -57,6 +58,7 @@ public sealed class Snackbar : Border
         {
             SnackbarKind.Success => "SuccessBrush",
             SnackbarKind.Warning => "WarningBrush",
+            SnackbarKind.Error => "ErrorBrush",
             _ => "AccentBrush"
         };
         SetResourceReference(BorderBrushProperty, borderKey);

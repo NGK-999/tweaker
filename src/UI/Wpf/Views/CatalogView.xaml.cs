@@ -2,6 +2,7 @@ using System;
 using System.Windows;
 using System.Windows.Controls;
 using ApexTweaker.Models;
+using ApexTweaker.UI.Wpf.Controls;
 using ApexTweaker.UI.Wpf.ViewModels;
 using WpfUserControl = System.Windows.Controls.UserControl;
 
@@ -10,6 +11,13 @@ namespace ApexTweaker.UI.Wpf.Views;
 public partial class CatalogView : WpfUserControl
 {
     private readonly CatalogViewModel viewModel = new();
+    private bool initialAnalyzeDone;
+
+    /// <summary>Shell should navigate to Dashboard only — does not start Auto-Optimize.</summary>
+    public event Action? GoToAutoOptimizeNavigationRequested;
+
+    /// <summary>Explicit snackbar kind for shell (no substring classification).</summary>
+    public event Action<string, SnackbarKind>? FeedbackStatusRequested;
 
     public CatalogView()
     {
@@ -20,19 +28,35 @@ public partial class CatalogView : WpfUserControl
         viewModel.LoadBios();
         BiosList.ItemsSource = viewModel.BiosItems;
         RulesList.ItemsSource = viewModel.Rows;
-        viewModel.Analyze();
-        StatusText.Text = viewModel.StatusText;
+        // Analyze on Loaded so MainWindow can subscribe FeedbackStatusRequested first.
+        Loaded += CatalogView_OnLoaded;
     }
 
-    private void AnalyzeButton_OnClick(object sender, RoutedEventArgs e)
+    private void CatalogView_OnLoaded(object sender, RoutedEventArgs e)
     {
-        if (PresetCombo.SelectedItem is WindowsOptimizationPreset preset)
+        if (initialAnalyzeDone)
         {
-            viewModel.SelectedPreset = preset;
+            return;
         }
 
-        viewModel.Analyze();
-        StatusText.Text = viewModel.StatusText;
+        initialAnalyzeDone = true;
+        RunAnalyzeAndRefreshUi();
+    }
+
+    private void AnalyzeButton_OnClick(object sender, RoutedEventArgs e) => RunAnalyzeAndRefreshUi();
+
+    private void RetryAnalyze_OnClick(object sender, RoutedEventArgs e)
+    {
+        RetryEmptyButton.Focus();
+        RunAnalyzeAndRefreshUi();
+    }
+
+    private void GoToAuto_OnClick(object sender, RoutedEventArgs e)
+    {
+        FeedbackStatusRequested?.Invoke(
+            "Abrindo Dashboard. Use Auto-Optimize la quando quiser aplicar — nada foi iniciado ainda.",
+            SnackbarKind.Info);
+        GoToAutoOptimizeNavigationRequested?.Invoke();
     }
 
     private void PresetCombo_OnSelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -41,5 +65,33 @@ public partial class CatalogView : WpfUserControl
         {
             viewModel.SelectedPreset = preset;
         }
+    }
+
+    private void RunAnalyzeAndRefreshUi()
+    {
+        if (PresetCombo.SelectedItem is WindowsOptimizationPreset preset)
+        {
+            viewModel.SelectedPreset = preset;
+        }
+
+        viewModel.Analyze();
+        StatusText.Text = viewModel.StatusText;
+        ApplyFeedbackVisibility();
+
+        if (viewModel.FeedbackKind == CatalogFeedbackKind.Error)
+        {
+            FeedbackStatusRequested?.Invoke(viewModel.StatusText, SnackbarKind.Error);
+            RetryErrorButton.Focus();
+        }
+    }
+
+    private void ApplyFeedbackVisibility()
+    {
+        EmptyPanel.Visibility = viewModel.ShowEmptyPanel ? Visibility.Visible : Visibility.Collapsed;
+        ErrorPanel.Visibility = viewModel.ShowErrorPanel ? Visibility.Visible : Visibility.Collapsed;
+        PartialPanel.Visibility = viewModel.ShowPartialPanel ? Visibility.Visible : Visibility.Collapsed;
+        RulesList.Visibility = viewModel.ShowRulesList ? Visibility.Visible : Visibility.Collapsed;
+        RulesHeader.Visibility = viewModel.ShowRulesList ? Visibility.Visible : Visibility.Collapsed;
+        GoToAutoButton.Visibility = viewModel.ShowGoToAutoCta ? Visibility.Visible : Visibility.Collapsed;
     }
 }

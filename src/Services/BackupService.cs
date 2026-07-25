@@ -289,12 +289,20 @@ internal sealed class BackupService
             session.NextSequence());
     }
 
+    /// <summary>Test-only override for ledger persistence failures (DemoSafetySelfTest).</summary>
+    internal Func<MutationSession, bool, string?, string?, IReadOnlyList<string>>? CommitMutationSessionOverride { get; set; }
+
     public IReadOnlyList<string> CommitMutationSession(
         MutationSession session,
         bool completed,
         string? failedCommandName = null,
         string? failureMessage = null)
     {
+        if (CommitMutationSessionOverride is not null)
+        {
+            return CommitMutationSessionOverride(session, completed, failedCommandName, failureMessage);
+        }
+
         Directory.CreateDirectory(BackupDirectory);
         if (!session.HasSnapshots)
         {
