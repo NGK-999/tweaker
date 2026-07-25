@@ -61,6 +61,17 @@ public static class CatalogFeedbackSelfTest
             CatalogFeedbackState.Describe(CatalogFeedbackKind.Error) == "Error",
             "state-labels-distinct");
 
+        var catalogVm = new CatalogViewModel();
+        catalogVm.HandleAnalyzeFailure(new InvalidOperationException("catalog-technical-boom"));
+        Check(
+            catalogVm.LastTechnicalDiagnostic is not null &&
+            catalogVm.LastTechnicalDiagnostic.Contains("catalog-technical-boom", StringComparison.Ordinal),
+            "catalog-records-technical-diagnostic");
+        Check(
+            !catalogVm.FeedbackDetail.Contains("catalog-technical-boom", StringComparison.Ordinal) &&
+            !catalogVm.StatusText.Contains("catalog-technical-boom", StringComparison.Ordinal),
+            "catalog-ui-keeps-friendly-copy");
+
         if (failures.Count > 0)
         {
             Console.Error.WriteLine("CatalogFeedbackSelfTest FAIL:");

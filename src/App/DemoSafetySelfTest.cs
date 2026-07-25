@@ -82,6 +82,22 @@ internal static class DemoSafetySelfTest
             "powercfg oficial bare /list continua ReadOnly");
         Check(CommandClassifier.Classify(@"C:\Windows\System32\POWERCFG.EXE", "/list") == CommandIntent.ReadOnly,
             "powercfg System32 com casing diferente continua ReadOnly");
+
+        var barePowerCfg = CommandClassifier.Resolve("powercfg");
+        Check(barePowerCfg.IsTrusted && !string.IsNullOrWhiteSpace(barePowerCfg.CanonicalPath),
+            "bare powercfg resolve IsTrusted com CanonicalPath");
+        Check(
+            barePowerCfg.CanonicalPath!.EndsWith(@"\System32\powercfg.exe", StringComparison.OrdinalIgnoreCase) ||
+            barePowerCfg.CanonicalPath.EndsWith(@"\SysWOW64\powercfg.exe", StringComparison.OrdinalIgnoreCase),
+            "bare powercfg resolve para System32/SysWOW64 (nao PATH/cwd)");
+        Check(
+            !barePowerCfg.CanonicalPath.Contains(@"\Temp\", StringComparison.OrdinalIgnoreCase) &&
+            !barePowerCfg.CanonicalPath.StartsWith(Environment.CurrentDirectory, StringComparison.OrdinalIgnoreCase),
+            "bare powercfg nao usa current-directory shadowing");
+
+        var bareReg = CommandClassifier.Resolve("reg.exe");
+        Check(bareReg.IsTrusted && bareReg.CanonicalPath is not null, "bare reg.exe resolve para System32");
+
         Check(CommandClassifier.Classify("powershell.exe", "-Command Get-Process") == CommandIntent.Mutation,
             "shell wrapper powershell e Mutation");
         Check(CommandClassifier.Classify("cmd.exe", "/c echo hi") == CommandIntent.Mutation,
@@ -91,6 +107,10 @@ internal static class DemoSafetySelfTest
         Check(fakePowerCfg.ExitCode == -3900, "C:\\Temp\\powercfg.exe /list bloqueado em Demo");
         var quotedFake = runner.Run(@"""C:\Temp\powercfg.exe""", "/list");
         Check(quotedFake.ExitCode == -3900, "powercfg Temp com aspas bloqueado em Demo");
+
+        // Official bare read still allowed and executed via canonical path.
+        var officialList = runner.Run("powercfg", "/list");
+        Check(officialList.ExitCode == 0, "powercfg bare /list executa binario oficial (exit 0)");
 
         var legacyDemoLog = new TweakService().ApplyNetworkTweaks();
         Check(legacyDemoLog.Any(line => line.Contains("[BLOQUEADO]", StringComparison.OrdinalIgnoreCase)),
@@ -174,6 +194,12 @@ internal static class DemoSafetySelfTest
         var cancelledFromCommand = RunCancelledFromCommandScenario();
         Check(cancelledFromCommand.Kind == OperationOutcomeKind.Cancelled, "OCE em command.Execute e CANCELLED");
         Check(cancelledFromCommand.Cancelled, "OCE em Execute marca Cancelled");
+        Check(cancelledFromCommand.RollbackRequired, "cancel durante Execute marca RollbackRequired");
+
+        var timedOutFromCommand = RunTimeoutFromCommandScenario();
+        Check(timedOutFromCommand.Kind == OperationOutcomeKind.TimedOut, "TimeoutException em command.Execute e TimedOut");
+        Check(timedOutFromCommand.TimedOut, "timeout em Execute marca TimedOut");
+        Check(timedOutFromCommand.RollbackRequired, "timeout em Execute marca RollbackRequired");
 
         var ledgerFailed = RunLedgerCommitFailureScenario();
         Check(ledgerFailed.RollbackRequired, "falha ao gravar ledger marca RollbackRequired no outcome");
@@ -251,6 +277,22 @@ internal static class DemoSafetySelfTest
         }
     }
 
+    private static OperationOutcome RunTimeoutFromCommandScenario()
+    {
+        var executor = new MutationExecutor(new BackupService());
+        Func<CancellationToken, Task<IReadOnlyList<string>>> action = _ =>
+        {
+            var pipelineLog = new List<string>();
+            executor.Execute(CreateTimeoutCommand("timeout-in-execute"), pipelineLog);
+            return Task.FromResult<IReadOnlyList<string>>(pipelineLog);
+        };
+        _ = executor.RunAsync("timedout-command", action, CancellationToken.None)
+            .GetAwaiter()
+            .GetResult();
+        return executor.LastOutcome
+            ?? throw new InvalidOperationException("Outcome TIMEOUT ausente apos TimeoutException em Execute.");
+    }
+
     private static OperationOutcome RunLedgerCommitFailureScenario()
     {
         var backup = new BackupService
@@ -279,6 +321,17 @@ internal static class DemoSafetySelfTest
             .GetAwaiter()
             .GetResult();
         return executor.LastOutcome ?? throw new InvalidOperationException("Outcome TIMEOUT ausente.");
+    }
+
+    private static ISystemMutationCommand CreateTimeoutCommand(string name)
+    {
+        return new SystemMutationCommand(
+            name,
+            (_, _) => { },
+            () => throw new TimeoutException("timeout-in-execute"),
+            () => { },
+            $"{name} OK",
+            $"{name} failed");
     }
 
     private static ISystemMutationCommand CreateCancelCommand(string name)

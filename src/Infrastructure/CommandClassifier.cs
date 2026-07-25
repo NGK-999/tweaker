@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Text.RegularExpressions;
 
@@ -11,14 +12,35 @@ internal enum CommandIntent
     Unknown = 2
 }
 
+internal readonly record struct TrustedCommandResolution(
+    bool IsTrusted,
+    string? CanonicalPath,
+    string ExecutableName);
+
 /// <summary>
 /// Fail-closed command intent classifier for Demo/Unknown runtime modes.
-/// Only an explicit allowlist of read-only operations on trusted binaries returns ReadOnly.
-/// Mixed read+mutation tokens, untrusted paths, and unknowns are blocked outside Standard.
+/// Bare names are resolved to System32/SysWOW64 before trust and classification.
 /// </summary>
 internal static class CommandClassifier
 {
     private static readonly Regex Whitespace = new(@"\s+", RegexOptions.Compiled);
+
+    private static readonly HashSet<string> KnownSystemTools = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "powercfg", "powercfg.exe",
+        "bcdedit", "bcdedit.exe",
+        "sc", "sc.exe",
+        "reg", "reg.exe",
+        "netsh", "netsh.exe",
+        "dism", "dism.exe",
+        "sfc", "sfc.exe",
+        "defrag", "defrag.exe",
+        "gpupdate", "gpupdate.exe",
+        "schtasks", "schtasks.exe",
+        "cmd", "cmd.exe",
+        "powershell", "powershell.exe",
+        "pwsh", "pwsh.exe"
+    };
 
     private static readonly string[] PowerCfgReadTokens = ["/list", "/query", "/aliases", "/getactivescheme"];
     private static readonly string[] PowerCfgMutationPrefixes = ["/set", "/change", "/hibernate", "/energy"];
@@ -44,6 +66,67 @@ internal static class CommandClassifier
         "/enable-feature", "/disable-feature", "/add-package", "/remove-package", "/apply-image"
     ];
 
+    /// <summary>
+    /// Resolve to a trusted System32/SysWOW64 binary. Bare names never rely on PATH/cwd.
+    /// </summary>
+    public static TrustedCommandResolution Resolve(string fileName)
+    {
+        if (string.IsNullOrWhiteSpace(fileName))
+        {
+            return new TrustedCommandResolution(false, null, string.Empty);
+        }
+
+        var trimmed = fileName.Trim().Trim('"');
+        var executable = NormalizeExecutable(trimmed);
+        if (executable.Length == 0)
+        {
+            return new TrustedCommandResolution(false, null, string.Empty);
+        }
+
+        var hasDirectory = trimmed.Contains('\\', StringComparison.Ordinal) ||
+                           trimmed.Contains('/', StringComparison.Ordinal) ||
+                           trimmed.Contains(':', StringComparison.Ordinal);
+
+        if (!hasDirectory)
+        {
+            if (!KnownSystemTools.Contains(executable))
+            {
+                return new TrustedCommandResolution(false, null, executable);
+            }
+
+            var canonical = TryMapBareNameToSystemBinary(executable);
+            return canonical is null
+                ? new TrustedCommandResolution(false, null, executable)
+                : new TrustedCommandResolution(true, canonical, executable);
+        }
+
+        try
+        {
+            var fullPath = Path.GetFullPath(trimmed);
+            if (!IsUnderTrustedSystemDirectory(fullPath))
+            {
+                return new TrustedCommandResolution(false, null, executable);
+            }
+
+            var file = Path.GetFileName(fullPath);
+            if (!FileNameMatchesExecutable(file, executable))
+            {
+                return new TrustedCommandResolution(false, null, executable);
+            }
+
+            if (!KnownSystemTools.Contains(executable) && !KnownSystemTools.Contains(file))
+            {
+                return new TrustedCommandResolution(false, null, executable);
+            }
+
+            return new TrustedCommandResolution(true, fullPath, executable);
+        }
+        catch
+        {
+            return new TrustedCommandResolution(false, null, executable);
+        }
+    }
+
     public static CommandIntent Classify(string fileName, string? arguments)
     {
         if (string.IsNullOrWhiteSpace(fileName))
@@ -51,16 +134,19 @@ internal static class CommandClassifier
             return CommandIntent.Unknown;
         }
 
-        var executable = NormalizeExecutable(fileName);
+        var resolution = Resolve(fileName);
+        var executable = resolution.ExecutableName.Length > 0
+            ? resolution.ExecutableName
+            : NormalizeExecutable(fileName);
         var args = NormalizeArguments(arguments);
 
         if (executable is "cmd" or "cmd.exe" or "powershell" or "powershell.exe" or "pwsh" or "pwsh.exe")
         {
+            // Shells are always mutation even when resolved under System32.
             return CommandIntent.Mutation;
         }
 
-        // Path present but not a trusted System32/SysWOW64 binary → never ReadOnly.
-        if (!IsTrustedSystemExecutable(fileName, executable))
+        if (!resolution.IsTrusted || string.IsNullOrWhiteSpace(resolution.CanonicalPath))
         {
             return CommandIntent.Unknown;
         }
@@ -104,50 +190,60 @@ internal static class CommandClassifier
         return Whitespace.Replace(arguments.Trim(), " ").ToLowerInvariant();
     }
 
-    /// <summary>
-    /// Bare tool names (PATH) are accepted. Absolute/relative paths must resolve under System or SystemX86.
-    /// </summary>
-    internal static bool IsTrustedSystemExecutable(string fileName, string normalizedFileName)
+    private static string? TryMapBareNameToSystemBinary(string executable)
     {
-        var trimmed = fileName.Trim().Trim('"');
-        if (trimmed.Length == 0)
-        {
-            return false;
-        }
+        var exeFile = executable.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)
+            ? executable
+            : executable + ".exe";
 
-        var hasDirectory = trimmed.Contains('\\', StringComparison.Ordinal) ||
-                           trimmed.Contains('/', StringComparison.Ordinal) ||
-                           trimmed.Contains(':', StringComparison.Ordinal);
-        if (!hasDirectory)
+        foreach (var directory in GetTrustedSystemDirectories())
         {
-            return true;
-        }
-
-        try
-        {
-            var fullPath = Path.GetFullPath(trimmed);
-            var file = Path.GetFileName(fullPath);
-            if (!file.Equals(normalizedFileName, StringComparison.OrdinalIgnoreCase) &&
-                !file.Equals(normalizedFileName + ".exe", StringComparison.OrdinalIgnoreCase) &&
-                !(normalizedFileName.EndsWith(".exe", StringComparison.Ordinal) &&
-                  file.Equals(normalizedFileName, StringComparison.OrdinalIgnoreCase)))
+            var candidate = Path.GetFullPath(Path.Combine(directory, exeFile));
+            if (File.Exists(candidate) && IsUnderTrustedSystemDirectory(candidate))
             {
-                return false;
+                return candidate;
             }
-
-            var system = Path.GetFullPath(Environment.GetFolderPath(Environment.SpecialFolder.System));
-            var systemX86 = Path.GetFullPath(Environment.GetFolderPath(Environment.SpecialFolder.SystemX86));
-            var windows = Path.GetFullPath(Environment.GetFolderPath(Environment.SpecialFolder.Windows));
-
-            return IsUnderDirectory(fullPath, system) ||
-                   IsUnderDirectory(fullPath, systemX86) ||
-                   IsUnderDirectory(fullPath, Path.Combine(windows, "System32")) ||
-                   IsUnderDirectory(fullPath, Path.Combine(windows, "SysWOW64"));
         }
-        catch
+
+        // Fail closed if the official binary is missing — do not fall back to PATH/cwd.
+        return null;
+    }
+
+    private static IEnumerable<string> GetTrustedSystemDirectories()
+    {
+        var system = Path.GetFullPath(Environment.GetFolderPath(Environment.SpecialFolder.System));
+        yield return system;
+
+        var systemX86 = Path.GetFullPath(Environment.GetFolderPath(Environment.SpecialFolder.SystemX86));
+        if (!systemX86.Equals(system, StringComparison.OrdinalIgnoreCase))
         {
-            return false;
+            yield return systemX86;
         }
+
+        var windows = Path.GetFullPath(Environment.GetFolderPath(Environment.SpecialFolder.Windows));
+        yield return Path.Combine(windows, "System32");
+        yield return Path.Combine(windows, "SysWOW64");
+    }
+
+    private static bool IsUnderTrustedSystemDirectory(string fullPath)
+    {
+        foreach (var directory in GetTrustedSystemDirectories())
+        {
+            if (IsUnderDirectory(fullPath, directory))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool FileNameMatchesExecutable(string file, string normalizedExecutable)
+    {
+        return file.Equals(normalizedExecutable, StringComparison.OrdinalIgnoreCase) ||
+               file.Equals(normalizedExecutable + ".exe", StringComparison.OrdinalIgnoreCase) ||
+               (normalizedExecutable.EndsWith(".exe", StringComparison.Ordinal) &&
+                file.Equals(normalizedExecutable, StringComparison.OrdinalIgnoreCase));
     }
 
     private static bool IsUnderDirectory(string fullPath, string directory)
@@ -178,7 +274,6 @@ internal static class CommandClassifier
         {
             if (mutationIsPrefix)
             {
-                // Prefix may appear after a read token (mixed → Unknown).
                 if (args.StartsWith(token, StringComparison.Ordinal) ||
                     args.Contains(" " + token, StringComparison.Ordinal))
                 {

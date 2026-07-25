@@ -154,6 +154,12 @@ internal sealed class MutationExecutor
             log.Add(command.SuccessMessage);
             return true;
         }
+        catch (TimeoutException)
+        {
+            scope.RegisterFailure(command.Name, "Tempo limite excedido.");
+            log.Add($"[ERRO] {command.Name}: tempo limite excedido.");
+            throw;
+        }
         catch (OperationCanceledException)
         {
             scope.RegisterFailure(command.Name, "Comando cancelado.");
@@ -238,7 +244,7 @@ internal sealed class MutationExecutor
     {
         if (ex is OperationCanceledException)
         {
-            return ("CANCEL", OperationStepStatus.Cancelled, false);
+            return ("CANCEL", OperationStepStatus.Cancelled, RequiresRollback: string.Equals(stageName, "Execute", StringComparison.OrdinalIgnoreCase));
         }
 
         if (ex is TimeoutException)

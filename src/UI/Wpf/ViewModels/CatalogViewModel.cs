@@ -78,14 +78,9 @@ internal sealed partial class CatalogViewModel : ObservableObject
                 $"{plan.RequiringConfirmation.Count} confirmacao, {plan.Blocked.Count} bloqueados. " +
                 "Esta tela so analisa; aplicacao e no Dashboard (Auto-Optimize).";
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            Rows.Clear();
-            ApplyFeedback(rowCount: 0, analyzeFailed: true, usageUnknown: true);
-            StatusText = "Falha ao analisar o catalogo.";
-            FeedbackDetail =
-                "Nao foi possivel gerar o plano. Nenhuma otimizacao foi aplicada. " +
-                "Abra Detalhes no log se precisar de diagnostico tecnico.";
+            HandleAnalyzeFailure(ex);
         }
 
         OnPropertyChanged(nameof(ShowEmptyPanel));
@@ -93,6 +88,23 @@ internal sealed partial class CatalogViewModel : ObservableObject
         OnPropertyChanged(nameof(ShowErrorPanel));
         OnPropertyChanged(nameof(ShowRulesList));
         OnPropertyChanged(nameof(ShowGoToAutoCta));
+    }
+
+    /// <summary>Last technical diagnostic from Analyze (not shown as primary UI copy).</summary>
+    public string? LastTechnicalDiagnostic { get; private set; }
+
+    /// <summary>Test/helper: record failure with technical detail while keeping friendly UI copy.</summary>
+    internal void HandleAnalyzeFailure(Exception ex)
+    {
+        LastTechnicalDiagnostic = ex.ToString();
+        System.Diagnostics.Trace.WriteLine("[Catalog.Analyze] " + LastTechnicalDiagnostic);
+
+        Rows.Clear();
+        ApplyFeedback(rowCount: 0, analyzeFailed: true, usageUnknown: true);
+        StatusText = "Falha ao analisar o catalogo.";
+        FeedbackDetail =
+            "Nao foi possivel gerar o plano. Nenhuma otimizacao foi aplicada. " +
+            "Abra Detalhes no log se precisar de diagnostico tecnico.";
     }
 
     private void ApplyFeedback(int rowCount, bool analyzeFailed, bool usageUnknown)

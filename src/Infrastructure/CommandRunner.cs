@@ -23,7 +23,8 @@ internal sealed class CommandRunner
         CancellationToken cancellationToken = default,
         TimeSpan? timeout = null)
     {
-        var mutationDecision = EvaluateRuntimeBoundary(fileName, arguments);
+        var resolution = CommandClassifier.Resolve(fileName);
+        var mutationDecision = EvaluateRuntimeBoundary(fileName, arguments, resolution);
         if (!mutationDecision.Allowed)
         {
             return new CommandResult(
@@ -31,6 +32,11 @@ internal sealed class CommandRunner
                 string.Empty,
                 mutationDecision.Reason);
         }
+
+        // Always execute the validated canonical path when trusted — never PATH/cwd shadowing.
+        var effectiveFileName = resolution.IsTrusted && !string.IsNullOrWhiteSpace(resolution.CanonicalPath)
+            ? resolution.CanonicalPath!
+            : fileName;
 
         using var process = new Process();
         var standardOutput = new StringBuilder();
@@ -43,7 +49,7 @@ internal sealed class CommandRunner
 
         process.StartInfo = new ProcessStartInfo
         {
-            FileName = fileName,
+            FileName = effectiveFileName,
             Arguments = arguments,
             UseShellExecute = false,
             RedirectStandardOutput = true,
@@ -93,12 +99,12 @@ internal sealed class CommandRunner
             {
                 if (!process.Start())
                 {
-                    return new CommandResult(-1, string.Empty, $"Falha ao iniciar processo: {fileName}");
+                    return new CommandResult(-1, string.Empty, $"Falha ao iniciar processo: {effectiveFileName}");
                 }
             }
             catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception)
             {
-                return new CommandResult(-1, string.Empty, $"Falha ao iniciar processo: {fileName}: {ex.Message}");
+                return new CommandResult(-1, string.Empty, $"Falha ao iniciar processo: {effectiveFileName}: {ex.Message}");
             }
 
             process.BeginOutputReadLine();
@@ -171,7 +177,10 @@ internal sealed class CommandRunner
         }
     }
 
-    private static RuntimeMutationDecision EvaluateRuntimeBoundary(string fileName, string arguments)
+    private static RuntimeMutationDecision EvaluateRuntimeBoundary(
+        string fileName,
+        string arguments,
+        TrustedCommandResolution resolution)
     {
         var mode = RuntimeModeContext.Current;
         if (mode == RuntimeMode.Standard)
@@ -180,17 +189,29 @@ internal sealed class CommandRunner
         }
 
         var intent = CommandClassifier.Classify(fileName, arguments);
+        var modeLabel = mode == RuntimeMode.Demo ? "modo demo" : "RuntimeMode incerto";
+
         if (intent == CommandIntent.ReadOnly)
         {
+            // Read-only only when the same trusted canonical binary will be executed.
+            if (!resolution.IsTrusted || string.IsNullOrWhiteSpace(resolution.CanonicalPath))
+            {
+                var untrustedSubject = string.Concat(fileName, " ", arguments).Trim();
+                return RuntimeMutationDecision.Block(
+                    mode,
+                    $"[COMMAND_NOT_CONFIRMED_READ_ONLY] Executavel nao resolvido para binario oficial do sistema ({modeLabel}): {untrustedSubject}.");
+            }
+
             return RuntimeMutationDecision.Allow(mode);
         }
 
-        var subject = string.Concat(fileName, " ", arguments).Trim();
+        var subject = resolution.IsTrusted && !string.IsNullOrWhiteSpace(resolution.CanonicalPath)
+            ? string.Concat(resolution.CanonicalPath, " ", arguments).Trim()
+            : string.Concat(fileName, " ", arguments).Trim();
         var errorCode = intent == CommandIntent.Unknown
             ? "COMMAND_NOT_CONFIRMED_READ_ONLY"
             : "COMMAND_MUTATION_BLOCKED";
 
-        var modeLabel = mode == RuntimeMode.Demo ? "modo demo" : "RuntimeMode incerto";
         return RuntimeMutationDecision.Block(
             mode,
             $"[{errorCode}] O comando foi bloqueado porque nao pode ser confirmado como somente leitura ({modeLabel}): {subject}. Intent={intent}.");
