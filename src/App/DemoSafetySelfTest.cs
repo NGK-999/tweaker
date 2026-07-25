@@ -67,6 +67,18 @@ internal static class DemoSafetySelfTest
         var cmdWrap = runner.Run("cmd.exe", "/c reg add HKCU\\Software\\ApexTweakerDemo /v X /d 1 /f");
         Check(cmdWrap.ExitCode == -3900, "cmd /c com mutacao e bloqueado em Demo");
 
+        Check(CommandClassifier.Classify(@"C:\Temp\powercfg.exe", "/list") == CommandIntent.Unknown,
+            "executavel falso powercfg em Temp e bloqueado (Unknown)");
+        Check(CommandClassifier.Classify("dism", "/online /get-features /enable-feature:NetFx3") == CommandIntent.Unknown,
+            "dism misturando get-features e enable-feature e Unknown");
+        Check(CommandClassifier.Classify("netsh", "interface show interface set interface name=x admin=disable") == CommandIntent.Unknown,
+            "netsh show+set misturado e Unknown");
+        Check(CommandClassifier.Classify("powercfg", "/list") == CommandIntent.ReadOnly,
+            "powercfg oficial bare /list continua ReadOnly");
+
+        var fakePowerCfg = runner.Run(@"C:\Temp\powercfg.exe", "/list");
+        Check(fakePowerCfg.ExitCode == -3900, "C:\\Temp\\powercfg.exe /list bloqueado em Demo");
+
         var legacyDemoLog = new TweakService().ApplyNetworkTweaks();
         Check(legacyDemoLog.Any(line => line.Contains("[BLOQUEADO]", StringComparison.OrdinalIgnoreCase)),
             "caminho legado TweakService nao contorna o gate central");
@@ -85,6 +97,16 @@ internal static class DemoSafetySelfTest
         RuntimeModeContext.Configure(RuntimeMode.Standard);
         var standardUnknown = new CommandRunner().Run("totally-unknown-apextweaker-tool", "--x");
         Check(standardUnknown.ExitCode != -3900, "Standard mantem comportamento esperado (sem bloqueio de intent)");
+
+        // LastOutcome isolation on same executor instance
+        var shared = new MutationExecutor(new BackupService());
+        _ = shared.RunAsync("first-ok", _ => Task.FromResult<IReadOnlyList<string>>(new[] { "ok" }), CancellationToken.None)
+            .GetAwaiter().GetResult();
+        Check(shared.LastOutcome?.Kind == OperationOutcomeKind.Completed, "primeira operacao COMPLETED");
+        _ = shared.RunAsync("second-fail", _ => throw new InvalidOperationException("boom"), CancellationToken.None)
+            .GetAwaiter().GetResult();
+        Check(shared.LastOutcome?.Kind == OperationOutcomeKind.Failed, "segunda operacao FAILED na mesma instancia");
+        Check(shared.LastOutcome?.OperationName == "second-fail", "LastOutcome representa somente a segunda operacao");
 
         var completed = RunOutcomeScenario("completed", (_, log) =>
         {
@@ -127,16 +149,18 @@ internal static class DemoSafetySelfTest
         });
         Check(rolledBack.Kind == OperationOutcomeKind.RolledBack, "outcome ROLLED_BACK distinto");
 
+        Check(completed.CorrelationId.Length > 0 &&
+              completed.Steps is not null &&
+              completed.FinishedAtUtc >= completed.StartedAtUtc,
+            "outcome rico expoe correlationId e timestamps");
+
         var cancelled = RunCancelledScenario();
         Check(cancelled.Kind == OperationOutcomeKind.Cancelled, "outcome CANCELLED distinto");
+        Check(cancelled.Cancelled, "CANCELLED marca flag Cancelled");
 
         var timedOut = RunTimeoutScenario();
         Check(timedOut.Kind == OperationOutcomeKind.TimedOut, "outcome TIMEOUT distinto");
-
-        Check(completed.CorrelationId.Length > 0 &&
-              completed.Steps.Count >= 0 &&
-              completed.FinishedAtUtc >= completed.StartedAtUtc,
-            "outcome rico expõe correlationId e timestamps");
+        Check(timedOut.TimedOut, "TIMEOUT marca flag TimedOut");
 
         RuntimeModeContext.Configure(RuntimeMode.Standard);
 
@@ -165,13 +189,20 @@ internal static class DemoSafetySelfTest
     private static OperationOutcome RunCancelledScenario()
     {
         var executor = new MutationExecutor(new BackupService());
-        _ = executor.RunAsync(
-                "cancelled",
-                _ => throw new OperationCanceledException("cancelled"),
-                CancellationToken.None)
-            .GetAwaiter()
-            .GetResult();
-        return executor.LastOutcome ?? throw new InvalidOperationException("Outcome CANCELLED ausente.");
+        try
+        {
+            _ = executor.RunAsync(
+                    "cancelled",
+                    _ => throw new OperationCanceledException("cancelled"),
+                    CancellationToken.None)
+                .GetAwaiter()
+                .GetResult();
+            throw new InvalidOperationException("Cancelamento deveria propagar OperationCanceledException.");
+        }
+        catch (OperationCanceledException)
+        {
+            return executor.LastOutcome ?? throw new InvalidOperationException("Outcome CANCELLED ausente apos rethrow.");
+        }
     }
 
     private static OperationOutcome RunTimeoutScenario()

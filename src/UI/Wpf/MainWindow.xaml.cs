@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -207,6 +207,7 @@ public partial class MainWindow : Window
             catalogView = new CatalogView();
             catalogView.GoToAutoOptimizeNavigationRequested += () => _ = ShowPageAsync(DashboardPageKey, DashboardButton);
             catalogView.FeedbackStatusRequested += (message, kind) => SetStatus(message, kind);
+            catalogView.EnsureInitialAnalyze();
             return catalogView;
         }
     }
@@ -476,7 +477,7 @@ public partial class MainWindow : Window
         if (alreadyOptimized)
         {
             WriteLine("[INFO] Sistema j\u00E1 otimizado detectado no startup.");
-            SetStatus("Sistema j\u00E1 otimizado. Voc\u00EA pode medir diretamente na Telemetria.");
+            SetStatus("Sistema j\u00E1 otimizado. Voc\u00EA pode medir diretamente na Telemetria.", SnackbarKind.Success);
         }
         else
         {
@@ -636,7 +637,7 @@ public partial class MainWindow : Window
             if (optimizationEngine.CheckIfAlreadyOptimized())
             {
                 WriteLine("[INFO] Sistema j\u00E1 est\u00E1 otimizado pelo ApexTweaker. Comandos redundantes foram ignorados.");
-                SetStatus("Auto-Tuning: sistema j\u00E1 otimizado.");
+                SetStatus("Auto-Tuning: sistema j\u00E1 otimizado.", SnackbarKind.Success);
                 return;
             }
 
@@ -644,26 +645,31 @@ public partial class MainWindow : Window
             var lines = await Task.Run(() => tweakService.ApplyAutonomousOptimization(valorantLocator.FindExecutable()));
             WriteLines(lines);
 
-            SetStatus("Auto-Tuning aplicado. Reinicie o PC antes de medir.");
+            SetStatus("Auto-Tuning aplicado. Reinicie o PC antes de medir.", SnackbarKind.Warning);
+        }
+        catch (OperationCanceledException)
+        {
+            WriteLine("Auto-Tuning cancelado.");
+            SetStatus("Auto-Tuning: cancelado.", SnackbarKind.Warning);
         }
         catch (UnauthorizedAccessException ex)
         {
             WriteLine("Acesso negado pelo Windows ao Registro.");
             WriteLine("Execute o app como Administrador. Se j\u00E1 estiver como admin, o driver protegeu essa chave e ela foi ignorada por seguran\u00E7a.");
             WriteLine($"Detalhe: {ex.Message}");
-            SetStatus("Auto-Tuning: acesso negado. Veja o log.");
+            SetStatus("Auto-Tuning: acesso negado. Veja o log.", SnackbarKind.Error);
         }
         catch (SecurityException ex)
         {
             WriteLine("A pol\u00EDtica de seguran\u00E7a do Windows bloqueou a altera\u00E7\u00E3o.");
             WriteLine("Nenhuma altera\u00E7\u00E3o adicional foi aplicada nessa etapa.");
             WriteLine($"Detalhe: {ex.Message}");
-            SetStatus("Auto-Tuning: pol\u00EDtica de seguran\u00E7a bloqueou a execu\u00E7\u00E3o.");
+            SetStatus("Auto-Tuning: pol\u00EDtica de seguran\u00E7a bloqueou a execu\u00E7\u00E3o.", SnackbarKind.Error);
         }
         catch (Exception ex)
         {
             WriteLine($"Falha inesperada durante o Auto-Tuning: {ex.Message}");
-            SetStatus("Auto-Tuning: falha inesperada. Veja o log.");
+            SetStatus("Auto-Tuning: falha inesperada. Veja o log.", SnackbarKind.Error);
         }
         finally
         {
@@ -735,7 +741,7 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// One-click from Modules: resolve instance → detect → audit → optimize (same pattern as other module buttons).
+    /// One-click from Modules: resolve instance â†’ detect â†’ audit â†’ optimize (same pattern as other module buttons).
     /// Stays on Modules; does not navigate to Minecraft page.
     /// </summary>
     private async Task RunMinecraftModuleOneClickAsync()
@@ -754,7 +760,7 @@ public partial class MainWindow : Window
         {
             WriteSection(section);
             WriteLine("Nenhuma instancia Minecraft resolvida. Selecione a pasta e tente novamente.");
-            SetStatus($"{section}: instancia nao selecionada.");
+            SetStatus($"{section}: instancia nao selecionada.", SnackbarKind.Warning);
             return;
         }
 
@@ -881,26 +887,31 @@ public partial class MainWindow : Window
             var lines = await Task.Run(action);
             WriteLines(lines);
 
-            SetStatus(completionStatus ?? $"{section}: conclu\u00EDdo. Veja o log.");
+            SetStatus(completionStatus ?? $"{section}: conclu\u00EDdo. Veja o log.", SnackbarKind.Success);
+        }
+        catch (OperationCanceledException)
+        {
+            WriteLine($"{section}: operacao cancelada.");
+            SetStatus($"{section}: cancelado.", SnackbarKind.Warning);
         }
         catch (UnauthorizedAccessException ex)
         {
             WriteLine("Acesso negado pelo Windows ao Registro.");
             WriteLine("Execute o app como Administrador. Se j\u00E1 estiver como admin, o driver protegeu essa chave e ela foi ignorada por seguran\u00E7a.");
             WriteLine($"Detalhe: {ex.Message}");
-            SetStatus($"{section}: acesso negado. Veja o log.");
+            SetStatus($"{section}: acesso negado. Veja o log.", SnackbarKind.Error);
         }
         catch (SecurityException ex)
         {
             WriteLine("A pol\u00EDtica de seguran\u00E7a do Windows bloqueou a altera\u00E7\u00E3o.");
             WriteLine("Nenhuma altera\u00E7\u00E3o adicional foi aplicada nessa etapa.");
             WriteLine($"Detalhe: {ex.Message}");
-            SetStatus($"{section}: bloqueado por pol\u00EDtica de seguran\u00E7a.");
+            SetStatus($"{section}: bloqueado por pol\u00EDtica de seguran\u00E7a.", SnackbarKind.Error);
         }
         catch (Exception ex)
         {
             WriteLine($"Falha inesperada em {section}: {ex.Message}");
-            SetStatus($"{section}: falha inesperada. Veja o log.");
+            SetStatus($"{section}: falha inesperada. Veja o log.", SnackbarKind.Error);
         }
         finally
         {
@@ -933,7 +944,7 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Minecraft.SetOperationText($"Deteccao nao concluida: {ex.Message}");
-            SetStatus("Nao foi possivel detectar a instancia. Revise a pasta selecionada e tente novamente.");
+            SetStatus("Nao foi possivel detectar a instancia. Revise a pasta selecionada e tente novamente.", SnackbarKind.Error);
         }
         finally
         {
@@ -1060,7 +1071,7 @@ public partial class MainWindow : Window
         {
             WriteLine($"Falha na auditoria Minecraft: {ex.Message}");
             Minecraft.SetOperationText($"Falha na auditoria: {ex.Message}");
-            SetStatus("Auditoria Minecraft falhou. Veja o diagnostico.");
+            SetStatus("Auditoria Minecraft falhou. Veja o diagnostico.", SnackbarKind.Error);
         }
         finally
         {
@@ -1125,13 +1136,13 @@ public partial class MainWindow : Window
             }
 
             WriteLine($"Relatorio antes/depois: {reportPath}");
-            SetStatus("Minecraft: dry-run concluido. Revise o plano antes de aplicar.");
+            SetStatus("Minecraft: dry-run concluido. Revise o plano antes de aplicar.", SnackbarKind.Success);
         }
         catch (Exception ex)
         {
             WriteLine($"Falha no dry-run Minecraft: {ex.Message}");
             Minecraft.SetOperationText($"Dry-run nao concluido: {ex.Message}");
-            SetStatus("Minecraft: dry-run falhou sem alterar arquivos.");
+            SetStatus("Minecraft: dry-run falhou sem alterar arquivos.", SnackbarKind.Error);
         }
         finally
         {
@@ -1202,7 +1213,7 @@ public partial class MainWindow : Window
         {
             WriteLine($"Falha ao aplicar perfil Minecraft: {ex.Message}");
             Minecraft.SetOperationText($"Perfil nao aplicado: {ex.Message}");
-            SetStatus("Minecraft: perfil nao aplicado. Nenhum mod foi alterado.");
+            SetStatus("Minecraft: perfil nao aplicado. Nenhum mod foi alterado.", SnackbarKind.Error);
         }
         finally
         {
@@ -1266,13 +1277,13 @@ public partial class MainWindow : Window
             latestMinecraftObservation = null;
             latestMinecraftCorrectionPlan = null;
             Minecraft.SetEasyRestored(restoredBackupId);
-            SetStatus("Minecraft: configuracao anterior restaurada.");
+            SetStatus("Minecraft: configuracao anterior restaurada.", SnackbarKind.Success);
         }
         catch (Exception ex)
         {
             WriteLine($"Falha no rollback Minecraft: {ex.Message}");
             Minecraft.SetOperationText($"Rollback nao concluido: {ex.Message}");
-            SetStatus("Minecraft: rollback nao concluido.");
+            SetStatus("Minecraft: rollback nao concluido.", SnackbarKind.Error);
         }
         finally
         {
@@ -1357,13 +1368,13 @@ public partial class MainWindow : Window
             latestMinecraftBenchmarkResult = null;
             InvalidateMinecraftScientificState("Experimento invalidado: o conjunto de mods mudou por quarentena.");
             Minecraft.InvalidateQuarantinePlan();
-            SetStatus("Minecraft: quarentena aplicada. Teste o servidor; use rollback se houver incompatibilidade.");
+            SetStatus("Minecraft: quarentena aplicada. Teste o servidor; use rollback se houver incompatibilidade.", SnackbarKind.Success);
         }
         catch (Exception ex)
         {
             WriteLine($"Falha na quarentena Minecraft: {ex.Message}");
             Minecraft.SetOperationText($"Quarentena nao aplicada: {ex.Message}");
-            SetStatus("Minecraft: quarentena falhou ou foi revertida automaticamente.");
+            SetStatus("Minecraft: quarentena falhou ou foi revertida automaticamente.", SnackbarKind.Error);
         }
         finally
         {
@@ -1404,13 +1415,13 @@ public partial class MainWindow : Window
             latestMinecraftBenchmarkResult = null;
             InvalidateMinecraftScientificState("Experimento invalidado: o conjunto de mods mudou por rollback da quarentena.");
             Minecraft.InvalidateQuarantinePlan();
-            SetStatus("Minecraft: JARs restaurados e verificados por SHA-256.");
+            SetStatus("Minecraft: JARs restaurados e verificados por SHA-256.", SnackbarKind.Success);
         }
         catch (Exception ex)
         {
             WriteLine($"Falha no rollback da quarentena: {ex.Message}");
             Minecraft.SetOperationText($"Rollback da quarentena nao concluido: {ex.Message}");
-            SetStatus("Minecraft: rollback da quarentena nao concluido.");
+            SetStatus("Minecraft: rollback da quarentena nao concluido.", SnackbarKind.Error);
         }
         finally
         {
@@ -1529,7 +1540,7 @@ public partial class MainWindow : Window
         {
             Minecraft.SetOperationText($"Diagnostico nao exportado: {ex.Message}");
             WriteLine($"Falha ao exportar diagnostico: {ex.Message}");
-            SetStatus("Minecraft Facil: falha ao criar o pacote de diagnostico.");
+            SetStatus("Minecraft Facil: falha ao criar o pacote de diagnostico.", SnackbarKind.Error);
         }
         finally
         {
@@ -1611,14 +1622,14 @@ public partial class MainWindow : Window
             Minecraft.CompleteBenchmark(null, cancelled: true);
             WriteLine("Benchmark Minecraft cancelado.");
             Minecraft.SetOperationText("Benchmark cancelado sem alterar a instancia.");
-            SetStatus("Minecraft: benchmark cancelado.");
+            SetStatus("Minecraft: benchmark cancelado.", SnackbarKind.Error);
         }
         catch (Exception ex)
         {
             Minecraft.CompleteBenchmark(null);
             WriteLine($"Benchmark Minecraft indisponivel: {ex.Message}");
             Minecraft.SetOperationText($"Benchmark nao iniciado: {ex.Message}");
-            SetStatus("Minecraft: abra o jogo e tente o benchmark novamente.");
+            SetStatus("Minecraft: abra o jogo e tente o benchmark novamente.", SnackbarKind.Warning);
         }
         finally
         {
@@ -1694,7 +1705,7 @@ public partial class MainWindow : Window
             latestMinecraftProfilePlan = profilePlan;
             Minecraft.SetOperationalChecklist(reportPath);
             WriteLine($"Checklist operacional: {reportPath}");
-            SetStatus("Minecraft: checklist operacional exportado sem alterar arquivos.");
+            SetStatus("Minecraft: checklist operacional exportado sem alterar arquivos.", SnackbarKind.Success);
         }
         catch (Exception ex)
         {
@@ -1769,7 +1780,7 @@ public partial class MainWindow : Window
             WriteLine($"Gargalo principal: {result.Plan.Diagnosis.Primary} ({result.Plan.Diagnosis.Confidence})");
             WriteLine($"Perfil candidato: {result.Plan.SelectedProfile} | {result.Plan.JavaMemory.Arguments} | {result.Plan.MaximumFps} FPS");
             WriteLine($"Relatorio cientifico: {result.Reports.MarkdownPath}");
-            SetStatus("Minecraft: diagnostico cientifico concluido em dry-run.");
+            SetStatus("Minecraft: diagnostico cientifico concluido em dry-run.", SnackbarKind.Success);
         }
         catch (Exception ex)
         {
@@ -1999,7 +2010,7 @@ public partial class MainWindow : Window
 
         WriteSection("Telemetria");
         WriteLine("Sess\u00E3o de telemetria iniciada.");
-        SetStatus("Telemetria ativa. Aguarde o jogo entrar em foco.");
+        SetStatus("Telemetria ativa. Aguarde o jogo entrar em foco.", SnackbarKind.Success);
 
         try
         {
@@ -2032,7 +2043,7 @@ public partial class MainWindow : Window
                 ? "Iniciar Teste (Ap\u00F3s Otimiza\u00E7\u00E3o)"
                 : "Iniciar Teste (Antes da Otimiza\u00E7\u00E3o)");
             WriteLine($"Falha ao iniciar telemetria: {ex.Message}");
-            SetStatus("Telemetria parcial: falha ao iniciar monitoramento.");
+            SetStatus("Telemetria parcial: falha ao iniciar monitoramento.", SnackbarKind.Error);
         }
     }
 
@@ -2059,7 +2070,7 @@ public partial class MainWindow : Window
         telemetryRunning = false;
         baselineCaptured = true;
         Telemetry.SetMonitoringButtonText("Iniciar Teste (Ap\u00F3s Otimiza\u00E7\u00E3o)");
-        SetStatus("Telemetria parada. Relat\u00F3rio gerado no console.");
+        SetStatus("Telemetria parada. Relat\u00F3rio gerado no console.", SnackbarKind.Success);
         WriteLine("Telemetria encerrada.");
     }
 
@@ -2086,27 +2097,27 @@ public partial class MainWindow : Window
             if (lines.Count > 0 &&
                 lines[^1].Contains("Nenhum snapshot pendente", StringComparison.OrdinalIgnoreCase))
             {
-                SetStatus("Nenhum rollback pendente encontrado.");
+                SetStatus("Nenhum rollback pendente encontrado.", SnackbarKind.Success);
                 return;
             }
 
-            SetStatus("Rollback conclu\u00EDdo. Reinicie o PC se houver altera\u00E7\u00F5es de BCD ou energia.");
+            SetStatus("Rollback conclu\u00EDdo. Reinicie o PC se houver altera\u00E7\u00F5es de BCD ou energia.", SnackbarKind.Warning);
         }
         catch (OperationCanceledException)
         {
             WriteLine("[AVISO] Master rollback cancelado antes da conclus\u00E3o.");
-            SetStatus("Rollback cancelado.");
+            SetStatus("Rollback cancelado.", SnackbarKind.Warning);
         }
         catch (UnauthorizedAccessException ex)
         {
             WriteLine("A opera\u00E7\u00E3o n\u00E3o pode ser conclu\u00EDda.");
             WriteLine($"Detalhe: {ex.Message}");
-            SetStatus("Rollback bloqueado por permiss\u00E3o.");
+            SetStatus("Rollback bloqueado por permiss\u00E3o.", SnackbarKind.Error);
         }
         catch (Exception ex)
         {
             WriteLine($"Falha inesperada durante o rollback: {ex.Message}");
-            SetStatus("Rollback: falha inesperada. Veja o log.");
+            SetStatus("Rollback: falha inesperada. Veja o log.", SnackbarKind.Error);
         }
         finally
         {
@@ -2176,7 +2187,7 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             WriteLine($"Falha no fluxo de desinstala\u00E7\u00E3o: {ex.Message}");
-            SetStatus("Desinstala\u00E7\u00E3o parcial. Veja o log.");
+            SetStatus("Desinstala\u00E7\u00E3o parcial. Veja o log.", SnackbarKind.Error);
         }
         finally
         {
@@ -2271,7 +2282,7 @@ public partial class MainWindow : Window
             MessageBoxImage.Information);
         if (confirmation != MessageBoxResult.Yes)
         {
-            SetStatus($"{operation}: cancelado sem elevacao.");
+            SetStatus($"{operation}: cancelado sem elevacao.", SnackbarKind.Error);
             return false;
         }
 
@@ -2283,12 +2294,12 @@ public partial class MainWindow : Window
         }
         catch (OperationCanceledException)
         {
-            SetStatus($"{operation}: UAC cancelado; nenhuma operacao foi iniciada.");
+            SetStatus($"{operation}: UAC cancelado; nenhuma operacao foi iniciada.", SnackbarKind.Error);
         }
         catch (Exception ex)
         {
             WriteLine($"Falha ao solicitar elevacao: {ex.Message}");
-            SetStatus($"{operation}: elevacao nao iniciada.");
+            SetStatus($"{operation}: elevacao nao iniciada.", SnackbarKind.Error);
         }
 
         return false;
@@ -2413,20 +2424,20 @@ public partial class MainWindow : Window
         [
             new CommandPaletteItem("Dashboard", "Pagina inicial: status e Auto-Optimize", () => ShowPageAsync(DashboardPageKey, DashboardButton)),
             new CommandPaletteItem("Desempenho", "VBS/HAGS/GameDVR e acoes de estabilidade", () => ShowPageAsync(PerformancePageKey, PerformanceButton)),
-            new CommandPaletteItem("Módulos", "Ajustes individuais por categoria", () => ShowPageAsync(ModulesPageKey, ModulesButton)),
-            new CommandPaletteItem("Telemetria", "Frametime e comparação antes/depois", () => ShowPageAsync(TelemetryPageKey, TelemetryButton)),
+            new CommandPaletteItem("MÃ³dulos", "Ajustes individuais por categoria", () => ShowPageAsync(ModulesPageKey, ModulesButton)),
+            new CommandPaletteItem("Telemetria", "Frametime e comparaÃ§Ã£o antes/depois", () => ShowPageAsync(TelemetryPageKey, TelemetryButton)),
             new CommandPaletteItem("Catalogo", "Analyze, riscos e checklist BIOS", () => ShowPageAsync(CatalogPageKey, CatalogButton)),
-            new CommandPaletteItem("Utilidades", "Rollback, suporte e desinstalação", () => ShowPageAsync(UtilitiesPageKey, UtilitiesButton)),
+            new CommandPaletteItem("Utilidades", "Rollback, suporte e desinstalaÃ§Ã£o", () => ShowPageAsync(UtilitiesPageKey, UtilitiesButton)),
             new CommandPaletteItem("CPU/Scheduler", "Tweak: prioridade e MMCSS para jogos", () => HandleModuleRequestedAsync("CPU/Scheduler")),
             new CommandPaletteItem("GPU/Display", "Tweak: HAGS, Game Mode e tela cheia", () => HandleModuleRequestedAsync("GPU/Display")),
-            new CommandPaletteItem("Energia", "Tweak: plano de energia máximo", () => HandleModuleRequestedAsync("Energia")),
-            new CommandPaletteItem("Latência extrema", "Tweak avançado: scheduler agressivo", () => HandleModuleRequestedAsync("Latência extrema")),
-            new CommandPaletteItem("Input/USB", "Tweak: aceleração do mouse e USB", () => HandleModuleRequestedAsync("Input/USB")),
-            new CommandPaletteItem("Rede", "Tweak: limitação de rede e adaptadores", () => HandleModuleRequestedAsync("Rede")),
-            new CommandPaletteItem("Políticas/Serviços", "Tweak avançado: serviços do Windows", () => HandleModuleRequestedAsync("Políticas/Serviços")),
+            new CommandPaletteItem("Energia", "Tweak: plano de energia mÃ¡ximo", () => HandleModuleRequestedAsync("Energia")),
+            new CommandPaletteItem("LatÃªncia extrema", "Tweak avanÃ§ado: scheduler agressivo", () => HandleModuleRequestedAsync("LatÃªncia extrema")),
+            new CommandPaletteItem("Input/USB", "Tweak: aceleraÃ§Ã£o do mouse e USB", () => HandleModuleRequestedAsync("Input/USB")),
+            new CommandPaletteItem("Rede", "Tweak: limitaÃ§Ã£o de rede e adaptadores", () => HandleModuleRequestedAsync("Rede")),
+            new CommandPaletteItem("PolÃ­ticas/ServiÃ§os", "Tweak avanÃ§ado: serviÃ§os do Windows", () => HandleModuleRequestedAsync("PolÃ­ticas/ServiÃ§os")),
             new CommandPaletteItem("GPU Windows", "Tweak: ajustes de GPU do Windows", () => HandleModuleRequestedAsync("GPU Windows")),
             new CommandPaletteItem("GPU regedit", "Tweak: registro por fabricante, com backup", () => HandleModuleRequestedAsync("GPU regedit")),
-            new CommandPaletteItem("Background", "Tweak: Game DVR e painéis do Game Bar", () => HandleModuleRequestedAsync("Background")),
+            new CommandPaletteItem("Background", "Tweak: Game DVR e painÃ©is do Game Bar", () => HandleModuleRequestedAsync("Background")),
             new CommandPaletteItem("UI noise", "Tweak mercado: menos ruido de UI", () => HandleModuleRequestedAsync("UI noise")),
             new CommandPaletteItem("Memory", "Tweak mercado: memoria", () => HandleModuleRequestedAsync("Memory")),
             new CommandPaletteItem("Rede avancada", "Tweak mercado: rede avancada", () => HandleModuleRequestedAsync("Rede avancada")),

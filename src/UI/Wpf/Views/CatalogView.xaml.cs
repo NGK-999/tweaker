@@ -11,6 +11,7 @@ namespace ApexTweaker.UI.Wpf.Views;
 public partial class CatalogView : WpfUserControl
 {
     private readonly CatalogViewModel viewModel = new();
+    private bool initialAnalyzeDone;
 
     /// <summary>Shell should navigate to Dashboard only — does not start Auto-Optimize.</summary>
     public event Action? GoToAutoOptimizeNavigationRequested;
@@ -27,6 +28,18 @@ public partial class CatalogView : WpfUserControl
         viewModel.LoadBios();
         BiosList.ItemsSource = viewModel.BiosItems;
         RulesList.ItemsSource = viewModel.Rows;
+        // Defer Analyze until shell wires FeedbackStatusRequested.
+    }
+
+    /// <summary>Run once after event handlers are attached by MainWindow.</summary>
+    public void EnsureInitialAnalyze()
+    {
+        if (initialAnalyzeDone)
+        {
+            return;
+        }
+
+        initialAnalyzeDone = true;
         RunAnalyzeAndRefreshUi();
     }
 

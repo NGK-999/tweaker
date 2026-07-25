@@ -13,12 +13,36 @@ internal enum CommandIntent
 
 /// <summary>
 /// Fail-closed command intent classifier for Demo/Unknown runtime modes.
-/// Only an explicit allowlist of read-only operations returns <see cref="CommandIntent.ReadOnly"/>.
-/// When in doubt, returns <see cref="CommandIntent.Unknown"/> (blocked outside Standard).
+/// Only an explicit allowlist of read-only operations on trusted binaries returns ReadOnly.
+/// Mixed read+mutation tokens, untrusted paths, and unknowns are blocked outside Standard.
 /// </summary>
 internal static class CommandClassifier
 {
     private static readonly Regex Whitespace = new(@"\s+", RegexOptions.Compiled);
+
+    private static readonly string[] PowerCfgReadTokens = ["/list", "/query", "/aliases", "/getactivescheme"];
+    private static readonly string[] PowerCfgMutationPrefixes = ["/set", "/change", "/hibernate", "/energy"];
+
+    private static readonly string[] BcdReadTokens = ["/enum"];
+    private static readonly string[] BcdMutationTokens = ["/set", "/delete", "/deletevalue", "/create", "/import", "/export"];
+
+    private static readonly string[] ScReadTokens = ["query", "queryex", "qc"];
+    private static readonly string[] ScMutationTokens = ["config", "start", "stop", "create", "delete", "failure"];
+
+    private static readonly string[] RegReadTokens = ["query"];
+    private static readonly string[] RegMutationTokens = ["add", "delete", "copy", "import", "restore", "load", "unload", "save"];
+
+    private static readonly string[] NetshMutationTokens = ["set", "add", "delete", "reset"];
+
+    private static readonly string[] DismReadFragments =
+    [
+        "/get-features", "/get-packages", "/get-providers", "/checkhealth", "/get-currentedition"
+    ];
+
+    private static readonly string[] DismMutationFragments =
+    [
+        "/enable-feature", "/disable-feature", "/add-package", "/remove-package", "/apply-image"
+    ];
 
     public static CommandIntent Classify(string fileName, string? arguments)
     {
@@ -30,18 +54,23 @@ internal static class CommandClassifier
         var executable = NormalizeExecutable(fileName);
         var args = NormalizeArguments(arguments);
 
-        // Shells can wrap arbitrary mutation — never treat as confirmed read-only.
         if (executable is "cmd" or "cmd.exe" or "powershell" or "powershell.exe" or "pwsh" or "pwsh.exe")
         {
             return CommandIntent.Mutation;
         }
 
+        // Path present but not a trusted System32/SysWOW64 binary → never ReadOnly.
+        if (!IsTrustedSystemExecutable(fileName, executable))
+        {
+            return CommandIntent.Unknown;
+        }
+
         return executable switch
         {
-            "powercfg" or "powercfg.exe" => ClassifyPowerCfg(args),
-            "bcdedit" or "bcdedit.exe" => ClassifyBcdEdit(args),
-            "sc" or "sc.exe" => ClassifySc(args),
-            "reg" or "reg.exe" => ClassifyReg(args),
+            "powercfg" or "powercfg.exe" => ClassifyByTokens(args, PowerCfgReadTokens, PowerCfgMutationPrefixes, mutationIsPrefix: true),
+            "bcdedit" or "bcdedit.exe" => ClassifyByTokens(args, BcdReadTokens, BcdMutationTokens, mutationIsPrefix: false),
+            "sc" or "sc.exe" => ClassifyByTokens(args, ScReadTokens, ScMutationTokens, mutationIsPrefix: false),
+            "reg" or "reg.exe" => ClassifyByTokens(args, RegReadTokens, RegMutationTokens, mutationIsPrefix: false),
             "netsh" or "netsh.exe" => ClassifyNetsh(args),
             "dism" or "dism.exe" => ClassifyDism(args),
             "sfc" or "sfc.exe" => CommandIntent.Mutation,
@@ -72,90 +101,111 @@ internal static class CommandClassifier
             return string.Empty;
         }
 
-        var collapsed = Whitespace.Replace(arguments.Trim(), " ");
-        return collapsed.ToLowerInvariant();
+        return Whitespace.Replace(arguments.Trim(), " ").ToLowerInvariant();
     }
 
-    private static CommandIntent ClassifyPowerCfg(string args)
+    /// <summary>
+    /// Bare tool names (PATH) are accepted. Absolute/relative paths must resolve under System or SystemX86.
+    /// </summary>
+    internal static bool IsTrustedSystemExecutable(string fileName, string normalizedFileName)
     {
-        if (StartsWithToken(args, "/list") ||
-            StartsWithToken(args, "/query") ||
-            StartsWithToken(args, "/aliases") ||
-            StartsWithToken(args, "/getactivescheme"))
+        var trimmed = fileName.Trim().Trim('"');
+        if (trimmed.Length == 0)
         {
-            return CommandIntent.ReadOnly;
+            return false;
         }
 
-        if (args.StartsWith("/set", StringComparison.Ordinal) ||
-            StartsWithToken(args, "/change") ||
-            StartsWithToken(args, "/hibernate") ||
-            StartsWithToken(args, "/energy"))
+        var hasDirectory = trimmed.Contains('\\', StringComparison.Ordinal) ||
+                           trimmed.Contains('/', StringComparison.Ordinal) ||
+                           trimmed.Contains(':', StringComparison.Ordinal);
+        if (!hasDirectory)
+        {
+            return true;
+        }
+
+        try
+        {
+            var fullPath = Path.GetFullPath(trimmed);
+            var file = Path.GetFileName(fullPath);
+            if (!file.Equals(normalizedFileName, StringComparison.OrdinalIgnoreCase) &&
+                !file.Equals(normalizedFileName + ".exe", StringComparison.OrdinalIgnoreCase) &&
+                !(normalizedFileName.EndsWith(".exe", StringComparison.Ordinal) &&
+                  file.Equals(normalizedFileName, StringComparison.OrdinalIgnoreCase)))
+            {
+                return false;
+            }
+
+            var system = Path.GetFullPath(Environment.GetFolderPath(Environment.SpecialFolder.System));
+            var systemX86 = Path.GetFullPath(Environment.GetFolderPath(Environment.SpecialFolder.SystemX86));
+            var windows = Path.GetFullPath(Environment.GetFolderPath(Environment.SpecialFolder.Windows));
+
+            return IsUnderDirectory(fullPath, system) ||
+                   IsUnderDirectory(fullPath, systemX86) ||
+                   IsUnderDirectory(fullPath, Path.Combine(windows, "System32")) ||
+                   IsUnderDirectory(fullPath, Path.Combine(windows, "SysWOW64"));
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool IsUnderDirectory(string fullPath, string directory)
+    {
+        var prefix = directory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                     + Path.DirectorySeparatorChar;
+        return fullPath.StartsWith(prefix, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static CommandIntent ClassifyByTokens(
+        string args,
+        string[] readTokens,
+        string[] mutationTokens,
+        bool mutationIsPrefix)
+    {
+        var hasRead = false;
+        foreach (var token in readTokens)
+        {
+            if (StartsWithToken(args, token))
+            {
+                hasRead = true;
+                break;
+            }
+        }
+
+        var hasMutation = false;
+        foreach (var token in mutationTokens)
+        {
+            if (mutationIsPrefix)
+            {
+                // Prefix may appear after a read token (mixed → Unknown).
+                if (args.StartsWith(token, StringComparison.Ordinal) ||
+                    args.Contains(" " + token, StringComparison.Ordinal))
+                {
+                    hasMutation = true;
+                    break;
+                }
+            }
+            else if (StartsWithToken(args, token) || ContainsToken(args, token))
+            {
+                hasMutation = true;
+                break;
+            }
+        }
+
+        if (hasMutation && hasRead)
+        {
+            return CommandIntent.Unknown;
+        }
+
+        if (hasMutation)
         {
             return CommandIntent.Mutation;
         }
 
-        return CommandIntent.Unknown;
-    }
-
-    private static CommandIntent ClassifyBcdEdit(string args)
-    {
-        if (StartsWithToken(args, "/enum"))
+        if (hasRead)
         {
             return CommandIntent.ReadOnly;
-        }
-
-        if (StartsWithToken(args, "/set") ||
-            StartsWithToken(args, "/delete") ||
-            StartsWithToken(args, "/deletevalue") ||
-            StartsWithToken(args, "/create") ||
-            StartsWithToken(args, "/import") ||
-            StartsWithToken(args, "/export"))
-        {
-            return CommandIntent.Mutation;
-        }
-
-        return CommandIntent.Unknown;
-    }
-
-    private static CommandIntent ClassifySc(string args)
-    {
-        if (StartsWithToken(args, "query") ||
-            StartsWithToken(args, "queryex") ||
-            StartsWithToken(args, "qc"))
-        {
-            return CommandIntent.ReadOnly;
-        }
-
-        if (StartsWithToken(args, "config") ||
-            StartsWithToken(args, "start") ||
-            StartsWithToken(args, "stop") ||
-            StartsWithToken(args, "create") ||
-            StartsWithToken(args, "delete") ||
-            StartsWithToken(args, "failure"))
-        {
-            return CommandIntent.Mutation;
-        }
-
-        return CommandIntent.Unknown;
-    }
-
-    private static CommandIntent ClassifyReg(string args)
-    {
-        if (StartsWithToken(args, "query"))
-        {
-            return CommandIntent.ReadOnly;
-        }
-
-        if (StartsWithToken(args, "add") ||
-            StartsWithToken(args, "delete") ||
-            StartsWithToken(args, "copy") ||
-            StartsWithToken(args, "import") ||
-            StartsWithToken(args, "restore") ||
-            StartsWithToken(args, "load") ||
-            StartsWithToken(args, "unload") ||
-            StartsWithToken(args, "save"))
-        {
-            return CommandIntent.Mutation;
         }
 
         return CommandIntent.Unknown;
@@ -163,17 +213,30 @@ internal static class CommandClassifier
 
     private static CommandIntent ClassifyNetsh(string args)
     {
-        if (StartsWithToken(args, "show") || args.Contains(" show ", StringComparison.Ordinal))
+        var hasShow = StartsWithToken(args, "show") || ContainsToken(args, "show");
+        var hasMutation = false;
+        foreach (var token in NetshMutationTokens)
         {
-            return CommandIntent.ReadOnly;
+            if (StartsWithToken(args, token) || ContainsToken(args, token))
+            {
+                hasMutation = true;
+                break;
+            }
         }
 
-        if (StartsWithToken(args, "set") ||
-            StartsWithToken(args, "add") ||
-            StartsWithToken(args, "delete") ||
-            StartsWithToken(args, "reset"))
+        if (hasMutation && hasShow)
+        {
+            return CommandIntent.Unknown;
+        }
+
+        if (hasMutation)
         {
             return CommandIntent.Mutation;
+        }
+
+        if (hasShow)
+        {
+            return CommandIntent.ReadOnly;
         }
 
         return CommandIntent.Unknown;
@@ -181,22 +244,39 @@ internal static class CommandClassifier
 
     private static CommandIntent ClassifyDism(string args)
     {
-        if (args.Contains("/get-features", StringComparison.Ordinal) ||
-            args.Contains("/get-packages", StringComparison.Ordinal) ||
-            args.Contains("/get-providers", StringComparison.Ordinal) ||
-            args.Contains("/checkhealth", StringComparison.Ordinal) ||
-            args.Contains("/get-currentedition", StringComparison.Ordinal))
+        var hasRead = false;
+        foreach (var fragment in DismReadFragments)
         {
-            return CommandIntent.ReadOnly;
+            if (args.Contains(fragment, StringComparison.Ordinal))
+            {
+                hasRead = true;
+                break;
+            }
         }
 
-        if (args.Contains("/enable-feature", StringComparison.Ordinal) ||
-            args.Contains("/disable-feature", StringComparison.Ordinal) ||
-            args.Contains("/add-package", StringComparison.Ordinal) ||
-            args.Contains("/remove-package", StringComparison.Ordinal) ||
-            args.Contains("/apply-image", StringComparison.Ordinal))
+        var hasMutation = false;
+        foreach (var fragment in DismMutationFragments)
+        {
+            if (args.Contains(fragment, StringComparison.Ordinal))
+            {
+                hasMutation = true;
+                break;
+            }
+        }
+
+        if (hasMutation && hasRead)
+        {
+            return CommandIntent.Unknown;
+        }
+
+        if (hasMutation)
         {
             return CommandIntent.Mutation;
+        }
+
+        if (hasRead)
+        {
+            return CommandIntent.ReadOnly;
         }
 
         return CommandIntent.Unknown;
@@ -215,5 +295,13 @@ internal static class CommandClassifier
         }
 
         return args.StartsWith(token + " ", StringComparison.Ordinal);
+    }
+
+    private static bool ContainsToken(string args, string token)
+    {
+        return args.Equals(token, StringComparison.Ordinal) ||
+               args.StartsWith(token + " ", StringComparison.Ordinal) ||
+               args.EndsWith(" " + token, StringComparison.Ordinal) ||
+               args.Contains(" " + token + " ", StringComparison.Ordinal);
     }
 }

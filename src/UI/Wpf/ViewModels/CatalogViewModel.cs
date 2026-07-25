@@ -78,14 +78,14 @@ internal sealed partial class CatalogViewModel : ObservableObject
                 $"{plan.RequiringConfirmation.Count} confirmacao, {plan.Blocked.Count} bloqueados. " +
                 "Esta tela so analisa; aplicacao e no Dashboard (Auto-Optimize).";
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             Rows.Clear();
             ApplyFeedback(rowCount: 0, analyzeFailed: true, usageUnknown: true);
             StatusText = "Falha ao analisar o catalogo.";
             FeedbackDetail =
                 "Nao foi possivel gerar o plano. Nenhuma otimizacao foi aplicada. " +
-                "Detalhe: " + ex.Message;
+                "Abra Detalhes no log se precisar de diagnostico tecnico.";
         }
 
         OnPropertyChanged(nameof(ShowEmptyPanel));

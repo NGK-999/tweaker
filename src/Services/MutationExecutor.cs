@@ -45,6 +45,8 @@ internal sealed class MutationExecutor
         Func<CancellationToken, Task<IReadOnlyList<string>>> action,
         CancellationToken cancellationToken)
     {
+        LastOutcome = null;
+
         var startedAtUtc = DateTimeOffset.UtcNow;
         var pipelineLog = new List<string>();
 
@@ -68,6 +70,11 @@ internal sealed class MutationExecutor
 
         pipelineLog.Add($"Pipeline central: Validate -> Snapshot -> Execute -> Verify -> Log ({operationName})");
 
+        OperationOutcomeKind? forcedKind = null;
+        var cancelled = false;
+        var timedOut = false;
+        OperationCanceledException? cancellationToRethrow = null;
+
         try
         {
             var actionLog = await action(cancellationToken).ConfigureAwait(false);
@@ -76,35 +83,26 @@ internal sealed class MutationExecutor
                 pipelineLog.AddRange(actionLog);
             }
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException ex)
         {
             scope.RegisterFailure(operationName, "Operacao cancelada antes da conclusao.");
             pipelineLog.Add("[AVISO] Pipeline cancelado antes da conclusao.");
-            LastOutcome = scope.BuildOutcome(
-                OperationOutcomeKind.Cancelled,
-                pipelineLog,
-                cancelled: true,
-                timedOut: false);
+            forcedKind = OperationOutcomeKind.Cancelled;
+            cancelled = true;
+            cancellationToRethrow = ex;
         }
         catch (TimeoutException ex)
         {
             scope.RegisterFailure(operationName, ex.Message);
             pipelineLog.Add($"[ERRO] Timeout da operacao {operationName}: {ex.Message}");
-            LastOutcome = scope.BuildOutcome(
-                OperationOutcomeKind.TimedOut,
-                pipelineLog,
-                cancelled: false,
-                timedOut: true);
+            forcedKind = OperationOutcomeKind.TimedOut;
+            timedOut = true;
         }
         catch (Exception ex)
         {
             scope.RegisterFailure(operationName, ex.Message);
             pipelineLog.Add($"Falha fatal do pipeline {operationName}: {ex.Message}");
-            LastOutcome = scope.BuildOutcome(
-                OperationOutcomeKind.Failed,
-                pipelineLog,
-                cancelled: false,
-                timedOut: false);
+            forcedKind = OperationOutcomeKind.Failed;
         }
         finally
         {
@@ -112,7 +110,7 @@ internal sealed class MutationExecutor
             {
                 pipelineLog.AddRange(backupService.CommitMutationSession(
                     session,
-                    completed: !scope.HasFailures,
+                    completed: !scope.HasFailures && cancellationToRethrow is null && !timedOut,
                     failedCommandName: scope.LastFailedCommandName,
                     failureMessage: scope.LastFailureMessage));
             }
@@ -122,9 +120,17 @@ internal sealed class MutationExecutor
                 pipelineLog.Add($"[ERRO] Falha ao persistir o ledger transacional: {ex.Message}");
             }
 
-            LastOutcome ??= scope.BuildOutcomeFromState(pipelineLog);
+            // Always rebuild after ledger attempt so RollbackRequired from commit failure is reflected.
+            LastOutcome = forcedKind is null
+                ? scope.BuildOutcomeFromState(pipelineLog)
+                : scope.BuildOutcome(forcedKind.Value, pipelineLog, cancelled, timedOut);
             AppendOutcomeSummary(pipelineLog, LastOutcome);
             activeScope.Value = null;
+        }
+
+        if (cancellationToRethrow is not null)
+        {
+            throw cancellationToRethrow;
         }
 
         return pipelineLog;
@@ -147,6 +153,12 @@ internal sealed class MutationExecutor
             scope.RegisterSuccess(command.Name);
             log.Add(command.SuccessMessage);
             return true;
+        }
+        catch (OperationCanceledException)
+        {
+            scope.RegisterFailure(command.Name, "Comando cancelado.");
+            log.Add($"[AVISO] {command.Name}: cancelado.");
+            throw;
         }
         catch (UnauthorizedAccessException ex)
         {
@@ -413,6 +425,18 @@ internal sealed class MutationExecutor
             if (rolledBack)
             {
                 kind = OperationOutcomeKind.RolledBack;
+            }
+            else if (cancelled)
+            {
+                kind = OperationOutcomeKind.Cancelled;
+            }
+            else if (timedOut)
+            {
+                kind = OperationOutcomeKind.TimedOut;
+            }
+            else if (rollbackRequired && kind != OperationOutcomeKind.RolledBack)
+            {
+                kind = OperationOutcomeKind.RollbackRequired;
             }
             else if (restartRequired &&
                      (kind == OperationOutcomeKind.Completed || kind == OperationOutcomeKind.PartiallyCompleted))
