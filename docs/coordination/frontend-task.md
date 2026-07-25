@@ -1,7 +1,7 @@
 # Frontend task
 
 **Task ID:** P0.2-BLOCKERS (FE slice)  
-**Status:** IN PROGRESS — branch de integração  
+**Status:** READY FOR RE-REVIEW — merge bloqueado  
 **Worktree:** `C:\projetos\Apextweaker`  
 **Branch:** `integration/p0-demo-outcome-feedback`  
 **Task:** `docs/coordination/p0.2-task.md`  
