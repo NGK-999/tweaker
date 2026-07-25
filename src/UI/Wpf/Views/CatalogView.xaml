@@ -28,14 +28,25 @@
 
             <TextBlock Style="{StaticResource MacSectionLabel}" Text="CATALOGO" />
             <TextBlock Margin="0,6,0,0"
-                       Style="{StaticResource MacPageTitle}"
-                       FontSize="20"
-                       Text="Otimizacoes Windows" />
-            <TextBlock Margin="0,6,0,0"
                        Style="{StaticResource MacBodyText}"
                        FontSize="13"
                        TextWrapping="Wrap"
                        Text="Somente analise nesta tela. Para aplicar, va ao Dashboard e use Auto-Optimize. BIOS e checklist sem flash." />
+
+            <Border x:Name="AnalyzingBanner"
+                    Margin="0,14,0,0"
+                    Padding="12,10"
+                    CornerRadius="8"
+                    Background="{DynamicResource InfoSurfaceBrush}"
+                    BorderBrush="{DynamicResource AccentBrush}"
+                    BorderThickness="1"
+                    Visibility="Collapsed">
+                <TextBlock Style="{StaticResource MacBodyText}"
+                           FontSize="12"
+                           FontWeight="SemiBold"
+                           Foreground="{DynamicResource AccentBrush}"
+                           Text="Analisando catalogo..." />
+            </Border>
 
             <Border Margin="0,18,0,0" Style="{StaticResource MacCardStyle}">
                 <Grid>
@@ -54,7 +65,8 @@
                                   HorizontalAlignment="Left"
                                   SelectionChanged="PresetCombo_OnSelectionChanged" />
                     </StackPanel>
-                    <Button Grid.Column="1"
+                    <Button x:Name="AnalyzeButton"
+                            Grid.Column="1"
                             VerticalAlignment="Bottom"
                             Style="{StaticResource MacPrimaryButton}"
                             Content="Analisar"

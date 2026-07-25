@@ -1,8 +1,6 @@
 # Frontend task
 
-**Task ID:** FE-SHELL-FLUENCY-P1  
-**Status:** DONE (orquestrador) — Claude API limit  
-**Branch:** `main`  
-**Handoff:** `docs/coordination/frontend-handoff.md`  
-
-Claude Opus ([Claude FE](816058bc-ea44-4921-a6cd-6020fedc0d9f)) não executou. P1 mecânico entregue: transition leve + AnalyzeAsync + probe async.
+**Task ID:** UI-OUTCOME-P1 + FE-SHELL-POLISH-P1  
+**Status:** DONE (orquestrador) — Claude [Claude FE polish](360e9c6b-70f7-45a1-ba5f-d89c73c6dcd7) **FAIL** (API usage limit; sem edits)  
+**Branch:** `integration/ui-outcome-polish`  
+**Handoff:** `docs/coordination/frontend-handoff.md`

@@ -20,6 +20,7 @@ using ApexTweaker.UI.Wpf.Controls;
 using ApexTweaker.UI.Wpf.Theming;
 using ApexTweaker.UI.Wpf.Views;
 using ApexTweaker;
+using ApexTweaker.Infrastructure;
 using ApexTweaker.Models;
 using ApexTweaker.Services;
 
@@ -518,6 +519,10 @@ public partial class MainWindow : Window
             var locator = valorantLocator;
             performanceCapture = Task.Run(() =>
                 (service.CaptureGamingPerformanceProbe(), locator.FindExecutable()));
+            if (page is PerformanceView loadingPerformance)
+            {
+                loadingPerformance.SetProbeLoading(true);
+            }
         }
 
         AppThemeManager.Apply(page, AppThemeManager.Current);
@@ -545,7 +550,7 @@ public partial class MainWindow : Window
             UtilitiesPageKey => "Utilidades",
             _ => AppInfo.Name
         };
-        HeaderSubtitleText.Text = pageKey switch
+        var headerSubtitle = pageKey switch
         {
             MinecraftPageKey => "Encontrar, preparar, testar e restaurar sem complexidade",
             TelemetryPageKey => "Frametime, sensores e comparacao antes/depois",
@@ -559,8 +564,9 @@ public partial class MainWindow : Window
         try
         {
             var headerTask = UiMotion.AnimateHeaderAsync(HeaderTitleText, headerTitle, cancellationToken);
+            var subtitleTask = UiMotion.AnimateHeaderAsync(HeaderSubtitleText, headerSubtitle, cancellationToken);
             var pageTask = PageTransitionAnimator.ShowAsync(PageHost, page, cancellationToken, skipAnimation: !animate);
-            await Task.WhenAll(headerTask, pageTask).ConfigureAwait(true);
+            await Task.WhenAll(headerTask, subtitleTask, pageTask).ConfigureAwait(true);
             activePageKey = pageKey;
 
             if (performanceCapture is not null && performanceView is not null)
@@ -588,6 +594,9 @@ public partial class MainWindow : Window
             HeaderTitleText.Text = headerTitle;
             HeaderTitleText.Opacity = 1D;
             HeaderTitleText.RenderTransform = Transform.Identity;
+            HeaderSubtitleText.Text = headerSubtitle;
+            HeaderSubtitleText.Opacity = 1D;
+            HeaderSubtitleText.RenderTransform = Transform.Identity;
         }
     }
 
@@ -668,7 +677,10 @@ public partial class MainWindow : Window
             var lines = await Task.Run(() => tweakService.ApplyAutonomousOptimization(valorantLocator.FindExecutable()));
             WriteLines(lines);
 
-            SetStatus("Auto-Tuning aplicado. Reinicie o PC antes de medir.", SnackbarKind.Warning);
+            if (!TrySetStatusFromMutationOutcome("Auto-Tuning", tweakService.LastMutationOutcome))
+            {
+                SetStatus("Auto-Tuning aplicado. Reinicie o PC antes de medir.", SnackbarKind.Warning);
+            }
         }
         catch (OperationCanceledException)
         {
@@ -910,7 +922,10 @@ public partial class MainWindow : Window
             var lines = await Task.Run(action);
             WriteLines(lines);
 
-            SetStatus(completionStatus ?? $"{section}: conclu\u00EDdo. Veja o log.", SnackbarKind.Success);
+            if (!TrySetStatusFromMutationOutcome(section, tweakService.LastMutationOutcome, completionStatus))
+            {
+                SetStatus(completionStatus ?? $"{section}: conclu\u00EDdo. Veja o log.", SnackbarKind.Success);
+            }
         }
         catch (OperationCanceledException)
         {
@@ -2385,6 +2400,59 @@ public partial class MainWindow : Window
         }
 
         Telemetry.AppendConsoleLines(messages);
+    }
+
+    /// <summary>
+    /// Maps pipeline <see cref="OperationOutcome"/> to snackbar. Returns false when there is no
+    /// outcome (non-pipeline paths like restore point) so callers can keep their legacy fallback.
+    /// </summary>
+    private bool TrySetStatusFromMutationOutcome(
+        string section,
+        OperationOutcome? outcome,
+        string? completionStatus = null)
+    {
+        if (outcome is null)
+        {
+            return false;
+        }
+
+        var (kind, message) = MapMutationOutcomeToSnackbar(section, outcome, completionStatus);
+        SetStatus(message, kind);
+        return true;
+    }
+
+    private static (SnackbarKind Kind, string Message) MapMutationOutcomeToSnackbar(
+        string section,
+        OperationOutcome outcome,
+        string? completionStatus)
+    {
+        if (outcome.RestartRequired &&
+            outcome.Kind is OperationOutcomeKind.Completed or OperationOutcomeKind.RestartRequired)
+        {
+            return (SnackbarKind.Warning, $"{section}: reinicie o PC antes de medir.");
+        }
+
+        return outcome.Kind switch
+        {
+            OperationOutcomeKind.Completed =>
+                (SnackbarKind.Success, completionStatus ?? $"{section}: conclu\u00EDdo. Veja o log."),
+            OperationOutcomeKind.PartiallyCompleted =>
+                (SnackbarKind.Warning, $"{section}: parcialmente conclu\u00EDdo. Veja o log."),
+            OperationOutcomeKind.Failed =>
+                (SnackbarKind.Error, $"{section}: falhou. Veja o log."),
+            OperationOutcomeKind.RollbackRequired =>
+                (SnackbarKind.Error, $"{section}: rollback necess\u00E1rio. Veja o log."),
+            OperationOutcomeKind.Cancelled =>
+                (SnackbarKind.Warning, $"{section}: cancelado."),
+            OperationOutcomeKind.TimedOut =>
+                (SnackbarKind.Error, $"{section}: tempo esgotado. Veja o log."),
+            OperationOutcomeKind.RestartRequired =>
+                (SnackbarKind.Warning, $"{section}: reinicie o PC antes de medir."),
+            OperationOutcomeKind.RolledBack =>
+                (SnackbarKind.Warning, $"{section}: revertido. Veja o log."),
+            _ =>
+                (SnackbarKind.Warning, $"{section}: resultado inesperado. Veja o log.")
+        };
     }
 
     private void SetStatus(string message) => SetStatus(message, SnackbarKind.Info);
