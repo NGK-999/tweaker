@@ -1,9 +1,9 @@
 # Frontend handoff — FE-FEEDBACK-SHELL-P0
 
-**Status:** DONE (worktree) — aguarda revisão do orquestrador  
-**Branch:** `agent/claude-fe-feedback-shell-p0`  
-**Worktree:** `C:\projetos\Apextweaker-claude`  
-**Executor:** Orquestrador (recuperação após falha do subagent Claude por limite de API)  
+**Status:** DONE (worktree) — aguarda revisão do orquestrador
+**Branch:** `agent/claude-fe-feedback-shell-p0`
+**Worktree:** `C:\projetos\Apextweaker-claude`
+**Executor:** Orquestrador (recuperação após falha do subagent Claude por limite de API)
 **Data:** 2026-07-25
 
 ## Escopo entregue
