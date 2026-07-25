@@ -12,6 +12,8 @@
 | Backend | `bf03db7` (cherry-pick de `0a1c68f`) | BE-DEMO-OUTCOME-P0 |
 | Frontend | `787e649` (cherry-pick de `97b38e5`) | FE-FEEDBACK-SHELL-P0 |
 | Harness | `70411ae` | `test: wire catalog feedback self-test` |
+| Docs | `eb25c82` | consolidate P0 status |
+| P0.1 fail-closed | *(este commit)* | `CommandIntent` ReadOnly\|Mutation\|Unknown |
 
 ## Resultados
 
@@ -19,14 +21,15 @@
 Backend commit integrado: bf03db7 (0a1c68f)
 Frontend commit integrado: 787e649 (97b38e5)
 Harness commit: 70411ae
-Build: PASS (após BE, após FE, após harness)
-demo-self-test: PASS (exit 0)
+P0.1 commit: (após commit local)
+Build: PASS
+demo-self-test: PASS (exit 0) — inclui unknown/ambiguous/PowerShell/cmd
 gaming-fps-probe-self-test: PASS (exit 0)
 catalog-feedback-self-test: PASS (exit 0) — COMPILADO / EXECUTADO / PASS
-Teste manual: launch ApexTweaker.exe sem flags — janela "ApexTweaker" abriu (Responding); Stop-Process; sem órfãos
-Problemas encontrados: ver dívidas abaixo (não bloqueantes para esta branch)
-Dívidas aceitas: ver seção Dívidas
-Próxima tarefa: merge controlado para main (humano) OU cross-review residual; depois BE-CORR-LOG / FE polish SetStatus tipado
+Teste manual: GUI smoke OK; sem órfãos
+Problemas encontrados: bypass fail-open CORRIGIDO na P0.1
+Dívidas aceitas: RegistryService direto ainda fora do CommandRunner (protegido via MutationExecutor); allowlist ReadOnly pode precisar expansão pontual
+Próxima tarefa: PR para main (sem squash); não aplicar stash wip-pre-p0-integration-*
 ```
 
 ## Revisão formal backend `0a1c68f` (orquestrador)
@@ -52,17 +55,22 @@ Próxima tarefa: merge controlado para main (humano) OU cross-review residual; d
 - PASS: tenta `powercfg /setactive` e recebe bloqueio; legado `TweakService` sob Demo/Unknown retorna `[BLOQUEADO]`.
 - Outcomes via comandos stub (sem SetValue real) sob Standard **abrem sessão BackupService** (I/O de ledger app) — dívida menor, não é reg/GPO/BCD/serviço.
 
-### Inventário de bypass (dívida documentada)
+### P0.1 — classificação fail-closed (`CommandIntent`)
 
-> Gate aplicado ao pipeline principal (`MutationExecutor` + `CommandRunner` classificado); caminhos abaixo exigem migração em tarefa posterior. **Não** afirmar segurança completa.
+- `ReadOnly` = allowlist explícita; `Mutation` / `Unknown` = bloqueados fora de `Standard`.
+- Fallback **nunca** retorna leitura: executável desconhecido → `Unknown`.
+- PowerShell/cmd sempre `Mutation` (não confirmáveis como read-only).
+- Códigos: `COMMAND_NOT_CONFIRMED_READ_ONLY` / `COMMAND_MUTATION_BLOCKED`.
+
+### Inventário de bypass residual
 
 | Caminho | Classificação |
 |---------|----------------|
-| `CommandRunner` comandos **não** listados em `LooksLikeMutation` (`_ => false`) | Mutação potencial **não protegida** em Demo (tratados como leitura) |
-| `RegistryService.Set*` via `TweakService` dentro de `MutationExecutor` | Mutação protegida pelo gate do executor |
-| `RegistryService` / `BackupService` restore paths fora de demo gate em CommandRunner reads | Leitura / restore via runner (mutações `powercfg`/`sc`/`bcdedit` passam pelo classifier) |
+| `CommandRunner` + `CommandClassifier` | Fail-closed em Demo/Unknown (P0.1) |
+| `RegistryService.Set*` via `MutationExecutor` | Protegido pelo gate do executor |
+| `RegistryService` fora do pipeline | Dívida futura (migração) |
 | `Inventory` OpenSubKey | Leitura |
-| `MainWindow` Process.Start (URLs/suporte) | Fora do pipeline Windows tweak |
+| `MainWindow` Process.Start (URLs) | Fora do pipeline tweak |
 | Minecraft `new Process` | Domínio MC paralelo |
 
 ## Frontend self-test

@@ -89,9 +89,16 @@ internal sealed class CommandRunner
 
         try
         {
-            if (!process.Start())
+            try
             {
-                return new CommandResult(-1, string.Empty, $"Falha ao iniciar processo: {fileName}");
+                if (!process.Start())
+                {
+                    return new CommandResult(-1, string.Empty, $"Falha ao iniciar processo: {fileName}");
+                }
+            }
+            catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception)
+            {
+                return new CommandResult(-1, string.Empty, $"Falha ao iniciar processo: {fileName}: {ex.Message}");
             }
 
             process.BeginOutputReadLine();
@@ -166,39 +173,26 @@ internal sealed class CommandRunner
 
     private static RuntimeMutationDecision EvaluateRuntimeBoundary(string fileName, string arguments)
     {
-        if (!LooksLikeMutation(fileName, arguments))
+        var mode = RuntimeModeContext.Current;
+        if (mode == RuntimeMode.Standard)
         {
-            return RuntimeMutationDecision.Allow(RuntimeModeContext.Current);
+            return RuntimeMutationDecision.Allow(mode);
+        }
+
+        var intent = CommandClassifier.Classify(fileName, arguments);
+        if (intent == CommandIntent.ReadOnly)
+        {
+            return RuntimeMutationDecision.Allow(mode);
         }
 
         var subject = string.Concat(fileName, " ", arguments).Trim();
-        return RuntimeModeContext.EvaluateMutation(subject);
-    }
+        var errorCode = intent == CommandIntent.Unknown
+            ? "COMMAND_NOT_CONFIRMED_READ_ONLY"
+            : "COMMAND_MUTATION_BLOCKED";
 
-    private static bool LooksLikeMutation(string fileName, string arguments)
-    {
-        var command = fileName.Trim().ToLowerInvariant();
-        var normalizedArguments = (arguments ?? string.Empty).Trim();
-        var lowerArguments = normalizedArguments.ToLowerInvariant();
-
-        return command switch
-        {
-            "powercfg" or "powercfg.exe" => !(lowerArguments.StartsWith("/list", StringComparison.Ordinal) ||
-                                              lowerArguments.StartsWith("/query", StringComparison.Ordinal) ||
-                                              lowerArguments.StartsWith("/aliases", StringComparison.Ordinal) ||
-                                              lowerArguments.StartsWith("/getactivescheme", StringComparison.Ordinal)),
-            "bcdedit" or "bcdedit.exe" => !lowerArguments.StartsWith("/enum", StringComparison.Ordinal),
-            "sc" or "sc.exe" => !(lowerArguments.StartsWith("query", StringComparison.Ordinal) ||
-                                  lowerArguments.StartsWith("queryex", StringComparison.Ordinal) ||
-                                  lowerArguments.StartsWith("qc", StringComparison.Ordinal)),
-            "reg" or "reg.exe" => !lowerArguments.StartsWith("query", StringComparison.Ordinal),
-            "netsh" or "netsh.exe" => !lowerArguments.Contains(" show ", StringComparison.Ordinal) &&
-                                      !lowerArguments.StartsWith("show ", StringComparison.Ordinal),
-            "dism" or "dism.exe" => !lowerArguments.Contains("/checkhealth", StringComparison.Ordinal),
-            "sfc" or "sfc.exe" => true,
-            "defrag" or "defrag.exe" => true,
-            "powershell" or "powershell.exe" => true,
-            _ => false
-        };
+        var modeLabel = mode == RuntimeMode.Demo ? "modo demo" : "RuntimeMode incerto";
+        return RuntimeMutationDecision.Block(
+            mode,
+            $"[{errorCode}] O comando foi bloqueado porque nao pode ser confirmado como somente leitura ({modeLabel}): {subject}. Intent={intent}.");
     }
 }

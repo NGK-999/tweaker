@@ -29,19 +29,53 @@ internal static class DemoSafetySelfTest
         }
 
         RuntimeModeContext.Configure(RuntimeMode.Demo);
-        var readResult = new CommandRunner().Run("powercfg", "/list");
-        Check(readResult.ExitCode == 0, "demo permite leituras/inventario via CommandRunner");
+        var runner = new CommandRunner();
 
-        var blockedCommand = new CommandRunner().Run("powercfg", "/setactive SCHEME_CURRENT");
-        Check(blockedCommand.ExitCode != 0 &&
-              blockedCommand.Output.Contains("modo demo", StringComparison.OrdinalIgnoreCase),
-            "demo bloqueia mutacao direta no CommandRunner");
+        var readResult = runner.Run("powercfg", "/list");
+        Check(readResult.ExitCode == 0, "comando conhecido de leitura e permitido em Demo");
+
+        var blockedCommand = runner.Run("powercfg", "/setactive SCHEME_CURRENT");
+        Check(blockedCommand.ExitCode == -3900 &&
+              blockedCommand.Output.Contains("COMMAND_MUTATION_BLOCKED", StringComparison.OrdinalIgnoreCase),
+            "comando conhecido de mutacao e bloqueado em Demo");
+
+        var unknownCommand = runner.Run("totally-unknown-apextweaker-tool", "--mutate");
+        Check(unknownCommand.ExitCode == -3900 &&
+              unknownCommand.Output.Contains("COMMAND_NOT_CONFIRMED_READ_ONLY", StringComparison.OrdinalIgnoreCase),
+            "comando desconhecido e bloqueado em Demo");
+
+        var unknownExe = runner.Run(@"C:\Windows\System32\definitely-not-a-real-tool.exe", "query");
+        Check(unknownExe.ExitCode == -3900, "executavel desconhecido e bloqueado em Demo");
+
+        var powershell = runner.Run("powershell.exe", "-Command \"Set-ItemProperty -Path HKCU:\\Software\\ApexTweakerDemo -Name X -Value 1\"");
+        Check(powershell.ExitCode == -3900 &&
+              powershell.Output.Contains("COMMAND_MUTATION_BLOCKED", StringComparison.OrdinalIgnoreCase),
+            "PowerShell nao classificado e bloqueado");
+
+        var ambiguous = runner.Run("powercfg", "/weird-flag");
+        Check(ambiguous.ExitCode == -3900 &&
+              ambiguous.Output.Contains("COMMAND_NOT_CONFIRMED_READ_ONLY", StringComparison.OrdinalIgnoreCase),
+            "argumentos ambiguos sao bloqueados");
+
+        Check(CommandClassifier.Classify("reg.exe", "ADD HKCU\\Software\\Apex") == CommandIntent.Mutation, "reg.exe ADD case-insensitive e Mutation");
+        Check(CommandClassifier.Classify("REG", "add HKCU\\Software\\Apex") == CommandIntent.Mutation, "REG add e Mutation");
+        Check(CommandClassifier.Classify("reg", "   add   HKCU\\Software\\Apex") == CommandIntent.Mutation, "reg com espacos extras e Mutation");
+        Check(CommandClassifier.Classify(@"C:\Windows\System32\reg.exe", "add HKCU\\Software\\Apex") == CommandIntent.Mutation, "caminho completo reg.exe e Mutation");
+        Check(CommandClassifier.Classify("cmd.exe", "/c reg add HKCU\\Software\\Apex /v X /d 1") == CommandIntent.Mutation, "cmd /c com mutacao e Mutation");
+        Check(CommandClassifier.Classify("reg", "query HKCU\\Software") == CommandIntent.ReadOnly, "reg query continua ReadOnly");
+
+        var cmdWrap = runner.Run("cmd.exe", "/c reg add HKCU\\Software\\ApexTweakerDemo /v X /d 1 /f");
+        Check(cmdWrap.ExitCode == -3900, "cmd /c com mutacao e bloqueado em Demo");
 
         var legacyDemoLog = new TweakService().ApplyNetworkTweaks();
         Check(legacyDemoLog.Any(line => line.Contains("[BLOQUEADO]", StringComparison.OrdinalIgnoreCase)),
             "caminho legado TweakService nao contorna o gate central");
         Check(legacyDemoLog.Any(line => line.Contains("RuntimeMode=Demo", StringComparison.OrdinalIgnoreCase)),
-            "log legado expõe runtime demo no outcome");
+            "log legado expoe runtime demo no outcome");
+        Check(legacyDemoLog.Any(line => line.Contains("Blocked=True", StringComparison.OrdinalIgnoreCase) ||
+                                        line.Contains("MutationBlocked", StringComparison.OrdinalIgnoreCase) ||
+                                        line.Contains("[BLOQUEADO]", StringComparison.OrdinalIgnoreCase)),
+            "bloqueio retorna MutationBlocked/Blocked");
 
         RuntimeModeContext.ResetForTests();
         var unknownLog = new TweakService().ApplyCompetitiveCaptureQuiet();
@@ -49,6 +83,8 @@ internal static class DemoSafetySelfTest
             "modo incerto falha fechado antes de mutar");
 
         RuntimeModeContext.Configure(RuntimeMode.Standard);
+        var standardUnknown = new CommandRunner().Run("totally-unknown-apextweaker-tool", "--x");
+        Check(standardUnknown.ExitCode != -3900, "Standard mantem comportamento esperado (sem bloqueio de intent)");
 
         var completed = RunOutcomeScenario("completed", (_, log) =>
         {
