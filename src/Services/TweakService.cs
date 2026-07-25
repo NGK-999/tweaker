@@ -64,8 +64,15 @@ internal sealed class TweakService
         mutationExecutor = new MutationExecutor(backupService);
     }
 
+    /// <summary>
+    /// Outcome of the last <see cref="RunMutationPipeline"/> call. Null for non-pipeline paths
+    /// (e.g. restore point) so the UI does not reuse a stale Kind.
+    /// </summary>
+    public OperationOutcome? LastMutationOutcome { get; private set; }
+
     public IReadOnlyList<string> CreateRestorePoint()
     {
+        LastMutationOutcome = null;
         return SystemRestoreService.CreatePreOptimizationRestorePoint();
     }
 
@@ -916,7 +923,9 @@ internal sealed class TweakService
 
     private IReadOnlyList<string> RunMutationPipeline(string operationName, Func<IReadOnlyList<string>> action)
     {
-        return mutationExecutor.Run(operationName, action);
+        var lines = mutationExecutor.Run(operationName, action);
+        LastMutationOutcome = mutationExecutor.LastOutcome;
+        return lines;
     }
 
     private bool ExecuteCommand(ISystemMutationCommand command, List<string> log)

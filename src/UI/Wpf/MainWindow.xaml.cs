@@ -20,6 +20,7 @@ using ApexTweaker.UI.Wpf.Controls;
 using ApexTweaker.UI.Wpf.Theming;
 using ApexTweaker.UI.Wpf.Views;
 using ApexTweaker;
+using ApexTweaker.Infrastructure;
 using ApexTweaker.Models;
 using ApexTweaker.Services;
 
@@ -668,7 +669,10 @@ public partial class MainWindow : Window
             var lines = await Task.Run(() => tweakService.ApplyAutonomousOptimization(valorantLocator.FindExecutable()));
             WriteLines(lines);
 
-            SetStatus("Auto-Tuning aplicado. Reinicie o PC antes de medir.", SnackbarKind.Warning);
+            if (!TrySetStatusFromMutationOutcome("Auto-Tuning", tweakService.LastMutationOutcome))
+            {
+                SetStatus("Auto-Tuning aplicado. Reinicie o PC antes de medir.", SnackbarKind.Warning);
+            }
         }
         catch (OperationCanceledException)
         {
@@ -910,7 +914,10 @@ public partial class MainWindow : Window
             var lines = await Task.Run(action);
             WriteLines(lines);
 
-            SetStatus(completionStatus ?? $"{section}: conclu\u00EDdo. Veja o log.", SnackbarKind.Success);
+            if (!TrySetStatusFromMutationOutcome(section, tweakService.LastMutationOutcome, completionStatus))
+            {
+                SetStatus(completionStatus ?? $"{section}: conclu\u00EDdo. Veja o log.", SnackbarKind.Success);
+            }
         }
         catch (OperationCanceledException)
         {
@@ -2385,6 +2392,59 @@ public partial class MainWindow : Window
         }
 
         Telemetry.AppendConsoleLines(messages);
+    }
+
+    /// <summary>
+    /// Maps pipeline <see cref="OperationOutcome"/> to snackbar. Returns false when there is no
+    /// outcome (non-pipeline paths like restore point) so callers can keep their legacy fallback.
+    /// </summary>
+    private bool TrySetStatusFromMutationOutcome(
+        string section,
+        OperationOutcome? outcome,
+        string? completionStatus = null)
+    {
+        if (outcome is null)
+        {
+            return false;
+        }
+
+        var (kind, message) = MapMutationOutcomeToSnackbar(section, outcome, completionStatus);
+        SetStatus(message, kind);
+        return true;
+    }
+
+    private static (SnackbarKind Kind, string Message) MapMutationOutcomeToSnackbar(
+        string section,
+        OperationOutcome outcome,
+        string? completionStatus)
+    {
+        if (outcome.RestartRequired &&
+            outcome.Kind is OperationOutcomeKind.Completed or OperationOutcomeKind.RestartRequired)
+        {
+            return (SnackbarKind.Warning, $"{section}: reinicie o PC antes de medir.");
+        }
+
+        return outcome.Kind switch
+        {
+            OperationOutcomeKind.Completed =>
+                (SnackbarKind.Success, completionStatus ?? $"{section}: conclu\u00EDdo. Veja o log."),
+            OperationOutcomeKind.PartiallyCompleted =>
+                (SnackbarKind.Warning, $"{section}: parcialmente conclu\u00EDdo. Veja o log."),
+            OperationOutcomeKind.Failed =>
+                (SnackbarKind.Error, $"{section}: falhou. Veja o log."),
+            OperationOutcomeKind.RollbackRequired =>
+                (SnackbarKind.Error, $"{section}: rollback necess\u00E1rio. Veja o log."),
+            OperationOutcomeKind.Cancelled =>
+                (SnackbarKind.Warning, $"{section}: cancelado."),
+            OperationOutcomeKind.TimedOut =>
+                (SnackbarKind.Error, $"{section}: tempo esgotado. Veja o log."),
+            OperationOutcomeKind.RestartRequired =>
+                (SnackbarKind.Warning, $"{section}: reinicie o PC antes de medir."),
+            OperationOutcomeKind.RolledBack =>
+                (SnackbarKind.Warning, $"{section}: revertido. Veja o log."),
+            _ =>
+                (SnackbarKind.Warning, $"{section}: resultado inesperado. Veja o log.")
+        };
     }
 
     private void SetStatus(string message) => SetStatus(message, SnackbarKind.Info);
