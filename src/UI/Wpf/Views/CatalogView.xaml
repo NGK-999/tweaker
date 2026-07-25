@@ -35,7 +35,7 @@
                        Style="{StaticResource MacBodyText}"
                        FontSize="13"
                        TextWrapping="Wrap"
-                       Text="Somente analise nesta tela. Auto-Optimize nunca aplica itens perigosos. BIOS e checklist sem flash." />
+                       Text="Somente analise nesta tela. Para aplicar, va ao Dashboard e use Auto-Optimize. BIOS e checklist sem flash." />
 
             <Border Margin="0,18,0,0" Style="{StaticResource MacCardStyle}">
                 <Grid>
@@ -58,7 +58,8 @@
                             VerticalAlignment="Bottom"
                             Style="{StaticResource MacPrimaryButton}"
                             Content="Analisar"
-                            Click="AnalyzeButton_OnClick" />
+                            Click="AnalyzeButton_OnClick"
+                            AutomationProperties.Name="CatalogAnalyze" />
                 </Grid>
             </Border>
 
@@ -69,7 +70,85 @@
                        TextWrapping="Wrap"
                        Text="Selecione um preset e analise." />
 
-            <TextBlock Margin="0,18,0,10" Style="{StaticResource MacSectionTitle}" Text="Regras" />
+            <!-- Empty -->
+            <Border x:Name="EmptyPanel"
+                    Margin="0,12,0,0"
+                    Style="{StaticResource MacCardStyle}"
+                    Visibility="Collapsed">
+                <StackPanel>
+                    <TextBlock FontSize="14" FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextPrimaryBrush}"
+                               Text="{Binding FeedbackTitle}" />
+                    <TextBlock Margin="0,6,0,12"
+                               Style="{StaticResource MacBodyText}"
+                               FontSize="12"
+                               TextWrapping="Wrap"
+                               Text="{Binding FeedbackDetail}" />
+                    <Button x:Name="RetryEmptyButton"
+                            HorizontalAlignment="Left"
+                            Style="{StaticResource MacPrimaryButton}"
+                            Content="Tentar de novo"
+                            Click="RetryAnalyze_OnClick"
+                            AutomationProperties.Name="CatalogRetryAnalyze" />
+                </StackPanel>
+            </Border>
+
+            <!-- Error -->
+            <Border x:Name="ErrorPanel"
+                    Margin="0,12,0,0"
+                    Style="{StaticResource MacCardStyle}"
+                    BorderBrush="{DynamicResource ErrorBrush}"
+                    Visibility="Collapsed">
+                <StackPanel>
+                    <TextBlock FontSize="14" FontWeight="SemiBold"
+                               Foreground="{DynamicResource ErrorBrush}"
+                               Text="{Binding FeedbackTitle}" />
+                    <TextBlock Margin="0,6,0,12"
+                               Style="{StaticResource MacBodyText}"
+                               FontSize="12"
+                               TextWrapping="Wrap"
+                               Text="{Binding FeedbackDetail}" />
+                    <Button x:Name="RetryErrorButton"
+                            HorizontalAlignment="Left"
+                            Style="{StaticResource MacPrimaryButton}"
+                            Content="Tentar de novo"
+                            Click="RetryAnalyze_OnClick"
+                            AutomationProperties.Name="CatalogRetryAnalyze" />
+                </StackPanel>
+            </Border>
+
+            <!-- Partial -->
+            <Border x:Name="PartialPanel"
+                    Margin="0,12,0,0"
+                    Style="{StaticResource MacCardStyle}"
+                    BorderBrush="{DynamicResource WarningBrush}"
+                    Visibility="Collapsed">
+                <StackPanel>
+                    <TextBlock FontSize="14" FontWeight="SemiBold"
+                               Foreground="{DynamicResource WarningBrush}"
+                               Text="{Binding FeedbackTitle}" />
+                    <TextBlock Margin="0,6,0,0"
+                               Style="{StaticResource MacBodyText}"
+                               FontSize="12"
+                               TextWrapping="Wrap"
+                               Text="{Binding FeedbackDetail}" />
+                </StackPanel>
+            </Border>
+
+            <Button x:Name="GoToAutoButton"
+                    Margin="0,14,0,0"
+                    HorizontalAlignment="Left"
+                    Style="{StaticResource MacSecondaryButton}"
+                    Content="Ir ao Dashboard para usar Auto-Optimize"
+                    Click="GoToAuto_OnClick"
+                    Visibility="Collapsed"
+                    AutomationProperties.Name="CatalogGoToAutoOptimize"
+                    ToolTip="Abre o Dashboard. Nao inicia a otimizacao automaticamente." />
+
+            <TextBlock x:Name="RulesHeader"
+                       Margin="0,18,0,10"
+                       Style="{StaticResource MacSectionTitle}"
+                       Text="Regras" />
             <ItemsControl x:Name="RulesList">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>

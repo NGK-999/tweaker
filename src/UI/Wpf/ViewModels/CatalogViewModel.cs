@@ -1,3 +1,4 @@
+using System;
 using System.Collections.ObjectModel;
 using System.Linq;
 using ApexTweaker.Models;
@@ -21,8 +22,31 @@ internal sealed partial class CatalogViewModel : ObservableObject
     [ObservableProperty]
     private WindowsOptimizationPreset selectedPreset = WindowsOptimizationPreset.GamerSafe;
 
+    [ObservableProperty]
+    private CatalogFeedbackKind feedbackKind = CatalogFeedbackKind.Idle;
+
+    [ObservableProperty]
+    private string feedbackTitle = string.Empty;
+
+    [ObservableProperty]
+    private string feedbackDetail = string.Empty;
+
+    [ObservableProperty]
+    private bool usageUnknown = true;
+
     public IReadOnlyList<WindowsOptimizationPreset> Presets { get; } =
         Enum.GetValues<WindowsOptimizationPreset>();
+
+    public bool ShowEmptyPanel => FeedbackKind == CatalogFeedbackKind.Empty;
+
+    public bool ShowPartialPanel => FeedbackKind == CatalogFeedbackKind.Partial;
+
+    public bool ShowErrorPanel => FeedbackKind == CatalogFeedbackKind.Error;
+
+    public bool ShowRulesList => FeedbackKind is CatalogFeedbackKind.Ready or CatalogFeedbackKind.Partial;
+
+    public bool ShowGoToAutoCta =>
+        FeedbackKind is CatalogFeedbackKind.Ready or CatalogFeedbackKind.Partial or CatalogFeedbackKind.Empty;
 
     public void LoadBios()
     {
@@ -36,16 +60,78 @@ internal sealed partial class CatalogViewModel : ObservableObject
     public void Analyze()
     {
         Rows.Clear();
-        var plan = optimizationService.Analyze(SelectedPreset, WindowsUsageProfile.Unknown);
-        foreach (var decision in plan.Decisions.OrderBy(d => d.Rule.Category).ThenBy(d => d.Rule.Name))
+        UsageUnknown = true;
+
+        try
         {
-            Rows.Add(new CatalogRowViewModel(decision));
+            // Usage profile UI not wired yet — Unknown is intentional Partial signal.
+            var plan = optimizationService.Analyze(SelectedPreset, WindowsUsageProfile.Unknown);
+            foreach (var decision in plan.Decisions.OrderBy(d => d.Rule.Category).ThenBy(d => d.Rule.Name))
+            {
+                Rows.Add(new CatalogRowViewModel(decision));
+            }
+
+            ApplyFeedback(rowCount: Rows.Count, analyzeFailed: false, usageUnknown: true);
+
+            StatusText =
+                $"{SelectedPreset}: {plan.Recommended.Count} recomendados, " +
+                $"{plan.RequiringConfirmation.Count} confirmacao, {plan.Blocked.Count} bloqueados. " +
+                "Esta tela so analisa; aplicacao e no Dashboard (Auto-Optimize).";
+        }
+        catch (Exception ex)
+        {
+            Rows.Clear();
+            ApplyFeedback(rowCount: 0, analyzeFailed: true, usageUnknown: true);
+            StatusText = "Falha ao analisar o catalogo.";
+            FeedbackDetail =
+                "Nao foi possivel gerar o plano. Nenhuma otimizacao foi aplicada. " +
+                "Detalhe: " + ex.Message;
         }
 
-        StatusText =
-            $"{SelectedPreset}: {plan.Recommended.Count} recomendados, " +
-            $"{plan.RequiringConfirmation.Count} confirmacao, {plan.Blocked.Count} bloqueados. " +
-            "Auto-Optimize nunca aplica dangerous.*";
+        OnPropertyChanged(nameof(ShowEmptyPanel));
+        OnPropertyChanged(nameof(ShowPartialPanel));
+        OnPropertyChanged(nameof(ShowErrorPanel));
+        OnPropertyChanged(nameof(ShowRulesList));
+        OnPropertyChanged(nameof(ShowGoToAutoCta));
+    }
+
+    private void ApplyFeedback(int rowCount, bool analyzeFailed, bool usageUnknown)
+    {
+        UsageUnknown = usageUnknown;
+        FeedbackKind = CatalogFeedbackState.Resolve(rowCount, analyzeFailed, usageUnknown);
+
+        switch (FeedbackKind)
+        {
+            case CatalogFeedbackKind.Empty:
+                FeedbackTitle = "Nenhuma regra neste resultado";
+                FeedbackDetail =
+                    "A analise nao retornou itens. Tente outro preset ou analise de novo. " +
+                    "Nenhuma alteracao foi aplicada nesta tela.";
+                break;
+            case CatalogFeedbackKind.Partial:
+                FeedbackTitle = "Uso do PC desconhecido";
+                FeedbackDetail =
+                    "Recomendacoes conservadoras: o perfil de uso ainda nao foi informado. " +
+                    "Revise a lista abaixo. Para aplicar otimizacoes, va ao Dashboard e use Auto-Optimize.";
+                break;
+            case CatalogFeedbackKind.Error:
+                FeedbackTitle = "Falha na analise";
+                // Detail set by caller when exception message available.
+                if (string.IsNullOrWhiteSpace(FeedbackDetail))
+                {
+                    FeedbackDetail = "A analise falhou. Nenhuma otimizacao foi aplicada.";
+                }
+
+                break;
+            case CatalogFeedbackKind.Ready:
+                FeedbackTitle = string.Empty;
+                FeedbackDetail = string.Empty;
+                break;
+            default:
+                FeedbackTitle = string.Empty;
+                FeedbackDetail = string.Empty;
+                break;
+        }
     }
 }
 

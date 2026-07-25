@@ -195,7 +195,21 @@ public partial class MainWindow : Window
         }
     }
 
-    private CatalogView Catalog => catalogView ??= new CatalogView();
+    private CatalogView Catalog
+    {
+        get
+        {
+            if (catalogView is not null)
+            {
+                return catalogView;
+            }
+
+            catalogView = new CatalogView();
+            catalogView.GoToAutoOptimizeNavigationRequested += () => _ = ShowPageAsync(DashboardPageKey, DashboardButton);
+            catalogView.FeedbackStatusRequested += (message, kind) => SetStatus(message, kind);
+            return catalogView;
+        }
+    }
 
     private UtilitiesView Utilities
     {
@@ -2339,33 +2353,12 @@ public partial class MainWindow : Window
         Telemetry.AppendConsoleLines(messages);
     }
 
-    private void SetStatus(string message)
+    private void SetStatus(string message) => SetStatus(message, SnackbarKind.Info);
+
+    private void SetStatus(string message, SnackbarKind kind)
     {
         StatusText.Text = message;
-        ShellSnackbar.Show(message, ClassifySnackbarKind(message));
-    }
-
-    // ponytail: heuristica por palavra-chave em vez de tipar cada chamada de SetStatus (50+ pontos);
-    // cobre os casos do handoff (Aplicado / SKIP / falha / reinicio). Se a copy divergir muito, tipar viraria util.
-    private static SnackbarKind ClassifySnackbarKind(string message)
-    {
-        if (message.Contains("falha", StringComparison.OrdinalIgnoreCase) ||
-            message.Contains("negado", StringComparison.OrdinalIgnoreCase) ||
-            message.Contains("bloque", StringComparison.OrdinalIgnoreCase) ||
-            message.Contains("reinicio necess", StringComparison.OrdinalIgnoreCase) ||
-            message.Contains("reinicie", StringComparison.OrdinalIgnoreCase))
-        {
-            return SnackbarKind.Warning;
-        }
-
-        if (message.Contains("conclu", StringComparison.OrdinalIgnoreCase) ||
-            message.Contains("aplicad", StringComparison.OrdinalIgnoreCase) ||
-            message.Contains("restaurad", StringComparison.OrdinalIgnoreCase))
-        {
-            return SnackbarKind.Success;
-        }
-
-        return SnackbarKind.Info;
+        ShellSnackbar.Show(message, kind);
     }
 
     private void MainWindow_OnPreviewKeyDown(object sender, KeyEventArgs e)
