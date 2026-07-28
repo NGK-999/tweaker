@@ -1,21 +1,23 @@
-# Frontend handoff — UI-OUTCOME-P1 + FE-SHELL-POLISH-P1
+# Frontend handoff — FE-DISTILL-MINIMAL
 
 **Status:** PASS  
-**Branch:** `integration/ui-outcome-polish`  
-**Data:** 2026-07-25  
+**Branch:** `integration/fe-distill-minimal`  
+**Data:** 2026-07-28  
 
 ## O que mudou
 
-### UI-OUTCOME-P1
-1. `TweakService.LastMutationOutcome` — preenchido só em `RunMutationPipeline`; limpo em `CreateRestorePoint`.
-2. `MainWindow.TrySetStatusFromMutationOutcome` — mapeia `OperationOutcomeKind` → `SnackbarKind` em `RunTweakAsync` e `RunAutoOptimizeAsync`.
-3. TimedOut / Failed / Partial **não** viram Success só porque o log retornou linhas.
+1. **Tokens** (`MacTheme.xaml` + `AppThemeManager`) — bordas mais sutis, section labels sentence-case, nav active bar fina, motion 120–180 ms, cards padding 16 / radius 8.
+2. **Shell** (`MainWindow.xaml`) — uma marca (sidebar); title bar só chrome; sidebar 188px; sem eyebrows INICIO/AJUSTES/SISTEMA; status flat; removido CachingHint na PageHost.
+3. **Dashboard** — 1 CTA + hardware/segurança em layout flat (sem hero card aninhado).
+4. **Módulos** — listas densas; Mercado densificado; CTT em Expander colapsado; `SetBusy` cobre todos os botões (incl. CTT).
+5. **Catalogo / Performance** — menos nesting; banners busy discretos; rows flat; status cards radius 8.
+6. **Motion** — `UiMotion.Standard` 180 ms; `PageTransitionAnimator` 180 ms opacity-only.
+7. Docs: `docs/DESIGN.md`, `docs/coordination/prompts/FE-DISTILL-MINIMAL-claude.md`.
 
-### FE-SHELL-POLISH-P1
-1. `Snackbar` — coalesce/cancel; surfaces por kind; `UiMotion.ConfigureStoryboard`.
-2. Catalog / Performance — removido `MacPageTitle` duplicado vs shell header; banners de busy.
-3. Header subtitle anima junto do título; probe loading + fade-in dos status cards.
-4. `UiMotion.FadeIn` aceita `beginTime` (stagger leve).
+## Fora de escopo (ok)
+
+- Minecraft wizard / Telemetria / Utilidades (só herança de tokens)
+- WPF-UI NuGet, contratos BE, Demo gate
 
 ## Como testar
 
@@ -24,14 +26,14 @@ dotnet build ApexTweaker.sln -c Release
 dotnet run --project ApexTweaker.csproj -c Release -- --demo
 dotnet run --project ApexTweaker.csproj -c Release -- --demo-self-test
 dotnet run --project ApexTweaker.csproj -c Release -- --catalog-feedback-self-test
-dotnet run --project ApexTweaker.csproj -c Release -- --gaming-fps-probe-self-test
 ```
 
-## Riscos / dívidas
+Smoke: 7 abas, Catalog Analyze busy, Auto-Tuning copy, snackbar kinds.
 
-- Claude polish paralelo: **API limit** — sem commits no worktree; elevação futura quando a quota voltar.
-- DEMO-INVENTORY-P1 e CI-REQUIRED-P1 ainda no master-plan.
-- `$impeccable init` (PRODUCT.md) ainda sugerido, não bloqueante.
+## Riscos
+
+- Labels CAPS em Minecraft/Telemetria ainda existem no markup (herdam estilo mais quieto).
+- Expander CTT usa chrome nativo WPF (aceitável neste lote).
 
 ## Resultado
 

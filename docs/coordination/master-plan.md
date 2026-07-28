@@ -1,6 +1,6 @@
 ﻿# Master plan — status
 
-**Atualizado:** 2026-07-25
+**Atualizado:** 2026-07-28
 
 | Task | Status |
 |------|--------|
@@ -15,6 +15,7 @@
 | UI-OUTCOME-P1 | **DONE** (branch `integration/ui-outcome-polish`) |
 | FE-SHELL-POLISH-P1 | **DONE** (Snackbar/headers/busy/motion) |
 | CTT-WINUTIL-PARITY | **DONE** (branch `integration/ctt-winutil-parity`) |
+| FE-DISTILL-MINIMAL | **DONE** (branch `integration/fe-distill-minimal`) |
 
 **PR #2:** MERGED (merge commit, sem squash). Stash WIP **não** aplicado.
 
@@ -22,6 +23,6 @@
 
 1. **DEMO-INVENTORY-P1** — Secure Boot/TPM sem PowerShell em Demo (API tipada ou coletor dedicado).
 2. **CI-REQUIRED-P1** — GitHub Actions obrigatório no HEAD (build + self-tests).
-3. Merge PR #3 (UI-OUTCOME/polish) se ainda aberto, depois CTT parity.
+3. Merge PR #3 / #4 / distill conforme revisão.
 
 Opcional depois: WPF-UI NuGet incremental; `$impeccable init`; restaurar stash `wip-pre-p0-integration-*` só com cuidado consciente.

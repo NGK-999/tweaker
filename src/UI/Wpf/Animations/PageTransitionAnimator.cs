@@ -10,7 +10,7 @@ namespace ApexTweaker.UI.Wpf.Animations;
 
 internal static class PageTransitionAnimator
 {
-    private static readonly TimeSpan OpacityDuration = TimeSpan.FromMilliseconds(200);
+    private static readonly TimeSpan OpacityDuration = TimeSpan.FromMilliseconds(180);
     private static readonly IEasingFunction EnterMotion = UiMotion.EaseOut;
     private static readonly IEasingFunction ExitMotion = UiMotion.EaseIn;
 

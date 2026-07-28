@@ -20,7 +20,7 @@ public static class AppThemeManager
             ["ContentBgColor"] = "#1B1D21",
             ["CardBgColor"] = "#212328",
             ["CardElevatedColor"] = "#2A2D33",
-            ["CardBorderColor"] = "#2E3138",
+            ["CardBorderColor"] = "#26282E",
             ["AccentColor"] = "#4B9E9E",
             ["AccentPressedColor"] = "#3A8484",
             ["AccentHoverColor"] = "#5CB0B0",
@@ -35,7 +35,7 @@ public static class AppThemeManager
             ["ErrorColor"] = "#EF6B63",
             ["ChartBgColor"] = "#17181B",
             ["NavHoverColor"] = "#1E2024",
-            ["NavActiveColor"] = "#20282A",
+            ["NavActiveColor"] = "#1A2224",
             ["SecondaryHoverColor"] = "#31343B",
             ["ControlBgColor"] = "#1B1D21",
             ["ControlDisabledColor"] = "#26282E",
@@ -46,7 +46,7 @@ public static class AppThemeManager
             ["WarningSurfaceColor"] = "#2A2317",
             ["ErrorSurfaceColor"] = "#2C1D1B",
             ["PanelBgColor"] = "#1B1D21",
-            ["PanelBorderColor"] = "#2E3138",
+            ["PanelBorderColor"] = "#26282E",
             ["OnAccentTextColor"] = "#0B1414"
         };
 

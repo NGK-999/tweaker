@@ -12,152 +12,72 @@
     </UserControl.Resources>
 
     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-        <StackPanel Margin="0,0,8,12">
-            <Border Style="{StaticResource MacCardStyle}"
-                    Background="{DynamicResource InfoSurfaceBrush}"
-                    BorderBrush="{DynamicResource AccentBrush}">
+        <StackPanel Margin="0,0,8,12" MaxWidth="760" HorizontalAlignment="Left">
+            <!-- Primary action: one CTA, no nested hero card -->
+            <TextBlock Style="{StaticResource MacSectionTitle}"
+                       Text="Otimizar com seguran&#x00E7;a" />
+            <TextBlock Margin="0,6,0,14"
+                       Style="{StaticResource MacBodyText}"
+                       FontSize="13"
+                       Text="Detecta o hardware, cria backup e aplica o perfil compat&#x00ED;vel com esta m&#x00E1;quina."
+                       TextWrapping="Wrap" />
+            <Button x:Name="AutoOptimizeButton"
+                    Width="220"
+                    HorizontalAlignment="Left"
+                    Style="{StaticResource MacPrimaryButton}"
+                    Content="Otimizar sistema"
+                    AutomationProperties.Name="Otimizar sistema automaticamente"
+                    Click="AutoOptimizeButton_OnClick" />
+            <TextBlock Margin="0,8,0,0"
+                       Style="{StaticResource MacBodyText}"
+                       FontSize="12"
+                       Foreground="{DynamicResource TextTertiaryBrush}"
+                       Text="Backup antes de cada pacote. Revers&#x00ED;vel em Utilidades."
+                       TextWrapping="Wrap" />
+
+            <Border Margin="0,22,0,0"
+                    Padding="0,16,0,0"
+                    BorderBrush="{DynamicResource SeparatorBrush}"
+                    BorderThickness="0,1,0,0">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="190" />
+                        <ColumnDefinition Width="20" />
+                        <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
 
-                    <StackPanel VerticalAlignment="Center">
-                        <TextBlock Style="{StaticResource MacSectionLabel}"
-                                   Foreground="{DynamicResource AccentBrush}"
-                                   Text="IN&#x00CD;CIO R&#x00C1;PIDO" />
-                        <TextBlock Margin="0,7,0,0"
-                                   Style="{StaticResource MacPageTitle}"
-                                   FontSize="24"
-                                   Text="Otimize com seguran&#x00E7;a" />
-                        <TextBlock Margin="0,9,0,18"
-                                   MaxWidth="610"
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Style="{StaticResource MacSectionLabel}" Text="Seguran&#x00E7;a" />
+                        <TextBlock Margin="0,6,0,0"
+                                   Style="{StaticResource MacSectionTitle}"
+                                   Text="Ponto de restaura&#x00E7;&#x00E3;o" />
+                        <TextBlock Margin="0,6,0,12"
                                    Style="{StaticResource MacBodyText}"
-                                   Text="O ApexTweaker detecta o hardware, cria um backup e aplica somente o perfil compat&#x00ED;vel com esta m&#x00E1;quina."
+                                   FontSize="12"
+                                   Text="Prote&#x00E7;&#x00E3;o adicional antes de ajustes agressivos."
                                    TextWrapping="Wrap" />
-                        <Button x:Name="AutoOptimizeButton"
-                                Width="220"
-                                HorizontalAlignment="Left"
-                                Style="{StaticResource MacPrimaryButton}"
-                                Content="Otimizar sistema"
-                                AutomationProperties.Name="Otimizar sistema automaticamente"
-                                Click="AutoOptimizeButton_OnClick" />
-                    </StackPanel>
-
-                    <Border Grid.Column="1"
-                            Margin="24,0,0,0"
-                            Padding="18"
-                            VerticalAlignment="Stretch"
-                            Background="{DynamicResource CardBgBrush}"
-                            BorderBrush="{DynamicResource CardBorderBrush}"
-                            BorderThickness="1"
-                            CornerRadius="8">
-                        <StackPanel VerticalAlignment="Center">
-                            <Border Width="48" Height="48"
-                                    HorizontalAlignment="Left"
-                                    Background="{DynamicResource AccentBrush}"
-                                    CornerRadius="8">
-                                <TextBlock HorizontalAlignment="Center"
-                                           VerticalAlignment="Center"
-                                           FontFamily="Segoe MDL2 Assets"
-                                           FontSize="22"
-                                           Foreground="White"
-                                           Text="&#xE73E;" />
-                            </Border>
-                            <TextBlock Margin="0,14,0,0"
-                                       Style="{StaticResource MacSectionTitle}"
-                                       Text="Fluxo revers&#x00ED;vel" />
-                            <TextBlock Margin="0,6,0,0"
-                                       Style="{StaticResource MacMetricCaption}"
-                                       Text="Backup antes de cada pacote de altera&#x00E7;&#x00F5;es."
-                                       TextWrapping="Wrap" />
-                        </StackPanel>
-                    </Border>
-                </Grid>
-            </Border>
-
-            <Grid Margin="0,14,0,0">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="14" />
-                    <ColumnDefinition Width="*" />
-                </Grid.ColumnDefinitions>
-
-                <Border Grid.Column="0" Style="{StaticResource MacCardStyle}">
-                    <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="*" />
-                            <RowDefinition Height="Auto" />
-                        </Grid.RowDefinitions>
-                        <Border Width="40" Height="40"
-                                HorizontalAlignment="Left"
-                                Background="{DynamicResource SuccessSurfaceBrush}"
-                                BorderBrush="{DynamicResource SuccessBrush}"
-                                BorderThickness="1"
-                                CornerRadius="8">
-                            <TextBlock HorizontalAlignment="Center"
-                                       VerticalAlignment="Center"
-                                       FontFamily="Segoe MDL2 Assets"
-                                       FontSize="18"
-                                       Foreground="{DynamicResource SuccessBrush}"
-                                       Text="&#xE72E;" />
-                        </Border>
-                        <StackPanel Grid.Row="1" Margin="0,16,0,18">
-                            <TextBlock Style="{StaticResource MacSectionLabel}" Text="SEGURAN&#x00C7;A" />
-                            <TextBlock Margin="0,6,0,0"
-                                       Style="{StaticResource MacSectionTitle}"
-                                       Text="Ponto de restaura&#x00E7;&#x00E3;o" />
-                            <TextBlock Margin="0,8,0,0"
-                                       Style="{StaticResource MacBodyText}"
-                                       Text="Crie uma prote&#x00E7;&#x00E3;o adicional antes de executar ajustes agressivos do Windows."
-                                       TextWrapping="Wrap" />
-                        </StackPanel>
                         <Button x:Name="RestorePointButton"
-                                Grid.Row="2"
-                                HorizontalAlignment="Stretch"
+                                HorizontalAlignment="Left"
                                 Style="{StaticResource MacSecondaryButton}"
                                 Content="Criar ponto de restaura&#x00E7;&#x00E3;o"
                                 AutomationProperties.Name="Criar ponto de restaura&#x00E7;&#x00E3;o do Windows"
                                 Click="RestorePointButton_OnClick" />
-                    </Grid>
-                </Border>
+                    </StackPanel>
 
-                <Border Grid.Column="2" Style="{StaticResource MacCardStyle}">
-                    <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="*" />
-                        </Grid.RowDefinitions>
-                        <Border Width="40" Height="40"
-                                HorizontalAlignment="Left"
-                                Background="{DynamicResource InfoSurfaceBrush}"
-                                BorderBrush="{DynamicResource AccentBrush}"
-                                BorderThickness="1"
-                                CornerRadius="8">
-                            <TextBlock HorizontalAlignment="Center"
-                                       VerticalAlignment="Center"
-                                       FontFamily="Segoe MDL2 Assets"
-                                       FontSize="18"
-                                       Foreground="{DynamicResource AccentBrush}"
-                                       Text="&#xE950;" />
-                        </Border>
-                        <StackPanel Grid.Row="1" Margin="0,16,0,12">
-                            <TextBlock Style="{StaticResource MacSectionLabel}" Text="HARDWARE" />
-                            <TextBlock Margin="0,6,0,0"
-                                       Style="{StaticResource MacSectionTitle}"
-                                       Text="Resumo detectado" />
-                        </StackPanel>
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Style="{StaticResource MacSectionLabel}" Text="Hardware" />
+                        <TextBlock Margin="0,6,0,8"
+                                   Style="{StaticResource MacSectionTitle}"
+                                   Text="Resumo detectado" />
                         <TextBlock x:Name="SummaryText"
-                                   Grid.Row="2"
+                                   FontFamily="{StaticResource MacMonoFont}"
                                    Foreground="{DynamicResource TextPrimaryBrush}"
-                                   FontSize="13"
-                                   LineHeight="21"
+                                   FontSize="12"
+                                   LineHeight="20"
                                    TextWrapping="Wrap" />
-                    </Grid>
-                </Border>
-            </Grid>
+                    </StackPanel>
+                </Grid>
+            </Border>
         </StackPanel>
     </ScrollViewer>
 </UserControl>

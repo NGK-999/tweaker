@@ -18,8 +18,8 @@
         KeyboardNavigation.TabNavigation="Cycle"
         AllowsTransparency="True">
     <shell:WindowChrome.WindowChrome>
-        <shell:WindowChrome CaptionHeight="52"
-                            CornerRadius="12"
+        <shell:WindowChrome CaptionHeight="44"
+                            CornerRadius="10"
                             GlassFrameThickness="0"
                             ResizeBorderThickness="8"
                             UseAeroCaptionButtons="False" />
@@ -36,24 +36,18 @@
     <Border Background="{DynamicResource WindowBgBrush}"
             BorderBrush="{DynamicResource SeparatorBrush}"
             BorderThickness="0.5"
-            CornerRadius="12"
+            CornerRadius="10"
             ClipToBounds="True">
         <Grid>
             <Grid.RowDefinitions>
-                <RowDefinition Height="52" />
+                <RowDefinition Height="44" />
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
-            <!-- Title bar -->
+            <!-- Title bar: drag region only; brand lives in sidebar -->
             <Grid Grid.Row="0"
                   Background="{DynamicResource SidebarBgBrush}"
                   MouseLeftButtonDown="TitleBar_OnMouseLeftButtonDown">
-                <TextBlock HorizontalAlignment="Center"
-                           VerticalAlignment="Center"
-                           Foreground="{DynamicResource TextTertiaryBrush}"
-                           FontSize="12"
-                           Text="ApexTweaker" />
-
                 <StackPanel Orientation="Horizontal"
                             HorizontalAlignment="Right"
                             VerticalAlignment="Top"
@@ -78,7 +72,7 @@
 
             <Grid Grid.Row="1">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="220" />
+                    <ColumnDefinition Width="188" />
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
 
@@ -94,7 +88,7 @@
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
 
-                        <StackPanel Margin="16,18,16,0">
+                        <StackPanel Margin="14,12,14,0">
                             <TextBlock Text="ApexTweaker"
                                        Foreground="{DynamicResource TextPrimaryBrush}"
                                        FontSize="14"
@@ -102,11 +96,8 @@
                         </StackPanel>
 
                         <StackPanel Grid.Row="1"
-                                    Margin="12,16,12,0"
+                                    Margin="8,16,8,0"
                                     VerticalAlignment="Top">
-                            <TextBlock Margin="10,0,0,6"
-                                       Style="{StaticResource MacSectionLabel}"
-                                       Text="INICIO" />
                             <Button x:Name="DashboardButton"
                                     Content="Dashboard"
                                     Style="{StaticResource MacNavButton}"
@@ -117,11 +108,8 @@
                                     Style="{StaticResource MacNavButton}"
                                     AutomationProperties.Name="Abrir Desempenho"
                                     Click="PerformanceButton_OnClick" />
-
-                            <TextBlock Margin="10,14,0,6"
-                                       Style="{StaticResource MacSectionLabel}"
-                                       Text="AJUSTES" />
                             <Button x:Name="ModulesButton"
+                                    Margin="0,10,0,0"
                                     Content="Modulos"
                                     Style="{StaticResource MacNavButton}"
                                     AutomationProperties.Name="Abrir Modulos"
@@ -131,11 +119,8 @@
                                     Style="{StaticResource MacNavButton}"
                                     AutomationProperties.Name="Abrir Catalogo de otimizacoes"
                                     Click="CatalogButton_OnClick" />
-
-                            <TextBlock Margin="10,14,0,6"
-                                       Style="{StaticResource MacSectionLabel}"
-                                       Text="SISTEMA" />
                             <Button x:Name="TelemetryButton"
+                                    Margin="0,10,0,0"
                                     Content="Telemetria"
                                     Style="{StaticResource MacNavButton}"
                                     AutomationProperties.Name="Abrir Telemetria"
@@ -147,17 +132,17 @@
                                     Click="UtilitiesButton_OnClick" />
                         </StackPanel>
 
-                        <StackPanel Grid.Row="2" Margin="12,0,12,16">
+                        <StackPanel Grid.Row="2" Margin="10,0,10,14">
                             <Button x:Name="ThemeButton"
-                                    Height="34"
+                                    Height="32"
                                     Padding="12,0"
                                     HorizontalContentAlignment="Left"
                                     Style="{StaticResource MacSecondaryButton}"
                                     Content="Tema claro"
                                     AutomationProperties.Name="Alternar tema claro ou escuro"
                                     Click="ThemeButton_OnClick" />
-                            <Border Margin="0,12,0,0"
-                                    Padding="0,10,0,0"
+                            <Border Margin="0,10,0,0"
+                                    Padding="4,8,0,0"
                                     BorderThickness="0,1,0,0"
                                     BorderBrush="{DynamicResource SeparatorBrush}">
                                 <StackPanel>
@@ -166,7 +151,7 @@
                                                FontSize="11"
                                                Text="v0.0.0" />
                                     <TextBlock x:Name="PrivilegeModeText"
-                                               Margin="0,3,0,0"
+                                               Margin="0,2,0,0"
                                                Foreground="{DynamicResource TextTertiaryBrush}"
                                                FontSize="11"
                                                Text="Modo normal" />
@@ -186,35 +171,34 @@
                     </Grid.RowDefinitions>
 
                     <StackPanel Grid.Row="0"
-                                Margin="32,28,32,0">
+                                Margin="28,20,28,0">
                         <TextBlock x:Name="HeaderTitleText"
                                    Style="{StaticResource MacPageTitle}"
                                    Text="Dashboard" />
                         <TextBlock x:Name="HeaderSubtitleText"
-                                   Margin="0,6,0,0"
+                                   Margin="0,4,0,0"
                                    Style="{StaticResource MacBodyText}"
+                                   FontSize="13"
                                    Text="Performance, telemetria e rollback transacional" />
                     </StackPanel>
 
                     <ContentControl x:Name="PageHost"
                                     Grid.Row="1"
-                                    Margin="32,20,32,12"
+                                    Margin="28,16,28,10"
                                     SnapsToDevicePixels="True"
                                     UseLayoutRounding="True"
-                                    RenderOptions.BitmapScalingMode="HighQuality"
-                                    RenderOptions.CachingHint="Cache" />
+                                    RenderOptions.BitmapScalingMode="HighQuality" />
 
                     <Border Grid.Row="2"
-                            Margin="32,0,32,24"
-                            Padding="12,9"
-                            Background="{DynamicResource CardBgBrush}"
-                            BorderBrush="{DynamicResource CardBorderBrush}"
-                            BorderThickness="1"
-                            CornerRadius="10">
+                            Margin="28,0,28,18"
+                            Padding="12,8"
+                            Background="{DynamicResource PanelBgBrush}"
+                            BorderBrush="{DynamicResource SeparatorBrush}"
+                            BorderThickness="0,1,0,0"
+                            CornerRadius="0">
                         <TextBlock x:Name="StatusText"
-                                   Foreground="{DynamicResource AccentBrush}"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
                                    FontSize="12"
-                                   FontWeight="SemiBold"
                                    Text="Pronto." />
                     </Border>
 
@@ -232,13 +216,13 @@
                     MouseLeftButtonDown="CommandPaletteOverlay_OnMouseLeftButtonDown">
                 <Border Width="480"
                         MaxHeight="380"
-                        Margin="0,90,0,0"
+                        Margin="0,72,0,0"
                         HorizontalAlignment="Center"
                         VerticalAlignment="Top"
                         Background="{DynamicResource CardBgBrush}"
                         BorderBrush="{DynamicResource CardBorderBrush}"
                         BorderThickness="1"
-                        CornerRadius="10"
+                        CornerRadius="8"
                         MouseLeftButtonDown="CommandPaletteBox_OnMouseLeftButtonDown">
                     <StackPanel Margin="4">
                         <TextBox x:Name="CommandPaletteInput"
