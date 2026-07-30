@@ -7,13 +7,14 @@
     <Color x:Key="ContentBgColor">#1B1D21</Color>
     <Color x:Key="CardBgColor">#212328</Color>
     <Color x:Key="CardElevatedColor">#2A2D33</Color>
-    <Color x:Key="CardBorderColor">#2E3138</Color>
+    <Color x:Key="CardBorderColor">#26282E</Color>
     <Color x:Key="AccentColor">#4B9E9E</Color>
     <Color x:Key="AccentPressedColor">#3A8484</Color>
     <Color x:Key="AccentHoverColor">#5CB0B0</Color>
     <Color x:Key="TextPrimaryColor">#EDEEF0</Color>
     <Color x:Key="TextSecondaryColor">#9AA0AC</Color>
-    <Color x:Key="TextTertiaryColor">#6C7280</Color>
+    <!-- #6C7280 reprovava WCAG AA (3.50:1 sobre ContentBg); #868C99 da 5.00:1 -->
+    <Color x:Key="TextTertiaryColor">#868C99</Color>
     <Color x:Key="SeparatorColor">#2A2D33</Color>
     <Color x:Key="DestructiveColor">#E5534B</Color>
     <Color x:Key="DestructiveHoverColor">#EF6B63</Color>
@@ -25,7 +26,7 @@
     <Color x:Key="TrafficGreenColor">#28C840</Color>
     <Color x:Key="ChartBgColor">#17181B</Color>
     <Color x:Key="NavHoverColor">#1E2024</Color>
-    <Color x:Key="NavActiveColor">#20282A</Color>
+    <Color x:Key="NavActiveColor">#1A2224</Color>
     <Color x:Key="SecondaryHoverColor">#31343B</Color>
     <Color x:Key="ControlBgColor">#1B1D21</Color>
     <Color x:Key="ControlDisabledColor">#26282E</Color>
@@ -36,7 +37,7 @@
     <Color x:Key="WarningSurfaceColor">#2A2317</Color>
     <Color x:Key="ErrorSurfaceColor">#2C1D1B</Color>
     <Color x:Key="PanelBgColor">#1B1D21</Color>
-    <Color x:Key="PanelBorderColor">#2E3138</Color>
+    <Color x:Key="PanelBorderColor">#26282E</Color>
     <Color x:Key="OnAccentTextColor">#0B1414</Color>
 
     <SolidColorBrush x:Key="WindowBgBrush" Color="{StaticResource WindowBgColor}" />
@@ -90,21 +91,21 @@
         </Setter>
     </Style>
 
-    <!-- Motion -->
-    <Duration x:Key="MotionFast">0:0:0.14</Duration>
-    <Duration x:Key="MotionNormal">0:0:0.22</Duration>
-    <Duration x:Key="MotionSlow">0:0:0.32</Duration>
+    <!-- Motion: opacity-first, 150–200ms product feel -->
+    <Duration x:Key="MotionFast">0:0:0.12</Duration>
+    <Duration x:Key="MotionNormal">0:0:0.18</Duration>
+    <Duration x:Key="MotionSlow">0:0:0.28</Duration>
     <PowerEase x:Key="MotionEaseOut" EasingMode="EaseOut" Power="4" />
     <PowerEase x:Key="MotionEaseIn" EasingMode="EaseIn" Power="3" />
     <CubicEase x:Key="MotionEaseInOut" EasingMode="EaseInOut" />
 
-    <!-- Cards -->
+    <!-- Cards: flat surfaces, hairline border -->
     <Style x:Key="MacCardStyle" TargetType="Border">
         <Setter Property="Background" Value="{DynamicResource CardBgBrush}" />
         <Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="CornerRadius" Value="8" />
-        <Setter Property="Padding" Value="20" />
+        <Setter Property="Padding" Value="16" />
         <Setter Property="SnapsToDevicePixels" Value="True" />
     </Style>
 
@@ -112,22 +113,23 @@
     <Style x:Key="MacPageTitle" TargetType="TextBlock">
         <Setter Property="FontFamily" Value="{StaticResource MacFont}" />
         <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
-        <Setter Property="FontSize" Value="24" />
+        <Setter Property="FontSize" Value="22" />
         <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
 
     <Style x:Key="MacSectionTitle" TargetType="TextBlock">
         <Setter Property="FontFamily" Value="{StaticResource MacFont}" />
         <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
-        <Setter Property="FontSize" Value="14" />
+        <Setter Property="FontSize" Value="13" />
         <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
 
+    <!-- Sentence-case section labels; callers should not shout CAPS -->
     <Style x:Key="MacSectionLabel" TargetType="TextBlock">
         <Setter Property="FontFamily" Value="{StaticResource MacFont}" />
         <Setter Property="Foreground" Value="{DynamicResource TextTertiaryBrush}" />
         <Setter Property="FontSize" Value="11" />
-        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="FontWeight" Value="Normal" />
     </Style>
 
     <Style x:Key="MacBodyText" TargetType="TextBlock">
@@ -364,10 +366,12 @@
     </Style>
 
     <Style x:Key="MacModuleButton" TargetType="Button" BasedOn="{StaticResource MacSecondaryButton}">
+        <Setter Property="MinWidth" Value="148" />
         <Setter Property="Width" Value="168" />
-        <Setter Property="Height" Value="40" />
-        <Setter Property="Margin" Value="0,0,10,10" />
+        <Setter Property="Height" Value="36" />
+        <Setter Property="Margin" Value="0" />
         <Setter Property="FontSize" Value="13" />
+        <Setter Property="HorizontalAlignment" Value="Left" />
     </Style>
 
     <Style x:Key="MacDestructiveButton" TargetType="Button" BasedOn="{StaticResource MacSecondaryButton}">
@@ -406,11 +410,11 @@
                                 Opacity="0"
                                 IsHitTestVisible="False" />
                         <Border x:Name="ActiveBar"
-                                Width="3"
-                                Margin="0,6,0,6"
+                                Width="2"
+                                Margin="0,8,0,8"
                                 HorizontalAlignment="Left"
                                 Background="{DynamicResource AccentBrush}"
-                                CornerRadius="1.5"
+                                CornerRadius="1"
                                 Opacity="0"
                                 IsHitTestVisible="False" />
                         <ContentPresenter VerticalAlignment="Center"

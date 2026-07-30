@@ -10,8 +10,8 @@ namespace ApexTweaker.UI.Wpf.Animations;
 
 internal static class UiMotion
 {
-    public static readonly TimeSpan Quick = TimeSpan.FromMilliseconds(120);
-    public static readonly TimeSpan Standard = TimeSpan.FromMilliseconds(160);
+    public static readonly TimeSpan Quick = TimeSpan.FromMilliseconds(110);
+    public static readonly TimeSpan Standard = TimeSpan.FromMilliseconds(180);
 
     public static readonly IEasingFunction EaseOut = new PowerEase { Power = 4, EasingMode = EasingMode.EaseOut };
     public static readonly IEasingFunction EaseIn = new PowerEase { Power = 3, EasingMode = EasingMode.EaseIn };

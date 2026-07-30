@@ -10,69 +10,59 @@
                 <ResourceDictionary Source="../Themes/MacTheme.xaml" />
             </ResourceDictionary.MergedDictionaries>
 
-            <!-- Badge de estado: glifo + texto + cor (nao depende so de cor). -->
             <Style x:Key="PerfStatusBadge" TargetType="Border">
-                <Setter Property="CornerRadius" Value="6" />
-                <Setter Property="Padding" Value="8,3" />
-                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="CornerRadius" Value="4" />
+                <Setter Property="Padding" Value="7,2" />
+                <Setter Property="BorderThickness" Value="0" />
                 <Setter Property="HorizontalAlignment" Value="Left" />
                 <Setter Property="Background" Value="{DynamicResource InfoSurfaceBrush}" />
-                <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
                 <Style.Triggers>
                     <DataTrigger Binding="{Binding StatusKey}" Value="good">
                         <Setter Property="Background" Value="{DynamicResource SuccessSurfaceBrush}" />
-                        <Setter Property="BorderBrush" Value="{DynamicResource SuccessBrush}" />
                     </DataTrigger>
                     <DataTrigger Binding="{Binding StatusKey}" Value="warn">
                         <Setter Property="Background" Value="{DynamicResource WarningSurfaceBrush}" />
-                        <Setter Property="BorderBrush" Value="{DynamicResource WarningBrush}" />
                     </DataTrigger>
                     <DataTrigger Binding="{Binding StatusKey}" Value="unknown">
                         <Setter Property="Background" Value="{DynamicResource PanelBgBrush}" />
-                        <Setter Property="BorderBrush" Value="{DynamicResource SeparatorBrush}" />
                     </DataTrigger>
                 </Style.Triggers>
             </Style>
 
             <Style x:Key="PerfStatusCard" TargetType="Border">
-                <Setter Property="Width" Value="208" />
-                <Setter Property="Margin" Value="0,0,12,12" />
+                <Setter Property="Width" Value="200" />
+                <Setter Property="Margin" Value="0,0,10,10" />
                 <Setter Property="Background" Value="{DynamicResource CardBgBrush}" />
-                <Setter Property="BorderBrush" Value="{DynamicResource PanelBorderBrush}" />
+                <Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}" />
                 <Setter Property="BorderThickness" Value="1" />
-                <Setter Property="CornerRadius" Value="12" />
-                <Setter Property="Padding" Value="14" />
+                <Setter Property="CornerRadius" Value="8" />
+                <Setter Property="Padding" Value="12" />
             </Style>
         </ResourceDictionary>
     </UserControl.Resources>
 
     <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="0,0,8,12">
-        <StackPanel MaxWidth="960" HorizontalAlignment="Left">
+        <StackPanel MaxWidth="900" HorizontalAlignment="Left">
 
-            <TextBlock Style="{StaticResource MacSectionLabel}" Text="DESEMPENHO" />
-            <TextBlock Margin="0,4,0,0"
-                       Style="{StaticResource MacBodyText}"
+            <TextBlock Style="{StaticResource MacBodyText}"
                        FontSize="13"
                        TextWrapping="Wrap"
                        Text="Foco em estabilidade: menos stutter e 1% low mais consistente. Nenhum ajuste aqui promete mais FPS." />
 
             <Border x:Name="ProbeLoadingBanner"
-                    Margin="0,14,0,0"
-                    Padding="12,10"
-                    CornerRadius="8"
+                    Margin="0,12,0,0"
+                    Padding="10,8"
+                    CornerRadius="6"
                     Background="{DynamicResource InfoSurfaceBrush}"
-                    BorderBrush="{DynamicResource AccentBrush}"
-                    BorderThickness="1"
+                    BorderThickness="0"
                     Visibility="Collapsed">
                 <TextBlock Style="{StaticResource MacBodyText}"
                            FontSize="12"
-                           FontWeight="SemiBold"
                            Foreground="{DynamicResource AccentBrush}"
                            Text="Lendo status do sistema..." />
             </Border>
 
-            <!-- Status -->
-            <TextBlock Margin="0,22,0,10" Style="{StaticResource MacSectionTitle}" Text="Status do sistema" />
+            <TextBlock Margin="0,18,0,8" Style="{StaticResource MacSectionTitle}" Text="Status do sistema" />
             <ItemsControl x:Name="StatusItemsControl">
                 <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
@@ -114,81 +104,78 @@
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
 
-            <!-- Acoes -->
-            <TextBlock Margin="0,14,0,10" Style="{StaticResource MacSectionTitle}" Text="A&#x00E7;&#x00F5;es" />
-            <Border Style="{StaticResource MacCardStyle}">
-                <StackPanel>
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="220" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <Button x:Name="DisableVbsButton"
-                                Grid.Column="0"
-                                HorizontalAlignment="Left"
-                                Style="{StaticResource MacSecondaryButton}"
-                                Content="Desativar VBS/HVCI"
-                                AutomationProperties.Name="Desativar VBS e Memory Integrity"
-                                Click="DisableVbsButton_OnClick" />
-                        <TextBlock Grid.Column="1"
-                                   Margin="12,0,0,0"
-                                   VerticalAlignment="Center"
-                                   Style="{StaticResource MacBodyText}"
-                                   FontSize="12"
-                                   TextWrapping="Wrap"
-                                   Text="Reduz overhead de virtualiza&#x00E7;&#x00E3;o em troca de seguran&#x00E7;a; exige reinicio." />
-                        <controls:RiskBadge Grid.Column="2" Margin="8,0,0,0" Level="Restart" />
-                    </Grid>
+            <TextBlock Margin="0,12,0,10" Style="{StaticResource MacSectionTitle}" Text="A&#x00E7;&#x00F5;es" />
+            <StackPanel>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="220" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Button x:Name="DisableVbsButton"
+                            Grid.Column="0"
+                            HorizontalAlignment="Left"
+                            Style="{StaticResource MacSecondaryButton}"
+                            Content="Desativar VBS/HVCI"
+                            AutomationProperties.Name="Desativar VBS e Memory Integrity"
+                            Click="DisableVbsButton_OnClick" />
+                    <TextBlock Grid.Column="1"
+                               Margin="12,0,0,0"
+                               VerticalAlignment="Center"
+                               Style="{StaticResource MacBodyText}"
+                               FontSize="12"
+                               TextWrapping="Wrap"
+                               Text="Reduz overhead de virtualiza&#x00E7;&#x00E3;o em troca de seguran&#x00E7;a; exige reinicio." />
+                    <controls:RiskBadge Grid.Column="2" Margin="8,0,0,0" Level="Restart" />
+                </Grid>
 
-                    <Grid Margin="0,14,0,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="220" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <Button x:Name="OptimizeFullscreenButton"
-                                Grid.Column="0"
-                                HorizontalAlignment="Left"
-                                Style="{StaticResource MacPrimaryButton}"
-                                Content="Otimizar tela cheia do jogo"
-                                AutomationProperties.Name="Otimizar tela cheia do jogo"
-                                Click="OptimizeFullscreenButton_OnClick" />
-                        <TextBlock x:Name="ValorantStatusText"
-                                   Grid.Column="1"
-                                   Margin="12,0,0,0"
-                                   VerticalAlignment="Center"
-                                   Style="{StaticResource MacBodyText}"
-                                   FontSize="12"
-                                   TextWrapping="Wrap"
-                                   Text="Ajusta HAGS e caminho de tela cheia exclusiva. Detecta Valorant automaticamente." />
-                        <controls:RiskBadge Grid.Column="2" Margin="8,0,0,0" Level="Safe" />
-                    </Grid>
+                <Grid Margin="0,12,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="220" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Button x:Name="OptimizeFullscreenButton"
+                            Grid.Column="0"
+                            HorizontalAlignment="Left"
+                            Style="{StaticResource MacPrimaryButton}"
+                            Content="Otimizar tela cheia do jogo"
+                            AutomationProperties.Name="Otimizar tela cheia do jogo"
+                            Click="OptimizeFullscreenButton_OnClick" />
+                    <TextBlock x:Name="ValorantStatusText"
+                               Grid.Column="1"
+                               Margin="12,0,0,0"
+                               VerticalAlignment="Center"
+                               Style="{StaticResource MacBodyText}"
+                               FontSize="12"
+                               TextWrapping="Wrap"
+                               Text="Ajusta HAGS e caminho de tela cheia exclusiva. Detecta Valorant automaticamente." />
+                    <controls:RiskBadge Grid.Column="2" Margin="8,0,0,0" Level="Safe" />
+                </Grid>
 
-                    <Grid Margin="0,14,0,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="220" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <Button x:Name="CompetitiveModeButton"
-                                Grid.Column="0"
-                                HorizontalAlignment="Left"
-                                Style="{StaticResource MacSecondaryButton}"
-                                Content="Modo competitivo (overlays)"
-                                AutomationProperties.Name="Ativar modo competitivo desligando overlays"
-                                Click="CompetitiveModeButton_OnClick" />
-                        <TextBlock Grid.Column="1"
-                                   Margin="12,0,0,0"
-                                   VerticalAlignment="Center"
-                                   Style="{StaticResource MacBodyText}"
-                                   FontSize="12"
-                                   TextWrapping="Wrap"
-                                   Text="Desliga Game DVR e paineis do Game Bar para reduzir interfer&#x00EA;ncia durante a partida." />
-                        <controls:RiskBadge Grid.Column="2" Margin="8,0,0,0" Level="Safe" />
-                    </Grid>
-                </StackPanel>
-            </Border>
+                <Grid Margin="0,12,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="220" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Button x:Name="CompetitiveModeButton"
+                            Grid.Column="0"
+                            HorizontalAlignment="Left"
+                            Style="{StaticResource MacSecondaryButton}"
+                            Content="Modo competitivo (overlays)"
+                            AutomationProperties.Name="Ativar modo competitivo desligando overlays"
+                            Click="CompetitiveModeButton_OnClick" />
+                    <TextBlock Grid.Column="1"
+                               Margin="12,0,0,0"
+                               VerticalAlignment="Center"
+                               Style="{StaticResource MacBodyText}"
+                               FontSize="12"
+                               TextWrapping="Wrap"
+                               Text="Desliga Game DVR e paineis do Game Bar para reduzir interfer&#x00EA;ncia durante a partida." />
+                    <controls:RiskBadge Grid.Column="2" Margin="8,0,0,0" Level="Safe" />
+                </Grid>
+            </StackPanel>
 
         </StackPanel>
     </ScrollViewer>

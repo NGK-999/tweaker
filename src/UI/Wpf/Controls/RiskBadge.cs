@@ -56,10 +56,10 @@ public sealed class RiskBadge : Border
     {
         var (glyph, label, surfaceKey, borderKey) = Level switch
         {
-            RiskLevel.Dangerous => ("!", "PERIGO", "ErrorSurfaceBrush", "ErrorBrush"),
-            RiskLevel.Advanced => ("!", "AVANCADO", "WarningSurfaceBrush", "WarningBrush"),
-            RiskLevel.Restart => ("R", "REINICIO", "InfoSurfaceBrush", "AccentBrush"),
-            _ => ("OK", "SEGURO", "SuccessSurfaceBrush", "SuccessBrush")
+            RiskLevel.Dangerous => ("!", "Perigo", "ErrorSurfaceBrush", "ErrorBrush"),
+            RiskLevel.Advanced => ("!", "Avançado", "WarningSurfaceBrush", "WarningBrush"),
+            RiskLevel.Restart => ("R", "Reinício", "InfoSurfaceBrush", "AccentBrush"),
+            _ => ("OK", "Seguro", "SuccessSurfaceBrush", "SuccessBrush")
         };
 
         glyphText.Text = glyph;
