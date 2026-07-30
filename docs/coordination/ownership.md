@@ -1,76 +1,66 @@
 # Matriz de propriedade (ownership)
 
-Data: 2026-07-24  
-Orquestrador: único agente autorizado a alterar contratos compartilhados e docs de coordenação.
+**Data:** 2026-07-25  
+**Papel do chat principal:** Chief Product Engineer / Architect / Quality Lead (Orquestrador)
 
 ## Agentes
 
 | Agente | Papel | Escopo |
 |--------|-------|--------|
-| **Orquestrador** (este chat) | arquitetura, contratos, integração, docs de coordenação | ver abaixo |
-| **Codex** | executor backend | Services / Core / Infrastructure / Minecraft / NativeInterop (com cuidado) |
-| **Claude Code** | executor frontend | `src/UI/**` apenas |
+| **Orquestrador** | produto, arquitetura, contratos, integração, qualidade, docs canônicos | abaixo |
+| **Codex** | backend, Windows, segurança, confiabilidade, self-tests técnicos | Services/Core/Infrastructure/Minecraft/Application/Windows |
+| **Claude Code** | frontend, UX, design system, a11y, testes visuais | `src/UI/**` |
 
 ## Matriz por caminho
 
 | Caminho | Dono | Notas |
 |---------|------|-------|
-| `src/UI/**` | Claude Code | XAML, ViewModels, Themes, Windows, animações |
-| `src/Services/**` | Codex | tweaks/backup/telemetria legados |
-| `src/Core/**` | Codex | pipeline de mutações |
-| `src/Infrastructure/**` | Codex | `CommandRunner`, `RuntimeMode` |
-| `src/Minecraft/**` | Codex | motor Minecraft; UI Minecraft chama via MainWindow/VM |
-| `src/NativeInterop/**` | Codex | P/Invoke; mudanças exigem build nativo |
-| `src/ApexTweaker.Windows/**` | Codex | inventário Windows (implementação) |
-| `src/ApexTweaker.Application/**` | Codex | catálogo/recomendação/fachada/self-test (sem mudar contratos públicos sem ok) |
-| `src/ApexTweaker.Contracts/**` | **Orquestrador** | DTOs/enums públicos entre assemblies; Codex propõe, orquestrador aprova |
-| `native/**` | Orquestrador (+ Codex só com autorização explícita) | C++ / vcxproj |
-| `src/Models/**` | **Orquestrador** | contratos legados do host; mudanças coordenada |
-| `src/App/Program.cs` | **Orquestrador** | flags CLI globais; mudanças coordenadas |
-| `src/App/DemoSafetySelfTest.cs` | Codex | self-test de demo (backend) |
-| `src/App/WindowsOptimizationService.cs` | Codex | adapter/host do Analyze (WIP) |
-| `src/App/ApplicationPaths.cs`, `AppInfo.cs` | Orquestrador | caminhos/versão |
-| `ApexTweaker.csproj`, `ApexTweaker.sln`, `*.csproj` novos | **Orquestrador** | TFM, ProjectReferences, pacotes — Codex não altera sem autorização |
-| `scripts/**` | Orquestrador | build/release/test |
-| `docs/architecture/**` | Orquestrador | |
+| `src/UI/**` | Claude Code | XAML, VM, Themes, Controls |
+| `src/Services/**` | Codex | tweaks, backup, telemetria |
+| `src/Core/**` | Codex | pipeline mutações |
+| `src/Infrastructure/**` | Codex | CommandRunner, futuro RuntimeMode |
+| `src/Minecraft/**` | Codex | motor; UI chama via contratos |
+| `src/NativeInterop/**` | Codex | P/Invoke |
+| `src/ApexTweaker.Windows/**` | Codex | inventário |
+| `src/ApexTweaker.Application/**` | Codex | fachadas (sem breaking de contrato) |
+| `src/ApexTweaker.Contracts/**` | **Orquestrador** | DTOs públicos |
+| `src/Models/**` | **Orquestrador** | contratos legado host |
+| `src/App/Program.cs` | **Orquestrador** | flags CLI globais |
+| `src/App/WindowsOptimizationService.cs` | Codex | adapter host |
+| `src/App/*SelfTest*.cs` | Codex | self-tests |
+| `native/**` | Orquestrador (+ Codex só autorizado) | |
+| `*.csproj`, `*.sln` | **Orquestrador** | |
+| `scripts/**` | Orquestrador | |
+| `docs/product/**`, `docs/architecture/**`, `docs/reliability/**`, `docs/quality/**`, `docs/ux/**` | Orquestrador | |
 | `docs/contracts/**` | Orquestrador | |
-| `docs/coordination/**` | Orquestrador | prompts e handoffs |
-| `docs/*` produto (Minecraft, releases) | Orquestrador (conteúdo técnico pode ser redigido por agentes sob pedido) | |
+| `docs/coordination/**` | Orquestrador | tasks/handoffs/prompts |
 | `AGENTS.md`, `README.md` | Orquestrador | |
-| `graphify-out/**` | gerado | não é fonte; não “corrigir” à mão |
+| `graphify-out/**` | gerado | atualizar via `graphify update .` |
 
-## Arquivos atualmente misturados (atenção)
+## Arquivo misturado
 
-| Arquivo | Problema | Regra temporária |
-|---------|----------|------------------|
-| `src/UI/Wpf/MainWindow.xaml.cs` | UI + orquestra 20 serviços | **Claude Code** pode editar UI/navegação; **qualquer nova chamada de serviço** precisa contrato aprovado pelo orquestrador. Preferir não expandir wiring até fachada existir. |
-| `src/Models/WindowsOptimizationModels.cs` | contrato novo WIP | Orquestrador; Codex solicita campos via handoff |
+| Arquivo | Regra |
+|---------|-------|
+| `MainWindow.xaml.cs` | Claude: navegação/UI/estados. **Nova chamada de serviço** exige contrato aprovado. Preferir não expandir domínio. |
 
-## Proibições absolutas
+## Proibições
 
-Nenhum agente pode:
+- dois agentes no mesmo worktree/arquivos;
+- alterar FE e BE na mesma task sem contrato;
+- mutações reais na máquina de dev em testes estruturais;
+- apagar “código morto” sem prova;
+- bypass de UAC / `--dangerously-skip-permissions` em automação.
 
-- editar arquivos do outro sem autorização do orquestrador;
-- alterar `src/Models/**` sem PR/diff revisado pelo orquestrador;
-- aplicar GPO/Registro/BCD/serviços reais na máquina de desenvolvimento;
-- usar `--dangerously-skip-permissions` / bypass de UAC em automação;
-- atualizar lock/csproj de pacotes sem justificativa documentada;
-- apagar código “parece morto” sem prova (referência + teste).
+## Worktrees
 
-## Worktrees (modo automatizado)
+| Agente | Path | Branch pattern |
+|--------|------|----------------|
+| Codex | `C:\projetos\Apextweaker-codex` | `agent/codex-<task>` |
+| Claude | `C:\projetos\Apextweaker-claude` | `agent/claude-<task>` |
+| Orquestrador | `C:\projetos\Apextweaker` | `main` |
 
-Quando usar CLI:
+## Revisão cruzada
 
-| Agente | Worktree sugerido |
-|--------|-------------------|
-| Codex | `../Apextweaker-codex` (branch `agent/codex-<task>`) |
-| Claude Code | `../Apextweaker-claude` (branch `agent/claude-<task>`) |
-| Orquestrador | worktree principal `C:\projetos\Apextweaker` |
-
-Nunca dois agentes no mesmo working tree.
-
-## Resolução de conflito de ownership
-
-1. Agente para e registra no handoff.
-2. Orquestrador decide e atualiza este arquivo se necessário.
-3. Só então a alteração compartilhada é aplicada.
+- FE → Codex revisa contrato/risco técnico.
+- BE → Claude revisa impacto UX/copy de erro.
+- Decisão final → Orquestrador.

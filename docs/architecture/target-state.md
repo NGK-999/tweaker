@@ -1,110 +1,78 @@
 # Arquitetura-alvo — ApexTweaker
 
-Data: 2026-07-24  
-Status: proposta do orquestrador (ainda não implementada)
+**Data:** 2026-07-25  
+**Status:** proposta do Chief Product Engineer (Fase 1) — **não implementar nesta fase**
 
 ## Princípio
 
-Preservar o monólito .NET + WPF funcional, **sem** inventar um servidor HTTP nesta fase.
-A separação FE/BE deve ser **por pastas + contratos C# + ownership**, com migração
-progressiva para reduzir o god-object `MainWindow`.
+Manter monólito .NET + WPF. Separar FE/BE por **contratos C# + ownership + fachadas**, sem HTTP.
 
-## Visão alvo (progressiva)
+Prioridade: integridade → recuperação → confiabilidade → clareza.
 
-```text
-src/App                 → bootstrap (orquestrador)
-src/Models              → contratos compartilhados (orquestrador)
-src/Application         → (futuro) casos de uso / fachadas estáveis
-src/Services            → backend Windows (Codex)
-src/Core                → backend mutações (Codex)
-src/Infrastructure      → CommandRunner / RuntimeMode (Codex, com gates demo)
-src/Minecraft           → backend Minecraft (Codex)
-src/UI/Wpf              → frontend (Claude Code)
-native/                 → nativo (orquestrador / Codex com autorização)
-docs/contracts          → contratos documentados (orquestrador)
-docs/coordination       → planos e handoffs (orquestrador)
-```
-
-## Fronteira FE ↔ BE (alvo imediato)
-
-Em vez de HTTP, o contrato é uma **fachada de aplicação** estável:
+## Visão estrutural
 
 ```text
-UI (Views/ViewModels)
-   │  chama apenas
-   ▼
-IWindowsOptimizationFacade / ITweakFacade / IMinecraftFacade
-   │  implementado por
-   ▼
-Services (inventário, recomendação, apply, backup, rollback, telemetria)
+UI (Claude)                    Contratos (Orquestrador)              Domínio (Codex)
+───────────                    ────────────────────────              ────────────────
+Views / ViewModels      →      IOperationEnvelope                    Inventory
+Interaction states      →      OperationOutcome                      Recommendation
+Design tokens           →      OperationProgress                     Mutation pipeline
+                        →      ErrorDescriptor                       Backup / Rollback
+                               CorrelationId                         Verify / Probe
+                               WindowsOptimization*                  CommandRunner
 ```
 
-Regras:
+UI **nunca** monta `reg`/`powercfg`/`bcdedit`.  
+UI envia intenções tipadas; BE devolve plano + progresso + outcome.
 
-1. UI **não** monta strings de `powercfg`/`reg`/`bcdedit`.
-2. UI **não** escolhe chaves de Registro.
-3. UI envia **intenções tipadas** (preset, confirmações de uso, IDs de regra).
-4. Backend devolve **planos tipados** + logs + necessidade de reboot + risco.
-5. Mutações reais só via `MutationExecutor` + backup; em `--demo`, nunca escrevem.
+## Máquina de estados oficial (operações longas)
 
-## Presets gamer (alvo de produto)
+Toda operação mutadora ou >500ms termina em **exatamente um** outcome:
 
-Unificar conceitualmente (sem fundir código legado de uma vez):
+| Outcome | Significado |
+|---------|-------------|
+| `COMPLETED` | tudo aplicado e verificado |
+| `PARTIALLY_COMPLETED` | subset ok; falhas registradas |
+| `FAILED` | nada útil concluído / falha fatal |
+| `CANCELLED` | usuário ou timeout cooperativo |
+| `ROLLBACK_REQUIRED` | estado inseguro; pedir rollback |
+| `ROLLED_BACK` | restore concluído |
+| `RESTART_REQUIRED` | mutação ok; reboot necessário |
 
-| Camada | Conteúdo |
-|--------|----------|
-| Performance hardware | power, CPU híbrida, DPC, GPU, rede, input (`TweakService` legado) |
-| Ruído Windows / GPO | catálogo `WindowsOptimization*` + LGPO (novo) |
-| Uso detectado | Game Pass, OBS, OneDrive, remoto, notebook, etc. |
+Estados transitórios UI: `Idle → Validating → BackingUp → Applying → Verifying → Finalizing → <Outcome>`.
 
-Preset recomendado final = interseção filtrada (**15–35** regras GPO + tweaks de performance compatíveis).
+Persistir progresso + correlationId para recovery após crash/fechamento.
 
-Expectativa de UX: **estabilidade / frametime**, não “+FPS mágico”.
+## Fronteiras de migração (sem big-bang)
 
-## Fases de migração (sem big-bang)
+| Milestone | Conteúdo | Não fazer |
+|-----------|----------|-----------|
+| **M0** | Docs Fase 1 + ownership + gates (esta entrega) | código de produto |
+| **M1** | Demo gate + `OperationOutcome` no pipeline (BE) | redesenhar UI |
+| **M2** | Feedback tipado no shell (FE consome envelope) | Apply catálogo completo |
+| **M3** | Unificar jornada: Catálogo recomenda → bridge Auto | fundir PresetKind |
+| **M4** | Apply seletivo do plano + verify tipado | LGPO massivo sem backup |
+| **M5** | Desacoplar `ApplyPolicyAndServiceTweaks` do caminho padrão | apagar legado sem prova |
+| **M6** | Extrair assemblies (opcional) | reescrita |
 
-### M0 — Congelar contratos (esta entrega)
+## Contratos a estabilizar (Orquestrador)
 
-Documentar APIs atuais; ownership; não reorganizar pastas.
+1. `OperationRequest` / `OperationEnvelope` / `OperationOutcome`
+2. `ErrorDescriptor` (título, causa, impacto, applied[], skipped[], action, correlationId)
+3. `WindowsOptimizationPlan` + futuro `ApplyPlanRequest` (só após M3)
+4. Ponte documentada `PresetKind` ↔ `WindowsOptimizationPreset` (sem merge forçado)
 
-### M1 — Completar backend Windows Optimization (análise)
+## Sistema visual alvo (resumo — detalhe em `docs/ux/`)
 
-Codex: inventário de uso mais rico, catálogo Gamer Seguro, self-tests.
-Sem LGPO apply ainda. Sem desligar Xbox/Search automaticamente.
+- Minimalista, hierarquia forte, **uma ação principal** por tela de fluxo.
+- Tokens já em `MacTheme.xaml` → evoluir para design system nomeado (sem copiar Apple).
+- Progresso e erro como cidadãos de primeira classe (não só snackbar heurístico).
+- Acessibilidade: AutomationProperties em Modules/Catalog/Utilities.
 
-### M2 — Fachada + UI demo
+## Critérios de sucesso arquitetural
 
-- Codex: `WindowsOptimizationService` expõe plano tipado estável.
-- Claude: tela/seção de presets gamer em `--demo`, consumindo só a fachada.
-- Orquestrador: aprova qualquer mudança em `Models`.
-
-### M3 — Apply via LGPO + rollback
-
-Codex: export/backup LGPO, apply seletivo, `gpupdate`, restore.
-Proibido executar mutações na máquina de desenvolvimento sem `--yes` em ambiente de teste dedicado.
-
-### M4 — Desacoplar legado perigoso
-
-`ApplyPolicyAndServiceTweaks` deixa de ser caminho padrão da UI;
-marcado legado ou reescrito para respeitar o catálogo novo.
-
-### M5 — (Opcional, futuro) extrair assembly
-
-Só depois das fachadas estáveis: `ApexTweaker.Core` + `ApexTweaker.UI`.
-Não fazer agora.
-
-## O que explicitamente NÃO é alvo agora
-
-- Reescrever em Electron/React
-- Introduzir API REST só para “separar FE/BE”
-- Fundir `PresetKind` e `WindowsOptimizationPreset` numa tacada
-- Apagar Minecraft / telemetria / pipeline transacional
-- Desabilitar Defender, Windows Update, VBS em presets automáticos
-
-## Critérios de sucesso da arquitetura-alvo
-
-- Codex e Claude não editam os mesmos arquivos
-- UI de otimização Windows funciona em `--demo` sem mutar a máquina
-- Plano GPO mostra risco, propósito e evidência (`None`/`Plausible`/`Measured`)
-- Backup/rollback continuam obrigatórios antes de apply real
-- Self-tests passam: `--demo-self-test`, `--minecraft-self-test`, build Release
+- Codex e Claude **não** tocam os mesmos arquivos.
+- Dev pode validar fluxos com **zero mutação** (demo gate).
+- God-object `MainWindow` para de crescer: novas features via fachada + VM.
+- Self-tests + gates de qualidade além de “build passou”.
+- Rollback e RESTART_REQUIRED sempre explícitos na UI.

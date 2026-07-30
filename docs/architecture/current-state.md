@@ -1,140 +1,101 @@
 # Estado atual da arquitetura — ApexTweaker
 
-Data da auditoria: 2026-07-24  
-Auditor: Orquestrador (Cursor)  
-Fonte: código no working tree + `README.md` + `docs/PROJECT_STRUCTURE.md` + `docs/architecture/` + graphify
+**Data da auditoria:** 2026-07-25  
+**HEAD observado:** `8706126` (+ alterações locais da auditoria PERF ainda não commitadas)  
+**Método:** graphify query/path/explain + confirmação em fonte  
+**Fase:** 1 — somente leitura (este doc atualiza o de 2026-07-24)
 
-## Resumo executivo
+## Resumo
 
-O ApexTweaker **não** é uma aplicação com frontend e backend separados por HTTP.
-É um host **.NET 10 + WPF** (versão **3.3.1**) com DLL nativa C++ opcional
-(`native/ApexTweaker.Native`).
+Host **.NET 10 + WPF** monólito in-process com projetos auxiliares:
 
-Historicamente era **um único assembly**. Durante esta auditoria o Codex iniciou
-(WIP não commitado) a divisão em projetos:
+| Projeto | Papel |
+|---------|-------|
+| `ApexTweaker.csproj` | WinExe / shell |
+| `src/ApexTweaker.Contracts` | DTOs Windows Optimization + probe |
+| `src/ApexTweaker.Application` | fachada Analyze / recommendation |
+| `src/ApexTweaker.Windows` | inventário |
+| `src/Services`, `Core`, `Infrastructure` | mutação legado + CommandRunner |
+| `src/Minecraft` | motor paralelo |
+| `native/ApexTweaker.Native` | C++ opcional |
+| `src/UI/Wpf` | Views / Themes / Controls |
 
-| Projeto | Papel aparente (WIP) |
-|---------|----------------------|
-| `ApexTweaker.csproj` | host WPF |
-| `src/ApexTweaker.Contracts` | contratos/DTOs de otimização Windows |
-| `src/ApexTweaker.Application` | catálogo, recomendação, fachada, self-test |
-| `src/ApexTweaker.Windows` | inventário Windows (implementação) |
+**Não há** HTTP, OpenAPI, Electron, projeto de testes xUnit/NUnit, nem `.github/workflows`.
 
-Essa migração estava **em andamento** no working tree; ownership abaixo trata
-os novos projetos como backend/contratos sob regras do orquestrador.
+## Entrada
 
-- **Ponto de entrada:** `src/App/Program.cs`
-- **Shell UI:** `src/UI/Wpf/MainWindow.xaml(.cs)` (+ partial `MainWindow.Minecraft.cs` no WIP)
-- **Backend in-process:** `src/Services`, `src/Core`, `src/Minecraft`, `src/Infrastructure`, + novos projetos Application/Windows
-- **Contratos:** `src/Models` (legado) + `src/ApexTweaker.Contracts` (novo WIP)
-- **IPC limitado:** named pipe de telemetria (`TelemetryPipeServer` / `TelemetryPipeClient`)
-- **Sem:** `package.json`, Electron/Tauri, controllers HTTP, OpenAPI, projeto de testes xUnit/NUnit
+`src/App/Program.cs`:
 
-## Árvore relevante (confirmada)
+- `--market-coverage-self-test`
+- `--gaming-fps-probe-self-test`
+- CLI Minecraft
+- GUI: Disclaimer → Loading → `MainWindow`
+- Handlers: `AppDomain.UnhandledException`, `DispatcherUnhandledException` → MessageBox “CRASH FATAL”
+
+**Observado:** não há `RuntimeMode.IsDemo` / `--demo` no tree atual (docs antigos descreviam WIP que **não está no HEAD**).
+
+## Fluxo UI → domínio
 
 ```text
-ApexTweaker.sln
-ApexTweaker.csproj          # WinExe, net10.0-windows, UseWPF=true
-native/ApexTweaker.Native/  # C++ topologia/afinidade
-src/
-  App/                      # Program.cs, ApplicationPaths, DemoSafetySelfTest
-  Core/Pipeline/            # comandos estruturados de mutação
-  Infrastructure/           # CommandRunner, RuntimeMode
-  Models/                   # DTOs/enums compartilhados
-  Minecraft/                # motor Minecraft isolado (models + services + CLI)
-  NativeInterop/            # P/Invoke
-  Services/                 # tweaks Windows, backup, telemetria, otimização
-  UI/Wpf/                   # Views, ViewModels, Themes, Windows
-scripts/                    # Build-Release, Build-Installer, Test-Release
-docs/                       # documentação de produto e arquitetura
+MainWindow (god-object ~102 KB)
+  ├─ TweakService (~75 KB) → MutationExecutor → BackupService
+  ├─ WindowsOptimizationService → Analyze + probe + 3 applies pontuais
+  ├─ OptimizationEngine (PresetKind legado)
+  ├─ BackupService / MasterRollbackService
+  ├─ EtwFrameTracker / HardwareTelemetryService
+  └─ Minecraft* services
 ```
 
-## Pontos de entrada
+Graphify: `MainWindow → TweakService → MutationExecutor` (2 hops).
 
-| Entrada | Comportamento | Status |
-|---------|---------------|--------|
-| GUI WPF | Disclaimer → Loading → `MainWindow` | confirmado |
-| CLI Minecraft | `MinecraftCommandLine.TryRun(args)` | confirmado |
-| `--demo` / `--demo-self-test` | ativa `RuntimeMode.IsDemo`; self-test de classificação | confirmado (WIP não commitado) |
-| `--minecraft-self-test` | self-test Minecraft | confirmado |
+## Duas gerações de otimização Windows
 
-## Fluxo UI → backend (in-process)
+| Geração | UI | Apply |
+|---------|----|-------|
+| Legado `PresetKind` + `TweakService` | Dashboard Auto, Módulos | sim |
+| Novo `WindowsOptimization*` | Catálogo Analyze, Desempenho probe | plano **sem** Apply; 3 ações pontuais só |
 
-`MainWindow` instancia diretamente ~20 serviços (`new TweakService()`, etc.) e
-chama métodos públicos que retornam `IReadOnlyList<string>` (log de linhas).
+Contrato: `docs/contracts/api-contract.md` §3.4 — Apply/LGPO **ausente**.
 
-Exemplos confirmados em `MainWindow.xaml.cs`:
+## Confiabilidade — o que já existe
 
-- Auto-Tuning → `tweakService.ApplyAutonomousOptimization(...)`
-- Módulos → `ApplyPowerTweaks`, `ApplyCpuSchedulerTweaks`, `ApplyGpuDisplayTweaks`, …
-- Políticas/Serviços → `ApplyPolicyAndServiceTweaks()` (legado agressivo)
-- Backup / Restore → `BackupService` / `MasterRollbackService`
-- Minecraft → serviços em `src/Minecraft/Services`
+- `CommandRunner` com timeout padrão **2 min**, cancelamento, kill best-effort.
+- `MutationExecutor`: Validate → Snapshot → Execute → Verify → Commit ledger.
+- `TryBeginTweaking` / `EndTweaking` — mutex UI booleano.
+- Fechamento: hide + teardown ≤2s + force exit (fix `488adb2`).
+- FSO AppCompat: merge de flags (auditoria PERF local).
 
-Não há camada de API HTTP. O “contrato” atual é a **superfície pública C#** dos
-serviços + records/enums em `Models`.
+## Confiabilidade — lacunas confirmadas
 
-## Presets e otimização Windows — duas gerações
+| Lacuna | Evidência | Impacto |
+|--------|-----------|---------|
+| Sem enum oficial de outcome | UI só `isTweaking` + strings | estados inconsistentes |
+| Sem correlationId | logs são `IReadOnlyList<string>` | suporte/diagnóstico frágil |
+| Snackbar sem `Error` | `SnackbarKind` = Info/Success/Warning | falha parece warning |
+| Classify por substring | `ClassifySnackbarKind` | frágil |
+| Catálogo usage hardcoded | `WindowsUsageProfile.Unknown` | recomendações conservadoras cegas |
+| Sem CI | sem `.github/workflows` | regressão só local |
+| God files | MainWindow ~102KB, TweakService ~75KB, HardwareTelemetry ~77KB | ownership e risco de hang |
+| Demo gate ausente | sem `IsDemo` no código | risco de mutar máquina de dev |
 
-### Legado (em produção na UI)
+## Persistência
 
-| Peça | Arquivo | Papel |
-|------|---------|-------|
-| `PresetKind` | `Safe` / `Competitive` / `Extreme` | classificação por hardware |
-| `OptimizationEngine` | recomenda preset por RAM/cores | |
-| `TweakService` | aplica power/CPU/GPU/rede/políticas | |
-| `ApplyPolicyAndServiceTweaks` | reg + desliga serviços Xbox/Search/WER | risco alto |
+- Backups / mutation sessions via `BackupService` sob ApplicationPaths.
+- Minecraft recovery state escrito em disco (`WriteRecoveryState`).
+- Sem store tipado de “última operação Windows” para resume na UI.
 
-### Novo (WIP Codex, ainda não ligado à UI)
+## Empacotamento
 
-| Peça | Arquivo | Papel |
-|------|---------|-------|
-| `WindowsOptimizationPreset` | 5 presets gamer | |
-| `WindowsOptimizationCatalog` | regras ADMX tipadas | |
-| `WindowsOptimizationInventoryService` | inventário SO/hardware/MDM/OneDrive | |
-| `WindowsOptimizationRecommendationService` | decide Recommended/Blocked/… | |
-| `WindowsOptimizationService.Analyze` | fachada de análise | **sem Apply/LGPO ainda** |
+Scripts PowerShell em `scripts/` (quando presentes): build release / installer / test-release.  
+Manifest: elevação sob demanda (`asInvoker` — docs/scripts).  
+Update channel de produto: **não verificado** como jornada tipada.
 
-## Estado Git (no momento da auditoria / atualização)
+## Testes atuais
 
-Branch: `main` tracking `origin/main` @ `c3d4733`.
+Self-tests CLI (não pirâmide):
 
-Alterações locais relevantes (não commitadas — **não descartar**):
+- `--gaming-fps-probe-self-test`
+- `--market-coverage-self-test`
+- Minecraft self-test / CLI
 
-- Modificados: `ApexTweaker.csproj`, `ApexTweaker.sln`, `Program.cs`, `CommandRunner.cs`, `MutationExecutor.cs`, `RegistryService.cs`, `MainWindow.xaml.cs`, `MinecraftSelfTest.cs`
-- Remoções/movimentações WIP: `GpuInfo.cs`, `NativeMethods.cs`, `HardwareEnvironmentDetector.cs`, `IntelHybridProbeStrategy.cs` (verificar se migraram para os novos projetos antes de restaurar)
-- Novos: `src/ApexTweaker.Application/**`, `src/ApexTweaker.Contracts/**`, `src/ApexTweaker.Windows/**`, `RuntimeMode.cs`, `DemoSafetySelfTest.cs`, `WindowsOptimizationService.cs` (App), partial Minecraft UI, docs de coordenação
-
-## Acoplamentos e riscos
-
-1. **`MainWindow.xaml.cs` ~2177 linhas** — mistura navegação UI, orquestração e chamadas de domínio.
-2. **`TweakService` ~1310 linhas** — fachada + mutação + verificação.
-3. **Dois modelos de preset incompatíveis** (`PresetKind` vs `WindowsOptimizationPreset`) sem ponte.
-4. **Políticas legadas conflitam** com o catálogo novo (ex.: desligar Xbox/Game Pass).
-5. **Sem projeto de testes unitários**; validação = self-tests CLI + `scripts/Test-Release.ps1`.
-6. **UI pode chamar infraestrutura** (assembly único); não há fronteira de compilação FE/BE.
-7. Documentação `PROJECT_STRUCTURE.md` menciona WinForms legado; **não encontrado** no tree atual (possível doc desatualizado).
-
-## Build / lint / testes (confirmados)
-
-```powershell
-dotnet build ApexTweaker.sln -c Release
-dotnet publish ApexTweaker.csproj -c Release -r win-x64 --self-contained true -o release-v2
-dotnet run --project ApexTweaker.csproj -- --minecraft-self-test
-dotnet run --project ApexTweaker.csproj -- --demo-self-test
-.\scripts\Test-Release.ps1
-```
-
-- **Lint dedicado:** não encontrado (sem ESLint/StyleCop explícito no repo).
-- **Requisito nativo:** VS Build Tools + C++ para `ApexTweaker.Native.dll`.
-
-## O que NÃO existe (confirmado ausente)
-
-- Servidor HTTP / REST / GraphQL
-- OpenAPI / Swagger
-- Electron, Tauri, React host
-- `package.json` / lockfiles JS
-- Controllers, rotas, schemas Zod/JSON Schema de API
-- Suite xUnit/NUnit/MSTest
-
-Qualquer plano que assuma “endpoints REST entre FE e BE” está **fora da realidade atual**.
+Build Release local = evidência principal hoje. **Insuficiente** como único gate (ver `docs/quality/*`).

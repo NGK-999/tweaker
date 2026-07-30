@@ -1,32 +1,29 @@
-# Frontend Handoff — FE-ALL-P0 (+ integração orquestrador)
+# Frontend handoff
 
-**Branch / worktree origem:** `agent/claude-fps-p0` + merge orquestrador em `main`  
-**Atualizado:** 2026-07-25
+Status: **AUDIT-PERF-FE concluido em 2026-07-25**
 
-## Resumo
+## Escopo executado
 
-Painel **Desempenho**, maturidade corporativa (Snackbar, RiskBadge, Ctrl+K, badges) e Minecraft opção A, com Catalog + market + APIs FPS.
+- Auditoria UI Desempenho (`PerformanceView` + wiring em `MainWindow`)
+- Conferencia de refresh do probe, snackbars e risco
+- Remocao de refresh duplicado na navegacao
 
-## Wiring BE
+## Achados
 
-- `DisableVbsHvci` → `ApplyVbsMemoryIntegrityDisable(true)`
-- Fullscreen → `ApplyGameFullscreenOptimizationsOff`
-- Competitivo → `ApplyCompetitiveCaptureQuiet`
-- Status Desempenho → `CaptureGamingPerformanceProbe()` (refresh ao abrir pagina e apos acoes)
+### Baixa / polish
 
-## Como testar
+- `PerformanceButton_OnClick` chamava `RefreshPerformanceProbe()` logo apos `ShowPageAsync(PerformancePageKey, ...)`, mas `ShowPageAsync` ja refresca o probe ao abrir Desempenho.
+- Fix: removido o refresh duplicado; a pagina continua atualizando uma unica vez na navegacao.
 
-```
-dotnet build ApexTweaker.sln -c Release
-dotnet run --project ApexTweaker.csproj -c Release -- --gaming-fps-probe-self-test
-dotnet run --project ApexTweaker.csproj -c Release -- --demo
-```
+### Sem bug confirmado na UI
 
-## Fechar janela
+- Status da pagina Desempenho continua vindo de `CaptureGamingPerformanceProbe()` via `RefreshPerformanceProbe()` / `ApplyProbe()`.
+- Acoes de risco (VBS/HVCI) seguem com confirmacao e badge de risco; Auto nao aplica `fps.vbs-hvci`.
 
-Close esconde imediatamente, teardown com timeout; segundo clique força `Environment.Exit` se travar.
+## Arquivos alterados nesta auditoria
 
-## Pendencias restantes (fora deste sprint)
+- `src/UI/Wpf/MainWindow.xaml.cs`
 
-- WPF-UI NuGet incremental (P2 opcional)
-- Kernel drivers: **nao**
+## Pendencias
+
+- Nenhuma pendencia frontend aberta dentro do escopo `AUDIT-PERF-FE`.
