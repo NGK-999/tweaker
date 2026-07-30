@@ -1,16 +1,16 @@
-# Graph Report - Apextweaker-codex  (2026-07-25)
+# Graph Report - Apextweaker-codex  (2026-07-30)
 
 ## Corpus Check
 - 182 files · ~136,965 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 2932 nodes · 5985 edges · 178 communities (147 shown, 31 thin omitted)
+- 2932 nodes · 5971 edges · 181 communities (149 shown, 32 thin omitted)
 - Extraction: 94% EXTRACTED · 6% INFERRED · 0% AMBIGUOUS · INFERRED: 334 edges (avg confidence: 0.74)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `0a1c68fe`
+- Built from commit: `931456c3`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -182,6 +182,9 @@
 - BackupService
 - DateTimeOffset
 - string
+- .BuildRecommendations
+- Estrutura do projeto
+- TimerResolutionTweakCommand
 
 ## God Nodes (most connected - your core abstractions)
 1. `MainWindow` - 136 edges
@@ -196,7 +199,7 @@
 10. `ApexTweaker.Services` - 37 edges
 
 ## Surprising Connections (you probably didn't know these)
-- `UserControl` --references--> `CorrectionDetails`  [INFERRED]
+- `UserControl` --references--> `UseExtremeResolution`  [INFERRED]
   src/UI/Wpf/Views/CobblemonEasyView.xaml → src/UI/Wpf/ViewModels/CobblemonEasyViewModel.cs
 - `MinecraftView` --references--> `ScientificExperimentPhase`  [EXTRACTED]
   src/UI/Wpf/Views/MinecraftView.xaml.cs → src/Minecraft/Models/MinecraftScientificModels.cs
@@ -210,15 +213,15 @@
 ## Import Cycles
 - None detected.
 
-## Communities (178 total, 31 thin omitted)
+## Communities (181 total, 32 thin omitted)
 
 ### Community 0 - "Win32MinecraftSessionHookPlatform"
 Cohesion: 0.06
 Nodes (39): EventHandler, ProcessIds, ProcessPowerThrottlingState, FakeMinecraftSessionHookPlatform, IReadOnlyList, MinecraftSessionHookAction, MinecraftSessionHookMode, MinecraftSessionHookReport (+31 more)
 
 ### Community 1 - "MinecraftProfileService"
-Cohesion: 0.09
-Nodes (20): FileMutation, JsonNode, JsonObject, MinecraftBackupFileEntry, MinecraftProfileChangeKind, MinecraftProfileDefinition, MinecraftProfileKind, MinecraftProfileSettingChange (+12 more)
+Cohesion: 0.06
+Nodes (29): FileMutation, JsonNode, JsonObject, ProfileOperation, MinecraftBackupFileEntry, MinecraftBackupManifest, MinecraftExperimentDefinition, MinecraftExperimentVariable (+21 more)
 
 ### Community 2 - "MinecraftBenchmarkService"
 Cohesion: 0.05
@@ -226,7 +229,7 @@ Nodes (33): AvailableMemoryGb, BenchmarkEvidence, CommitUsedMb, IoCounters, Read
 
 ### Community 3 - "CpuTopologyNative"
 Cohesion: 0.05
-Nodes (37): CoreGroupMapping, ApexTweaker.NativeInterop, HardwareEnvironmentDetectionResult, HardwareEnvironmentDetector, HashSet, CoreGroupMapping, IntelHybridProbeStrategy, LOGICAL_PROCESSOR_RELATIONSHIP (+29 more)
+Nodes (40): CoreGroupMapping, ApexTweaker.NativeInterop, LOGICAL_PROCESSOR_RELATIONSHIP, HardwareEnvironmentDetectionResult, HardwareEnvironmentDetector, HashSet, CoreGroupMapping, IntelHybridProbeStrategy (+32 more)
 
 ### Community 4 - "PageTransitionAnimator"
 Cohesion: 0.20
@@ -250,19 +253,19 @@ Nodes (46): DWORD, KAFFINITY, AT_BuildPreferredGameAffinityMask(), CopyEntry(), 
 
 ### Community 9 - "CobblemonEasyViewModel"
 Cohesion: 0.05
-Nodes (28): MinecraftEasyState, CobblemonEasyViewModel, AuditReady, CorrectionDetails, DuplicateMods, EssentialMods, HasBackup, HeavyMods (+20 more)
+Nodes (27): MinecraftEasyCorrectionPlan, MinecraftEasyState, CobblemonEasyViewModel, AuditReady, DuplicateMods, EssentialMods, HasBackup, HeavyMods (+19 more)
 
 ### Community 10 - "MinecraftAuditResult"
-Cohesion: 0.12
-Nodes (11): MinecraftOperationalChecklist, MinecraftQuarantinePlan, MinecraftReportPaths, MinecraftSurvivalPlan, MinecraftReportService, ICollection, IEnumerable, JsonSerializerOptions (+3 more)
+Cohesion: 0.14
+Nodes (10): MinecraftQuarantinePlan, MinecraftReportPaths, MinecraftSurvivalPlan, MinecraftReportService, ICollection, IEnumerable, JsonSerializerOptions, StringBuilder (+2 more)
 
 ### Community 11 - "MinecraftEnvironmentService"
 Cohesion: 0.09
 Nodes (16): AllocatedMb, AvailableGb, DisplayDevice, InUseMb, PerformanceInformation, JavaMemoryRecommendation, JavaRuntimeInfo, MinecraftEnvironmentService (+8 more)
 
 ### Community 12 - "BackupService.cs"
-Cohesion: 0.09
-Nodes (37): IGrouping, RegistryBackupEntry, BeginMutationSession(), BuildUniqueMutationLedgerPath(), CaptureActivePowerScheme(), CaptureBcdEntries(), CaptureCommandState(), CaptureDisplayDriverEntries() (+29 more)
+Cohesion: 0.08
+Nodes (41): IGrouping, RegistryBackupEntry, BcdBackupEntry, TweakBackup, DateTime, IReadOnlyList, BeginMutationSession(), BuildUniqueMutationLedgerPath() (+33 more)
 
 ### Community 13 - "Window"
 Cohesion: 0.08
@@ -289,20 +292,20 @@ Cohesion: 0.09
 Nodes (17): AdvancedModeTabButton, ApplyProfileButton, ApplyQuarantineButton, AuditButton, BenchmarkButton, BrowseButton, CancelBenchmarkButton, EasyModeTabButton (+9 more)
 
 ### Community 21 - "MinecraftScientificModels.cs"
-Cohesion: 0.11
-Nodes (20): MinecraftBottleneckDiagnosis, MinecraftExperimentMeasurement, MinecraftScientificComparison, ModConfigAutomationStatus, ScientificActionKind, ScientificActionRisk, ScientificBenchmarkOutcome, ScientificConfidence (+12 more)
+Cohesion: 0.12
+Nodes (19): MinecraftBottleneckDiagnosis, MinecraftExperimentMeasurement, MinecraftScientificComparison, ModConfigAutomationStatus, ScientificActionKind, ScientificActionRisk, ScientificBenchmarkOutcome, ScientificConfidence (+11 more)
 
 ### Community 22 - "MinecraftScientificExperimentService"
-Cohesion: 0.13
-Nodes (14): MinecraftInstanceEvidence, MinecraftScientificExperiment, MinecraftScientificOperationResult, ScientificHypothesis, MinecraftScientificExperimentService, DateTimeOffset, HashSet, IReadOnlyDictionary (+6 more)
+Cohesion: 0.17
+Nodes (10): MinecraftInstanceEvidence, MinecraftScientificExperiment, MinecraftScientificOperationResult, ScientificHypothesis, MinecraftScientificExperimentService, DateTimeOffset, HashSet, IReadOnlyDictionary (+2 more)
 
 ### Community 23 - "HardwareTelemetryService"
 Cohesion: 0.12
 Nodes (9): Computer, float, KernelLatencyTracker, BenchmarkState, HardwareTelemetryService, double, JsonSerializerOptions, Task (+1 more)
 
 ### Community 24 - "ApexTweaker.Models"
-Cohesion: 0.12
-Nodes (12): ApexTweaker.Services, ApexTweaker, ApexTweaker.Application.Optimizations, ApexTweaker.Infrastructure, ApexTweaker.Models, ApexTweaker.Core.Pipeline, ApexTweaker.UI.Wpf, UninstallTarget (+4 more)
+Cohesion: 0.11
+Nodes (14): ApexTweaker.Services, ApexTweaker, ApexTweaker.Application.Optimizations, ApexTweaker.Infrastructure, ApexTweaker.Models, ApexTweaker.Windows.Inventory, ApexTweaker.Core.Pipeline, UninstallTarget (+6 more)
 
 ### Community 25 - "MinecraftScientificReportService"
 Cohesion: 0.11
@@ -325,8 +328,8 @@ Cohesion: 0.20
 Nodes (9): Backend / orquestração — `.agents/skills/`, Codex / agents (usuário), Como o orquestrador seleciona skills, Frontend — `.claude/skills/`, Política, Projeto ApexTweaker, Skills já instaladas na máquina (observadas), Skills planejadas (criar depois da aprovação) (+1 more)
 
 ### Community 30 - "ExtremeMutationCommands.cs"
-Cohesion: 0.13
-Nodes (16): GROUP_AFFINITY, LOGICAL_PROCESSOR_RELATIONSHIP, SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX_HEADER, int, CACHE_RELATIONSHIP, GROUP_AFFINITY, L3CacheDescriptor, LOGICAL_PROCESSOR_RELATIONSHIP (+8 more)
+Cohesion: 0.16
+Nodes (13): GROUP_AFFINITY, CACHE_RELATIONSHIP, GROUP_AFFINITY, L3CacheDescriptor, LOGICAL_PROCESSOR_RELATIONSHIP, ResolvedGpuInterruptTarget, SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX_HEADER, VideoControllerCandidate (+5 more)
 
 ### Community 32 - "ValorantProcessOptimizer"
 Cohesion: 0.16
@@ -377,7 +380,7 @@ Cohesion: 0.13
 Nodes (13): Channel, NamedPipeServerStream, TelemetryPipeServer, bool, byte, CancellationToken, CancellationTokenSource, ConcurrentDictionary (+5 more)
 
 ### Community 44 - "GpuOptimizationService"
-Cohesion: 0.16
+Cohesion: 0.15
 Nodes (10): DisplayAdapterDevice, GpuInfo, DisplayAdapterDevice, GpuMutationPlan, GpuOptimizationService, IReadOnlyList, JsonElement, List (+2 more)
 
 ### Community 45 - "WindowsOptimizationModels.cs"
@@ -385,24 +388,24 @@ Cohesion: 0.19
 Nodes (15): WindowsOptimizationCatalog, IReadOnlyList, IReadOnlySet, AdmxPolicyReference, EvidenceLevel, OptimizationDecisionKind, OptimizationRequirement, PerformanceEvidence (+7 more)
 
 ### Community 46 - "CommandRunner"
-Cohesion: 0.16
-Nodes (9): CommandResult, int, Process, CommandRunner, CancellationToken, Task, HypervisorTweakCommand, TimerResolutionTweakCommand (+1 more)
+Cohesion: 0.18
+Nodes (8): CommandResult, int, Process, CommandRunner, CancellationToken, Task, HypervisorTweakCommand, TimeSpan
 
 ### Community 47 - "EtwFrameTracker"
 Cohesion: 0.12
 Nodes (12): EtwFrameTracker, bool, CancellationToken, CancellationTokenSource, ConcurrentDictionary, int, long, object (+4 more)
 
 ### Community 48 - "Pastas principais"
-Cohesion: 0.10
-Nodes (20): Dados em disco, Estrutura do projeto, `installer`, `native/ApexTweaker.Native`, Pastas geradas pelo .NET, Pastas principais, Pipeline de mutacao, `release-installer` (+12 more)
+Cohesion: 0.13
+Nodes (15): `installer`, `native/ApexTweaker.Native`, Pastas principais, `release-installer`, `release-v2`, `scripts`, `src/App`, `src/Core/Pipeline` (+7 more)
 
 ### Community 49 - "MinecraftAuditModels.cs"
-Cohesion: 0.09
-Nodes (27): AuditSeverity, BenchmarkStatus, DiskInfo, JavaMemoryTier, MinecraftAuditIssue, MinecraftAuditSummary, MinecraftHomologationCriterion, MinecraftLoader (+19 more)
+Cohesion: 0.27
+Nodes (7): MinecraftLoader, MinecraftAuditService, HashSet, IEnumerable, IReadOnlyCollection, IReadOnlySet, List
 
 ### Community 50 - ".SetCurrentStep"
-Cohesion: 0.16
-Nodes (10): Plan, Reports, MinecraftScientificOptimizationPlan, MinecraftScientificReportPaths, MinecraftScientificReportService, IEnumerable, IReadOnlyDictionary, JsonSerializerOptions (+2 more)
+Cohesion: 0.10
+Nodes (16): Plan, Reports, MinecraftScientificOptimizationPlan, MinecraftScientificReportPaths, ModConfigContractAssessment, ScientificEvidenceType, MinecraftModConfigContractCatalog, IReadOnlyList (+8 more)
 
 ### Community 51 - "MainWindow"
 Cohesion: 0.14
@@ -421,8 +424,8 @@ Cohesion: 0.15
 Nodes (11): L3CacheDescriptor, ProcessorIsolationTopology, AffinityIsolationCommand, ProcessorIsolationTopology, Dictionary, DllImport, HashSet, IntPtr (+3 more)
 
 ### Community 55 - "MinecraftEasyModeService"
-Cohesion: 0.17
-Nodes (7): MinecraftContentProfileKind, MinecraftEasyModSummary, MinecraftEasyModeService, Func, IReadOnlyCollection, IReadOnlyList, string
+Cohesion: 0.19
+Nodes (7): MinecraftContentProfileKind, MinecraftEasyServerReadiness, MinecraftEasyModeService, Func, IReadOnlyCollection, IReadOnlyList, string
 
 ### Community 56 - "WindowsPowerModeService"
 Cohesion: 0.28
@@ -445,8 +448,8 @@ Cohesion: 0.23
 Nodes (6): WindowsOptimizationApplicationFacade, IWindowsOptimizationInventory, GamingPerformanceProbe, WindowsUsageProfile, WindowsOptimizationService, IReadOnlyList
 
 ### Community 61 - "MinecraftModDescriptor"
-Cohesion: 0.11
-Nodes (16): MinecraftBackupManifest, MinecraftQuarantineApplyResult, MinecraftQuarantineCandidate, MinecraftQuarantineConfirmation, MinecraftQuarantineFileEntry, MinecraftQuarantineManifest, MinecraftQuarantineRollbackResult, QuarantineRisk (+8 more)
+Cohesion: 0.20
+Nodes (8): MinecraftQuarantineFileEntry, MinecraftQuarantineManifest, DateTimeOffset, MinecraftQuarantineService, IEnumerable, IReadOnlyList, JsonSerializerOptions, string
 
 ### Community 62 - "CpuTopologyProfile"
 Cohesion: 0.18
@@ -485,8 +488,8 @@ Cohesion: 0.15
 Nodes (12): IDisposable, NamedPipeClientStream, TelemetryPipeClient, bool, CancellationToken, CancellationTokenSource, int, JsonSerializerOptions (+4 more)
 
 ### Community 72 - "MinecraftBenchmarkResult"
-Cohesion: 0.17
-Nodes (9): MinecraftBenchmarkResult, MinecraftOperationalHomologationResult, MinecraftOperationalObservation, ScientificEvidence, MinecraftOperationalHomologationService, MinecraftScientificMetricsService, ICollection, IEnumerable (+1 more)
+Cohesion: 0.10
+Nodes (15): MinecraftSelfTest, Action, Color, IReadOnlyDictionary, MinecraftBenchmarkResult, MinecraftEnvironmentSnapshot, MinecraftOperationalChecklist, MinecraftOperationalHomologationResult (+7 more)
 
 ### Community 74 - "Arquitetura do backend"
 Cohesion: 0.14
@@ -497,7 +500,7 @@ Cohesion: 0.14
 Nodes (13): Acoplamento, Arquivos da primeira etapa, Auditoria estrutural do backend, Codigo grande e duplicacao, Contratos, Escopo e restricoes, Estrutura observada, Estrutura proposta (+5 more)
 
 ### Community 76 - "README.md"
-Cohesion: 0.26
+Cohesion: 0.22
 Nodes (3): Contratos usados pelo perfil, Matriz Fabric 1.21.1, Pacote local auditado
 
 ### Community 77 - "Cobblemon Low-End Lab v3.3.1"
@@ -517,8 +520,8 @@ Cohesion: 0.17
 Nodes (11): 2026-07-24 14:32 — Orquestracao FPS-P0-P1, 2026-07-24 14:38 � Orquestracao FE-ALL + FPS-BE, 2026-07-24 14:47 � BE PASS; FE finish relaunch, 2026-07-24 14:57 � Integracao no main, 2026-07-24 — discovery only (sem execução de agentes), 2026-07-24 — FPS P0/P1 orquestrado, 2026-07-24 — L2-SHELL-2 (parcial), 2026-07-24 — L2-SHELL despachado (Claude) (+3 more)
 
 ### Community 81 - ".Apply"
-Cohesion: 0.19
-Nodes (12): BottleneckCandidate, MinecraftAuditResult, MinecraftBottleneckKind, ModConfigContractAssessment, ScientificDerivedMetrics, MinecraftBottleneckDiagnosticService, ICollection, IReadOnlyList (+4 more)
+Cohesion: 0.40
+Nodes (7): BottleneckCandidate, MinecraftAuditResult, MinecraftBottleneckKind, ScientificDerivedMetrics, MinecraftBottleneckDiagnosticService, ICollection, IReadOnlyList
 
 ### Community 82 - "ISystemMutationCommand"
 Cohesion: 0.18
@@ -541,8 +544,8 @@ Cohesion: 0.34
 Nodes (7): WindowsOptimizationRecommendationService, WindowsOptimizationContext, WindowsOptimizationDecision, WindowsOptimizationPlan, WindowsOptimizationRule, IReadOnlyList, CatalogRowViewModel
 
 ### Community 87 - "TextBox"
-Cohesion: 0.20
-Nodes (7): ApexTweaker.UI.Wpf.Controls, ApexTweaker.UI.Wpf.Theming, ApexTweaker.UI.Wpf.Views, ApexTweaker.UI.Wpf.ViewModels, BenchmarkChartPoint, CommandPaletteItem, EasyPrimaryAction
+Cohesion: 0.18
+Nodes (8): ApexTweaker.UI.Wpf.Controls, ApexTweaker.UI.Wpf.Theming, ApexTweaker.UI.Wpf.Views, ApexTweaker.UI.Wpf.ViewModels, ApexTweaker.UI.Wpf, BenchmarkChartPoint, CommandPaletteItem, EasyPrimaryAction
 
 ### Community 88 - "MainWindow.xaml.cs"
 Cohesion: 0.33
@@ -565,8 +568,8 @@ Cohesion: 0.31
 Nodes (8): CoreButtonsPanel, GamesButtonsPanel, GpuButtonsPanel, MarketButtonsPanel, PeripheralButtonsPanel, UserControl, StackPanel, WrapPanel
 
 ### Community 93 - "MarketUtilitiesService"
-Cohesion: 0.24
-Nodes (5): MinecraftSelfTest, Action, Color, IReadOnlyDictionary, MinecraftEnvironmentSnapshot
+Cohesion: 0.22
+Nodes (6): MinecraftModDescriptor, Dictionary, HashSet, List, IDictionary, IReadOnlyList
 
 ### Community 94 - "NetworkInterruptModerationTweakCommand"
 Cohesion: 0.22
@@ -581,8 +584,8 @@ Cohesion: 0.42
 Nodes (4): MinecraftInstanceEvidenceService, IEnumerable, IReadOnlyDictionary, IReadOnlyList
 
 ### Community 98 - "MinecraftSelfTest.cs"
-Cohesion: 0.15
-Nodes (4): RegistryService, RegistryKey, List, RegistryKey
+Cohesion: 0.23
+Nodes (3): RegistryService, RegistryKey, RegistryKey
 
 ### Community 99 - "MemoryCompressionTweakCommand"
 Cohesion: 0.36
@@ -628,10 +631,6 @@ Nodes (7): SelectedFps, SelectedHookMode, SelectedFps, SelectedHookMode, EasyFps
 Cohesion: 0.29
 Nodes (7): Artefato portatil (oficial), Como gerar o portatil, Como o cliente deve executar, Distribuicao, Fluxo de release recomendado, Instalador (opcional), Observacoes
 
-### Community 112 - "MinecraftEasyModSummary"
-Cohesion: 0.15
-Nodes (8): ProfileOperation, MinecraftExperimentDefinition, MinecraftExperimentVariable, MinecraftProfileApplyResult, MinecraftProfilePlan, MinecraftExtremeExperimentCatalog, int, IReadOnlyList
-
 ### Community 115 - ".RunTweakAsync"
 Cohesion: 0.20
 Nodes (9): Achados Fase 1 (resumo), Backlog priorizado, Entregas recentes (histórico curto), Norte, Não fazer agora, Próximo passo após revisão humana, Top 5 causas prováveis de travamento, Top 5 problemas arquiteturais (+1 more)
@@ -649,8 +648,8 @@ Cohesion: 0.28
 Nodes (5): ContentControl, CancellationToken, FrameworkElement, Task, TransformGroup
 
 ### Community 119 - "MinecraftBenchmarkService.cs"
-Cohesion: 0.50
-Nodes (4): BcdBackupEntry, TweakBackup, DateTime, IReadOnlyList
+Cohesion: 0.33
+Nodes (4): MinecraftScientificExperimentStore, JsonSerializerOptions, object, string
 
 ### Community 120 - "StartupDisclaimerWindow"
 Cohesion: 0.24
@@ -669,8 +668,8 @@ Cohesion: 0.33
 Nodes (6): Arquitetura, Contratos e coordenação, Documentação ApexTweaker, Essencial, Minecraft / Cobblemon, Produto, confiabilidade, qualidade, UX (Fase 1 — 2026-07-25)
 
 ### Community 125 - "MinecraftEasyCorrectionPlan"
-Cohesion: 0.18
-Nodes (3): MinecraftEasyCorrectionPlan, MinecraftEasyInstanceStatus, MinecraftEasyServerReadiness
+Cohesion: 0.11
+Nodes (17): AuditSeverity, BenchmarkStatus, DiskInfo, JavaMemoryTier, MinecraftAuditIssue, MinecraftAuditSummary, MinecraftEasyInstanceStatus, MinecraftHomologationCriterion (+9 more)
 
 ### Community 126 - "GameOpenedCheckBox"
 Cohesion: 0.50
@@ -706,10 +705,10 @@ Nodes (9): AverageFpsTextBox, JavaArgumentsTextBox, JoinSecondsTextBox, MenuSeco
 
 ### Community 147 - "WindowsOptimizationInventoryService.cs"
 Cohesion: 0.18
-Nodes (9): ApexTweaker.Contracts.Inventory, ApexTweaker.Windows.Inventory, ComputerInventory, DeviceGuardInventory, OperatingSystemInventory, ProcessorInventory, SystemPowerStatus, byte (+1 more)
+Nodes (8): ApexTweaker.Contracts.Inventory, ComputerInventory, DeviceGuardInventory, OperatingSystemInventory, ProcessorInventory, SystemPowerStatus, byte, uint
 
 ### Community 148 - "Estratégia de recuperação — ApexTweaker"
-Cohesion: 0.18
+Cohesion: 0.20
 Nodes (10): Camadas de recuperação, Diagnóstico exportável (alvo), Estratégia de recuperação — ApexTweaker, Fechamento / hang, Objetivos, Recovery após falha — checklist operacional, Reinício, Rollback (+2 more)
 
 ### Community 149 - "SystemRestoreService"
@@ -749,32 +748,44 @@ Cohesion: 0.40
 Nodes (5): BenchmarkEvidence, IoCounters, MemoryStatusEx, uint, ulong
 
 ### Community 160 - "Quality gates — ApexTweaker"
-Cohesion: 0.40
+Cohesion: 0.25
 Nodes (4): Bloqueadores absolutos, Gate checklist (orquestrador), Integração, Quality gates — ApexTweaker
 
 ### Community 162 - "Acessibilidade — ApexTweaker"
 Cohesion: 0.50
 Nodes (3): Acessibilidade — ApexTweaker, Observado, Requisitos mínimos (Fase 4+)
 
+### Community 163 - "ValorantProcessOptimizer.cs"
+Cohesion: 0.33
+Nodes (3): MinecraftEasyModSummary, ICollection, IReadOnlyList
+
+### Community 178 - ".BuildRecommendations"
+Cohesion: 0.38
+Nodes (5): ModRecommendation, MinecraftModCatalog, HashSet, IReadOnlyCollection, IReadOnlyList
+
+### Community 179 - "Estrutura do projeto"
+Cohesion: 0.33
+Nodes (5): Dados em disco, Estrutura do projeto, Pastas geradas pelo .NET, Pipeline de mutacao, Solucao e projeto
+
 ## Knowledge Gaps
-- **520 isolated node(s):** `Escopo executado`, `Arquivos alterados`, `Diff resumido`, `Contratos / Models`, `Propostas de contrato para fase futura` (+515 more)
+- **520 isolated node(s):** `Essencial`, `Arquitetura`, `Produto, confiabilidade, qualidade, UX (Fase 1 — 2026-07-25)`, `Contratos e coordenação`, `Minecraft / Cobblemon` (+515 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **31 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **32 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `MainWindow` connect `.TrySetDword` to `Win32MinecraftSessionHookPlatform`, `MinecraftProfileService`, `MinecraftBenchmarkService`, `TelemetryView`, `MinecraftAuditResult`, `MinecraftEnvironmentService`, `Window`, `TweakService`, `MinecraftView`, `.WriteLine`, `MinecraftScientificExperimentService`, `HardwareTelemetryService`, `MinecraftScientificReportService`, `SystemDiagnosticsService`, `.EnsureAdministratorForWindowsOperation`, `.Run`, `UtilitiesView`, `EtwFrameTracker`, `MinecraftAuditModels.cs`, `MinecraftEasyModeService`, `WindowsOptimizationService`, `MinecraftModDescriptor`, `OptimizationEngine`, `DashboardView`, `MinecraftBenchmarkResult`, `.Apply`, `UserControl`, `TextBox`, `MainWindow.xaml.cs`, `MinecraftEnvironmentService.cs`, `.ExecuteAsync`, `CatalogView`, `MinecraftEasyModSummary`, `StartupDisclaimerWindow`, `ValorantLocator`, `MinecraftEasyCorrectionPlan`?**
-  _High betweenness centrality (0.387) - this node is a cross-community bridge._
-- **Why does `MinecraftView` connect `MinecraftView` to `Win32MinecraftSessionHookPlatform`, `MinecraftBenchmarkService`, `UserControl`, `MinecraftBenchmarkResult`, `.TrySetDword`, `MinecraftAuditResult`, `CatalogView`, `MinecraftAuditModels.cs`, `TextBox`, `RoutedEventArgs`, `MainWindow`, `MinecraftScientificModels.cs`, `MinecraftEasyModeService`, `TextBox`, `MinecraftWizardViewModel`, `MinecraftBenchmarkSample`, `MinecraftEasyCorrectionPlan`?**
-  _High betweenness centrality (0.098) - this node is a cross-community bridge._
+- **Why does `MainWindow` connect `.TrySetDword` to `Win32MinecraftSessionHookPlatform`, `MinecraftProfileService`, `MinecraftBenchmarkService`, `TelemetryView`, `CobblemonEasyViewModel`, `MinecraftAuditResult`, `MinecraftEnvironmentService`, `Window`, `TweakService`, `MinecraftView`, `.WriteLine`, `MinecraftScientificExperimentService`, `HardwareTelemetryService`, `MinecraftScientificReportService`, `SystemDiagnosticsService`, `.EnsureAdministratorForWindowsOperation`, `.Run`, `UtilitiesView`, `EtwFrameTracker`, `MinecraftAuditModels.cs`, `MinecraftEasyModeService`, `WindowsOptimizationService`, `MinecraftModDescriptor`, `OptimizationEngine`, `DashboardView`, `MinecraftBenchmarkResult`, `.Apply`, `UserControl`, `TextBox`, `MainWindow.xaml.cs`, `MinecraftEnvironmentService.cs`, `.ExecuteAsync`, `CatalogView`, `StartupDisclaimerWindow`, `ValorantLocator`?**
+  _High betweenness centrality (0.367) - this node is a cross-community bridge._
 - **Why does `HardwareTelemetryService` connect `HardwareTelemetryService` to `.StartMonitoringGame`, `.MonitorLoopAsync`, `TelemetryPipeClient`, `TelemetrySnapshot`, `HardwareTelemetryService.cs`, `.TrySetDword`, `TelemetryPipeServer`, `EtwFrameTracker`, `KernelLatencyTracker`, `CpuTopologyProfile`?**
-  _High betweenness centrality (0.086) - this node is a cross-community bridge._
+  _High betweenness centrality (0.109) - this node is a cross-community bridge._
+- **Why does `ApexTweaker.Services` connect `ApexTweaker.Models` to `Win32MinecraftSessionHookPlatform`, `CpuTopologyNative`, `TelemetryPipeClient.cs`, `TelemetryView`, `BackupService.cs`, `WindowsOptimizationInventoryService.cs`, `SystemRestoreService`, `ExtremeMutationCommands.cs`, `.EnsureAdministratorForWindowsOperation`, `HardwareTelemetryService.cs`, `TelemetryPipeServer`, `GpuOptimizationService`, `EtwFrameTracker`, `WindowsPowerModeService`, `OptimizationEngine`, `ISystemMutationCommand`, `TextBox`, `MinecraftSelfTest.cs`, `.ExecuteAsync`, `ValorantLocator`?**
+  _High betweenness centrality (0.103) - this node is a cross-community bridge._
 - **Are the 42 inferred relationships involving `CobblemonEasyViewModel` (e.g. with `ApproximateFps` and `AuditReady`) actually correct?**
   _`CobblemonEasyViewModel` has 42 INFERRED edges - model-reasoned connections that need verification._
-- **What connects `Escopo executado`, `Arquivos alterados`, `Diff resumido` to the rest of the system?**
+- **What connects `Essencial`, `Arquitetura`, `Produto, confiabilidade, qualidade, UX (Fase 1 — 2026-07-25)` to the rest of the system?**
   _520 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `Win32MinecraftSessionHookPlatform` be split into smaller, more focused modules?**
   _Cohesion score 0.06295715778474399 - nodes in this community are weakly interconnected._
 - **Should `MinecraftProfileService` be split into smaller, more focused modules?**
-  _Cohesion score 0.09049773755656108 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.06456140350877193 - nodes in this community are weakly interconnected._
