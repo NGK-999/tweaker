@@ -13,7 +13,8 @@
     <Color x:Key="AccentHoverColor">#5CB0B0</Color>
     <Color x:Key="TextPrimaryColor">#EDEEF0</Color>
     <Color x:Key="TextSecondaryColor">#9AA0AC</Color>
-    <Color x:Key="TextTertiaryColor">#6C7280</Color>
+    <!-- #6C7280 reprovava WCAG AA (3.50:1 sobre ContentBg); #868C99 da 5.00:1 -->
+    <Color x:Key="TextTertiaryColor">#868C99</Color>
     <Color x:Key="SeparatorColor">#2A2D33</Color>
     <Color x:Key="DestructiveColor">#E5534B</Color>
     <Color x:Key="DestructiveHoverColor">#EF6B63</Color>

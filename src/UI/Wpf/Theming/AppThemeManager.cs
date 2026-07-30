@@ -26,7 +26,7 @@ public static class AppThemeManager
             ["AccentHoverColor"] = "#5CB0B0",
             ["TextPrimaryColor"] = "#EDEEF0",
             ["TextSecondaryColor"] = "#9AA0AC",
-            ["TextTertiaryColor"] = "#6C7280",
+            ["TextTertiaryColor"] = "#868C99",
             ["SeparatorColor"] = "#2A2D33",
             ["DestructiveColor"] = "#E5534B",
             ["DestructiveHoverColor"] = "#EF6B63",
