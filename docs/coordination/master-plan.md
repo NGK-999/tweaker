@@ -1,4 +1,4 @@
-# Master plan — status
+﻿# Master plan — status
 
 **Atualizado:** 2026-07-25
 
@@ -11,15 +11,17 @@
 | BE-DEMO-OUTCOME-P0 + FE-FEEDBACK-SHELL-P0 | **MERGED** via PR #2 (`de49cc3`) |
 | P0.1 / P0.2 / P0.2.1 | **MERGED** (HEAD integrado `eacf9ec`) |
 | Kernel | **fora** |
+| FE-SHELL-FLUENCY-P1 | **DONE** — transition leve + Analyze/probe off UI thread |
+| UI-OUTCOME-P1 | **DONE** (branch `integration/ui-outcome-polish`) |
+| FE-SHELL-POLISH-P1 | **DONE** (Snackbar/headers/busy/motion) |
+| CTT-WINUTIL-PARITY | **DONE** (branch `integration/ctt-winutil-parity`) |
 
 **PR #2:** MERGED (merge commit, sem squash). Stash WIP **não** aplicado.
 
 ## Próximo lote (dívidas não bloqueantes)
 
-1. **UI-OUTCOME-P1** — consumir `OperationOutcome` na UI (`RunTweakAsync` / Auto-Tuning); timeout/cancel não podem parecer sucesso.
-2. **DEMO-INVENTORY-P1** — Secure Boot/TPM sem PowerShell em Demo (API tipada ou coletor dedicado).
-3. **CI-REQUIRED-P1** — GitHub Actions obrigatório no HEAD (build + self-tests).
+1. **DEMO-INVENTORY-P1** — Secure Boot/TPM sem PowerShell em Demo (API tipada ou coletor dedicado).
+2. **CI-REQUIRED-P1** — GitHub Actions obrigatório no HEAD (build + self-tests).
+3. Merge PR #3 (UI-OUTCOME/polish) se ainda aberto, depois CTT parity.
 
-| FE-SHELL-FLUENCY-P1 | **DONE** — transition leve + Analyze/probe off UI thread |
-
-Opcional depois: WPF-UI NuGet incremental / polish; restaurar stash `wip-pre-p0-integration-*` só com cuidado consciente.
+Opcional depois: WPF-UI NuGet incremental; `$impeccable init`; restaurar stash `wip-pre-p0-integration-*` só com cuidado consciente.

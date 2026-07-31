@@ -170,3 +170,25 @@ Formato por entrada (preencher após cada decisão/execução):
 - BE FPS sync + self-test PASS
 - FE Claude (Performance/Snackbar/Ctrl+K/RiskBadge/Minecraft A) + Catalog + market + wiring BE real
 - Build Release OK
+
+## 2026-07-25 � UI-OUTCOME-P1 + FE-SHELL-POLISH-P1
+
+```yaml
+- timestamp: "2026-07-25T09:35:00-03:00"
+  task_id: UI-OUTCOME-P1+FE-SHELL-POLISH-P1
+  task_type: frontend-risk-ux / frontend-refactor
+  executor: cursor-orchestrator
+  parallel: claude-opus (360e9c6b-70f7-45a1-ba5f-d89c73c6dcd7)
+  skills: [graphify, impeccable-product, frontend-verification]
+  worktree_main: integration/ui-outcome-polish
+  worktree_claude: ../Apextweaker-claude agent/claude-fe-outcome-polish
+  verification_commands:
+    - dotnet build ApexTweaker.sln -c Release
+    - dotnet run --project ApexTweaker.csproj -c Release -- --demo-self-test
+    - dotnet run --project ApexTweaker.csproj -c Release -- --catalog-feedback-self-test
+    - dotnet run --project ApexTweaker.csproj -c Release -- --gaming-fps-probe-self-test
+  verification_results: [PASS, PASS, PASS, PASS]
+  notes:
+    - TweakService.LastMutationOutcome + MainWindow Kind map
+    - Snackbar coalesce/surfaces; Catalog/Performance busy; header subtitle motion
+```

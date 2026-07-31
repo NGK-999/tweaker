@@ -18,6 +18,8 @@ internal static class ApplicationWarmup
     public static bool AlreadyOptimized =>
         cachedAlreadyOptimized ??= new OptimizationEngine().CheckIfAlreadyOptimized();
 
+    public static void InvalidateAlreadyOptimized() => cachedAlreadyOptimized = null;
+
     public static void Run()
     {
         _ = Hardware;

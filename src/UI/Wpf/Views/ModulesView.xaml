@@ -194,6 +194,48 @@
                     <Button Style="{StaticResource MacModuleButton}" Tag="Debloat" Content="Debloat" Click="ModuleButton_OnClick" />
                     <Button Style="{StaticResource MacModuleButton}" Tag="Timer resolution" Content="Timer resolution" Click="ModuleButton_OnClick" />
                 </WrapPanel>
+
+                <TextBlock Margin="0,18,0,2"
+                           Style="{StaticResource MacSectionTitle}"
+                           Text="WinUtil-inspired (CTT)" />
+                <TextBlock Margin="0,0,0,10"
+                           Style="{StaticResource MacBodyText}"
+                           FontSize="12"
+                           Text="Reimplementado no pipeline Apex (ledger/Demo). Nao executa scripts do Chris Titus." />
+                <StackPanel>
+                    <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="176" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0"
+                                Margin="0"
+                                Style="{StaticResource MacModuleButton}"
+                                Tag="CTT Essential"
+                                Content="CTT Essential"
+                                Click="ModuleButton_OnClick" />
+                        <TextBlock Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center" Style="{StaticResource MacBodyText}" FontSize="12"
+                                   Text="Telemetria leve, widgets, location, WPBT, limpeza e Ultimate Performance." />
+                        <controls:RiskBadge Grid.Column="2" Margin="8,0,0,0" Level="Safe" />
+                    </Grid>
+                    <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="176" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0"
+                                Margin="0"
+                                Style="{StaticResource MacModuleButton}"
+                                Tag="CTT Advanced"
+                                Content="CTT Advanced"
+                                Click="ModuleButton_OnClick" />
+                        <TextBlock Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center" Style="{StaticResource MacBodyText}" FontSize="12"
+                                   Text="CAUTION: background apps, notificacoes, menu classico, IPv4 preferido, AI pages." />
+                        <controls:RiskBadge Grid.Column="2" Margin="8,0,0,0" Level="Advanced" />
+                    </Grid>
+                </StackPanel>
             </StackPanel>
     </ScrollViewer>
 </UserControl>

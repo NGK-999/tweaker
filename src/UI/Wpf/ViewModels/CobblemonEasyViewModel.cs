@@ -170,7 +170,7 @@ internal sealed partial class CobblemonEasyViewModel : ObservableObject
     private int selectedFps = 24;
 
     [ObservableProperty]
-    private string selectedHookMode = "Seguro";
+    private string selectedHookMode = "Extremo";
 
     [ObservableProperty]
     private string selectedPlayTarget = "Servidor";

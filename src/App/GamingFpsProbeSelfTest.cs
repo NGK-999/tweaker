@@ -50,6 +50,14 @@ internal static class GamingFpsProbeSelfTest
         Check(rules.Any(rule => rule.Id == "fps.rebar-checklist"), "catalog contains fps.rebar-checklist");
         Check(rules.Any(rule => rule.Id == "fps.fso-per-game"), "catalog contains fps.fso-per-game");
         Check(rules.Any(rule => rule.Id == "fps.competitive-overlays"), "catalog contains fps.competitive-overlays");
+        Check(rules.Any(rule => rule.Id == "ctt.essential-bundle"), "catalog contains ctt.essential-bundle");
+        Check(rules.Any(rule => rule.Id == "ctt.advanced-bundle"), "catalog contains ctt.advanced-bundle");
+        Check(rules.Any(rule => rule.Id == "dangerous.ctt-disable-bitlocker" && !rule.MayApplyAutomatically),
+            "catalog blocks auto-apply for dangerous.ctt-disable-bitlocker");
+        Check(rules.First(rule => rule.Id == "ctt.essential-bundle").MayApplyAutomatically,
+            "ctt.essential-bundle may apply automatically when Safe");
+        Check(!rules.First(rule => rule.Id == "ctt.advanced-bundle").MayApplyAutomatically,
+            "ctt.advanced-bundle does not auto-apply (Conditional)");
 
         if (failures == 0)
         {

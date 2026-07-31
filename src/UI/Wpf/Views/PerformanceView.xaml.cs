@@ -2,6 +2,7 @@ using System;
 using System.Threading.Tasks;
 using System.Windows;
 using ApexTweaker.Models;
+using ApexTweaker.UI.Wpf.Animations;
 using WpfButton = System.Windows.Controls.Button;
 using WpfUserControl = System.Windows.Controls.UserControl;
 
@@ -44,11 +45,27 @@ public partial class PerformanceView : WpfUserControl
     {
         InitializeComponent();
         StatusItemsControl.ItemsSource = Array.Empty<PerformanceStatusItem>();
+        SetProbeLoading(false);
     }
 
     internal void ApplyProbe(GamingPerformanceProbe probe)
     {
         StatusItemsControl.ItemsSource = BuildStatusItems(probe);
+        SetProbeLoading(false);
+        UiMotion.FadeIn(StatusItemsControl, UiMotion.Standard);
+    }
+
+    public void SetProbeLoading(bool loading)
+    {
+        ProbeLoadingBanner.Visibility = loading ? Visibility.Visible : Visibility.Collapsed;
+        if (loading)
+        {
+            StatusItemsControl.Opacity = 0.45;
+        }
+        else
+        {
+            StatusItemsControl.Opacity = 1D;
+        }
     }
 
     public void SetBusy(bool busy)

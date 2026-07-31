@@ -44,3 +44,8 @@ Modo: **A** (catálogo completo; Auto só Safe/Competitive; Dangerous com confir
 ## Explicitamente fora
 
 - Flash BIOS, HIDUSBF, NSudo SYSTEM elevation, kill switch, telemetria HWID de terceiros, copiar EXM Electron.
+- WinUtil: WinGet/ISO/Updates Disable ALL / OOSU / Brave debloat — ver [winutil-coverage-matrix.md](winutil-coverage-matrix.md).
+
+## WinUtil (CTT)
+
+Paridade Essential + Advanced (confirm) via `ApplyCttEssentialTweaks` / `ApplyCttAdvancedTweaks` (2026-07-25). BitLocker = `dangerous.ctt-disable-bitlocker`.

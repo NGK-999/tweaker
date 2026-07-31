@@ -53,7 +53,7 @@ internal static class UiMotion
         return animation;
     }
 
-    public static void FadeIn(FrameworkElement element, TimeSpan? duration = null)
+    public static void FadeIn(FrameworkElement element, TimeSpan? duration = null, TimeSpan? beginTime = null)
     {
         element.Opacity = 0D;
         var storyboard = new Storyboard();
@@ -63,7 +63,8 @@ internal static class UiMotion
             UIElement.OpacityProperty,
             1D,
             duration ?? Standard,
-            EaseOut));
+            EaseOut,
+            beginTime));
         storyboard.Begin();
     }
 

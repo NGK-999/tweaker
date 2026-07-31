@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
+using ApexTweaker.UI.Wpf.Animations;
 
 namespace ApexTweaker.UI.Wpf.Controls;
 
@@ -28,6 +29,8 @@ public sealed class Snackbar : Border
     };
 
     private DispatcherTimer? hideTimer;
+    private Storyboard? activeStoryboard;
+    private int showGeneration;
 
     public Snackbar()
     {
@@ -53,25 +56,76 @@ public sealed class Snackbar : Border
             return;
         }
 
-        messageText.Text = message;
-        var borderKey = kind switch
-        {
-            SnackbarKind.Success => "SuccessBrush",
-            SnackbarKind.Warning => "WarningBrush",
-            SnackbarKind.Error => "ErrorBrush",
-            _ => "AccentBrush"
-        };
-        SetResourceReference(BorderBrushProperty, borderKey);
+        var generation = ++showGeneration;
+        CancelActivePresentation();
 
-        hideTimer?.Stop();
-        BeginAnimation(OpacityProperty, new DoubleAnimation(1, TimeSpan.FromMilliseconds(180)));
+        messageText.Text = message;
+        ApplyKindSurface(kind);
+
+        var fadeIn = new Storyboard { FillBehavior = FillBehavior.HoldEnd };
+        UiMotion.ConfigureStoryboard(fadeIn);
+        fadeIn.Children.Add(UiMotion.CreateDoubleAnimation(
+            this,
+            OpacityProperty,
+            1D,
+            TimeSpan.FromMilliseconds(180),
+            UiMotion.EaseOut,
+            from: Opacity));
+        activeStoryboard = fadeIn;
+        fadeIn.Begin();
 
         hideTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(seconds) };
         hideTimer.Tick += (_, _) =>
         {
+            if (generation != showGeneration)
+            {
+                return;
+            }
+
             hideTimer?.Stop();
-            BeginAnimation(OpacityProperty, new DoubleAnimation(0, TimeSpan.FromMilliseconds(220)));
+            hideTimer = null;
+
+            var fadeOut = new Storyboard { FillBehavior = FillBehavior.HoldEnd };
+            UiMotion.ConfigureStoryboard(fadeOut);
+            fadeOut.Children.Add(UiMotion.CreateDoubleAnimation(
+                this,
+                OpacityProperty,
+                0D,
+                TimeSpan.FromMilliseconds(220),
+                UiMotion.EaseIn,
+                from: Opacity));
+            activeStoryboard = fadeOut;
+            fadeOut.Begin();
         };
         hideTimer.Start();
+    }
+
+    private void CancelActivePresentation()
+    {
+        hideTimer?.Stop();
+        hideTimer = null;
+
+        if (activeStoryboard is not null)
+        {
+            activeStoryboard.Stop();
+            activeStoryboard.Remove(this);
+            activeStoryboard = null;
+        }
+
+        BeginAnimation(OpacityProperty, null);
+    }
+
+    private void ApplyKindSurface(SnackbarKind kind)
+    {
+        var (backgroundKey, borderKey) = kind switch
+        {
+            SnackbarKind.Success => ("SuccessSurfaceBrush", "SuccessBrush"),
+            SnackbarKind.Warning => ("WarningSurfaceBrush", "WarningBrush"),
+            SnackbarKind.Error => ("ErrorSurfaceBrush", "ErrorBrush"),
+            _ => ("InfoSurfaceBrush", "AccentBrush")
+        };
+
+        SetResourceReference(BackgroundProperty, backgroundKey);
+        SetResourceReference(BorderBrushProperty, borderKey);
     }
 }
