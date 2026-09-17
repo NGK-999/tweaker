@@ -44,7 +44,6 @@ public partial class ModulesView : WpfUserControl
         return FindButtons(CoreButtonsPanel)
             .Concat(FindButtons(PeripheralButtonsPanel))
             .Concat(FindButtons(GpuButtonsPanel))
-            .Concat(FindButtons(GamesButtonsPanel))
             .Concat(FindButtons(MarketButtonsPanel))
             .ToArray();
     }

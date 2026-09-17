@@ -69,17 +69,6 @@ Self-test de cobertura: `dotnet run -- --market-coverage-self-test`
 
 Sessoes salvas em `%LOCALAPPDATA%\ApexTweaker\Telemetry` (`Sessao_Baseline.json`, `Sessao_Optimized.json`).
 
-### Cobblemon / Minecraft
-
-| Acao | Backend |
-|------|---------|
-| Auditar pasta | `MinecraftAuditService` + `ModJarScanner` |
-| Gerar relatorios | `MinecraftReportService` |
-| Previsualizar / aplicar / restaurar perfil | `MinecraftProfileService` |
-| Quarentena | `MinecraftQuarantineService` |
-| Benchmark | `MinecraftBenchmarkService.CaptureAsync()` |
-
-Consulte `docs/COBBLEMON_LOW_END.md`.
 
 ---
 

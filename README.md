@@ -4,7 +4,7 @@
 
 <p align="center">
   <strong>Otimizador Windows para jogos</strong> — diagnóstico, telemetria e tweaks
-  <em>reversíveis</em>, com preparação segura de Minecraft em PCs limitados.
+  <em>reversíveis</em> com foco em baixa latência e estabilidade de sistema.
 </p>
 
 <p align="center">
@@ -17,7 +17,6 @@
 <p align="center">
   <a href="#segurança-primeiro">Segurança</a> ·
   <a href="#interface">Interface</a> ·
-  <a href="#minecraft-resumo">Minecraft</a> ·
   <a href="#build-local">Build</a> ·
   <a href="#distribuição">Download</a> ·
   <a href="#arquitetura-e-produto">Docs</a>
@@ -31,7 +30,7 @@
 |:--|:--|
 | **Medir** | Hardware, VBS/HVCI/HAGS, frametime — entender o PC antes de mexer |
 | **Otimizar** | Tweaks Windows com snapshot/ledger e rollback |
-| **Preparar** | Minecraft (vanilla/modded) sem prometer FPS mágico nem apagar mods |
+| **Limpar** | Debloat, telemetria inútil e caches sem corromper o sistema |
 
 ---
 
@@ -43,7 +42,7 @@
 |:------|:--------------|
 | **Demo** | `--demo` bloqueia mutações Windows |
 | **Elevação** | UAC só quando a mutação realmente exige admin |
-| **Minecraft** | Backup antes de escrever · rollback separado · sem delete de mods |
+| **Rollback** | Snapshot automático antes de qualquer escrita no registro ou sistema |
 | **Kernel** | Sem drivers · sem injeção · sem RealTime |
 
 ```powershell
@@ -69,25 +68,7 @@ Shell WPF com transição leve (opacity). Catálogo e probe de Desempenho rodam 
 | **Módulos** | Tweaks individuais com snapshot |
 | **Telemetria** | Teste A/B, frametime, sensores |
 | **Catálogo** | Analyze de presets (sem aplicar) + checklist BIOS |
-| **Minecraft Rápido** | `Encontrar → Preparar → Testar → Restaurar` |
 | **Utilidades** | Rollback, limpeza, TRIM, SFC/DISM, desinstalação |
-
----
-
-## Minecraft (resumo)
-
-```text
-Encontrar  →  Preparar  →  Testar  →  Resolver / Restaurar
-```
-
-- Perfis leves (ex.: `POTATO_4GB`) só após confirmação e backup
-- Cobblemon como perfil opcional quando detectado
-- Avançado: auditoria de mods, quarentena SHA-256, motor científico
-
-**Docs:** [hooks de sessão](docs/MINECRAFT_GENERAL_AND_SESSION_HOOKS.md) ·
-[motor científico](docs/SCIENTIFIC_ENGINE.md) ·
-[Cobblemon low-end](docs/COBBLEMON_LOW_END.md) ·
-[índice](docs/README.md)
 
 ---
 
@@ -119,26 +100,9 @@ Self-contained (não exige .NET instalado). Detalhes: [docs/DISTRIBUTION.md](doc
 | Dados | Caminho |
 |:------|:--------|
 | Backups Windows | `C:\ProgramData\ApexTweaker\Backups` |
-| Backups Minecraft | `%LOCALAPPDATA%\ApexTweaker\MinecraftBackups` |
-| Relatórios / experimentos | `%LOCALAPPDATA%\ApexTweaker\MinecraftReports` |
+| Backups Locais | `%LOCALAPPDATA%\ApexTweaker\Backups` |
+| Relatórios | `%LOCALAPPDATA%\ApexTweaker\Reports` |
 | Telemetria | `%LOCALAPPDATA%\ApexTweaker\Telemetry` |
-
----
-
-## CLI útil
-
-```powershell
-dotnet run --project ApexTweaker.csproj -- --minecraft-help
-
-dotnet run --project ApexTweaker.csproj -- `
-  --minecraft-audit `
-  --mods "$env:USERPROFILE\Downloads\mods\mods" `
-  --output ".\artifacts\minecraft-audit"
-
-dotnet run --project ApexTweaker.csproj -- --minecraft-self-test
-```
-
-Escrita via CLI exige `--yes` e instância válida.
 
 ---
 

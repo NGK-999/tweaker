@@ -44,8 +44,8 @@ Reconstrua o instalador apos atualizar `release-v2`, para que o setup embuta o b
 
 ## Como o cliente deve executar
 
-O app usa `asInvoker` no manifesto e inicia sem UAC. Auditoria, configs,
-backup/rollback Minecraft, relatorios e benchmark funcionam como usuario normal.
+O app usa `asInvoker` no manifesto e inicia sem UAC. Diagnosticos,
+relatorios e telemetria basica funcionam como usuario normal.
 Mutacoes de Registro, BCD, energia, rollback de sistema e ETW de kernel pedem
 elevacao sob demanda e somente depois de confirmacao.
 
@@ -66,20 +66,18 @@ Start-Process "release-v2\ApexTweaker.exe" -Verb RunAs
 1. Fechar todas as instancias do ApexTweaker.
 2. `scripts\Build-Release.ps1` (ou `dotnet publish ... -o release-v2`)
 3. Confirmar data/tamanho de `ApexTweaker.exe`.
-4. Executar `--minecraft-self-test` no EXE publicado.
+4. Executar os self-tests (`--demo-self-test`, `--catalog-feedback-self-test`, `--gaming-fps-probe-self-test`) no EXE publicado.
 5. Executar `scripts\Test-Release.ps1` para validar `asInvoker` sem bypass.
 6. Conferir versoes, SHA-256 e conteudo do ZIP.
 7. Testar navegacao, Auto-Tuning, telemetria e fechamento.
 8. Rebuild do instalador.
-9. Criar release no GitHub com os quatro artefatos.
+9. Criar release no GitHub com os artefatos.
 
 ## Observacoes
 
 - **SmartScreen** pode alertar enquanto o arquivo nao estiver assinado digitalmente. Para distribuicao comercial, use certificado de code signing.
 - Backups do app: `C:\ProgramData\ApexTweaker\Backups`
-- Dados Minecraft/telemetria: `%LOCALAPPDATA%\ApexTweaker`
-- O modulo Cobblemon modifica somente arquivos de uma instancia explicitamente
-  selecionada, sempre com dry-run, confirmacao e backup. Ele nao injeta hooks no jogo.
+- Dados e telemetria: `%LOCALAPPDATA%\ApexTweaker`
 - O repositorio esta privado em 2026-07-12. Os links abaixo retornam `404` sem
   login em uma conta autorizada:
   - Instalador: [ApexTweaker-Setup.exe](https://github.com/NGK-999/tweaker/releases/latest/download/ApexTweaker-Setup.exe)

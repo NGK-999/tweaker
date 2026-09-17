@@ -7,8 +7,6 @@ namespace ApexTweaker.Services;
 internal enum ApplicationOperation
 {
     HardwareDiagnostics,
-    MinecraftFiles,
-    MinecraftBenchmark,
     UserTelemetry,
     WindowsMutation,
     WindowsRollback,

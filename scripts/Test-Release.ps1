@@ -41,19 +41,13 @@ try {
         throw 'O executavel publicado nao usa privilegio minimo (asInvoker).'
     }
 
-    $statusPath = Join-Path $testRootFull 'self-test.txt'
     $process = Start-Process -FilePath $exe `
-        -ArgumentList @('--minecraft-self-test', '--status-file', ('"{0}"' -f $statusPath)) `
+        -ArgumentList @('--demo-self-test') `
         -WindowStyle Hidden `
         -Wait `
         -PassThru
-    if ($process.ExitCode -ne 0 -or -not (Test-Path -LiteralPath $statusPath)) {
+    if ($process.ExitCode -ne 0) {
         throw "Self-test do executavel falhou com codigo $($process.ExitCode)."
-    }
-
-    $status = Get-Content -Raw -LiteralPath $statusPath
-    if ($status -notmatch 'SELF_TEST_OK') {
-        throw 'Self-test do executavel nao confirmou SELF_TEST_OK.'
     }
 
     $hash = (Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash.ToLowerInvariant()
