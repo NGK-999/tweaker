@@ -378,6 +378,9 @@ internal sealed class TweakService
             RunPowercfgSetting($"/setacvalueindex {PowerSchemeCurrent} {SubUsb} {UsbSelectiveSuspend} 0", "Suspensao seletiva USB desativada na tomada via GUID absoluto.", log);
             RunPowercfgSetting("/setactive SCHEME_CURRENT", "Plano atual reativado apos ajustes de energia.", log);
 
+            TrySetDword(Registry.LocalMachine, @"SYSTEM\CurrentControlSet\Control\Power", "PowerThrottlingOff", 1, "PowerThrottlingOff=1: previne reducao forçada de clock em processos.", log);
+            TrySetDword(Registry.LocalMachine, @"SYSTEM\CurrentControlSet\Control\Power", "CsEnabled", 0, "CsEnabled=0: Connected Standby desativado para consistencia de scheduler.", log);
+
             return log;
         });
     }
@@ -395,7 +398,15 @@ internal sealed class TweakService
 
             if (!ultimateAvailable)
             {
-                log.Add("[INFO] Plano Desempenho M\u00E1ximo legado n\u00E3o est\u00E1 exposto neste Windows. O ApexTweaker vai refor\u00E7ar o Power Mode moderno.");
+                var duplicateResult = commandRunner.Run("powercfg", $"-duplicatescheme {UltimatePerformanceGuid}");
+                if (duplicateResult.ExitCode == 0)
+                {
+                    RunPowercfgSetting($"-setactive {UltimatePerformanceGuid}", "Plano Desempenho M\u00E1ximo duplicado e ativado.", log);
+                }
+                else
+                {
+                    log.Add("[INFO] Plano Desempenho M\u00E1ximo legado n\u00E3o est\u00E1 exposto neste Windows. O ApexTweaker vai refor\u00E7ar o Power Mode moderno.");
+                }
             }
             else
             {
@@ -532,9 +543,13 @@ internal sealed class TweakService
             TrySetString(Registry.CurrentUser, @"Control Panel\Mouse", "MouseSpeed", "0", "MouseSpeed=0 aplicado.", log);
             TrySetString(Registry.CurrentUser, @"Control Panel\Mouse", "MouseThreshold1", "0", "MouseThreshold1=0 aplicado.", log);
             TrySetString(Registry.CurrentUser, @"Control Panel\Mouse", "MouseThreshold2", "0", "MouseThreshold2=0 aplicado.", log);
+            TrySetString(Registry.CurrentUser, @"Control Panel\Mouse", "MouseSensitivity", "10", "MouseSensitivity=10 (sensibilidade neutra 1:1) aplicada.", log);
             TrySetString(Registry.CurrentUser, @"Control Panel\Keyboard", "KeyboardDelay", "0", "KeyboardDelay=0 aplicado.", log);
             TrySetString(Registry.CurrentUser, @"Control Panel\Keyboard", "KeyboardSpeed", "31", "KeyboardSpeed=31 aplicado.", log);
-            log.Add("Aceleracao do mouse removida e repeticao do teclado configurada para resposta rapida.");
+            TrySetDword(Registry.LocalMachine, @"SYSTEM\CurrentControlSet\Services\mouclass\Parameters", "MouseDataQueueSize", 100, "MouseDataQueueSize=100 aplicado para buffer de mouse.", log);
+            TrySetDword(Registry.LocalMachine, @"SYSTEM\CurrentControlSet\Services\kbdclass\Parameters", "KeyboardDataQueueSize", 100, "KeyboardDataQueueSize=100 aplicado para buffer de teclado.", log);
+            TrySetDword(Registry.LocalMachine, @"SYSTEM\CurrentControlSet\Services\i8042prt\Parameters", "KeyboardDataQueueSize", 100, "KeyboardDataQueueSize=100 em porta legada de teclado aplicada.", log);
+            log.Add("Aceleracao do mouse removida, buffers de input ajustados e repeticao do teclado configurada para resposta rapida.");
 
             RunPowercfgSetting($"/setacvalueindex {PowerSchemeCurrent} {SubUsb} {UsbSelectiveSuspend} 0", "Suspensao seletiva USB desativada via GUID absoluto.", log);
             RunPowercfgSetting("/setactive SCHEME_CURRENT", "Plano atual reativado apos ajustes USB.", log);
@@ -620,7 +635,8 @@ internal sealed class TweakService
             TrySetDword(Registry.LocalMachine, DeliveryOptimizationConfigPath, "DODownloadMode", 0, "Delivery Optimization DODownloadMode=0: P2P de updates desativado.", log);
             TrySetDword(Registry.LocalMachine, @"SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management\PrefetchParameters", "EnablePrefetcher", 0, "EnablePrefetcher=0 aplicado.", log);
             TrySetDword(Registry.LocalMachine, @"SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management\PrefetchParameters", "EnableSuperfetch", 0, "EnableSuperfetch=0 aplicado.", log);
-            TrySetDword(Registry.LocalMachine, @"SYSTEM\CurrentControlSet\Control", "SvcHostSplitThresholdInKB", 67108864, "SvcHostSplitThresholdInKB=0x04000000 aplicado.", log);
+            var svcHostSplit = CalculateSvcHostSplitThresholdInKb();
+            TrySetDword(Registry.LocalMachine, @"SYSTEM\CurrentControlSet\Control", "SvcHostSplitThresholdInKB", svcHostSplit, $"SvcHostSplitThresholdInKB=0x{svcHostSplit:X8} aplicado dinamicamente conforme RAM.", log);
 
             TrySetDword(Registry.CurrentUser, @"Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager", "ContentDeliveryAllowed", 0, "Sugestoes/entrega de conteudo desativadas para o usuario atual.", log);
             TrySetDword(Registry.CurrentUser, @"Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager", "FeatureManagementEnabled", 0, "Feature suggestions desativado para o usuario atual.", log);
@@ -760,7 +776,7 @@ internal sealed class TweakService
             BackupRegistryKey(@"HKLM\SYSTEM\CurrentControlSet\Control", "system-control-memory", log);
             TrySetDword(Registry.LocalMachine, MemoryManagementPath, "DisablePagingExecutive", 1, "DisablePagingExecutive=1.", log);
             TrySetDword(Registry.LocalMachine, MemoryManagementPath, "LargeSystemCache", 0, "LargeSystemCache=0 (perfil desktop/jogo).", log);
-            TrySetDword(Registry.LocalMachine, @"SYSTEM\CurrentControlSet\Control", "SvcHostSplitThresholdInKB", 67108864, "SvcHostSplitThresholdInKB reforcado.", log);
+            TrySetDword(Registry.LocalMachine, @"SYSTEM\CurrentControlSet\Control", "SvcHostSplitThresholdInKB", CalculateSvcHostSplitThresholdInKb(), "SvcHostSplitThresholdInKB reforcado.", log);
             return log;
         });
     }
@@ -816,6 +832,65 @@ internal sealed class TweakService
             }
 
             return log;
+        });
+    }
+
+    public IReadOnlyList<string> ApplyWindows11ShellTweaks()
+    {
+        return RunMutationPipeline("Win11 Shell", () =>
+        {
+            var log = new List<string> { "Win11 Shell: aplicando ajustes de usabilidade e menu de contexto classico." };
+
+            BackupRegistryKey(@"HKCU\Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}", "clsid-classic-context-menu", log);
+            BackupRegistryKey(@"HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced\TaskbarDeveloperSettings", "taskbar-dev-settings", log);
+            BackupRegistryKey(@"HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced", "explorer-advanced-shell", log);
+
+            TrySetString(Registry.CurrentUser, @"Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InprocServer32", "", "", "Menu de contexto classico do Windows 10 ativado (InprocServer32 vazio).", log);
+            TrySetDword(Registry.CurrentUser, @"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced\TaskbarDeveloperSettings", "TaskbarEndTask", 1, "Finalizar Tarefa no menu da barra de tarefas ativado.", log);
+            TrySetDword(Registry.CurrentUser, @"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced", "HideFileExt", 0, "Exibir extensoes de arquivos conhecidos ativado.", log);
+            TrySetDword(Registry.CurrentUser, @"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced", "Hidden", 1, "Exibir arquivos e pastas ocultos ativado.", log);
+            TrySetDword(Registry.CurrentUser, @"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced", "EnableSnapAssist", 0, "Snap Assist desativado para navegacao mais agil.", log);
+
+            BroadcastUserPreferenceChanges();
+            log.Add("Ajustes do Shell aplicados com sucesso. Algumas alteracoes exigem reiniciar o Explorer.");
+            return log;
+        });
+    }
+
+    public IReadOnlyList<string> ApplyAiAndCopilotDisableTweaks()
+    {
+        return RunMutationPipeline("IA e Copilot", () =>
+        {
+            var log = new List<string> { "IA e Copilot: desativando Copilot, Recall e analises em segundo plano." };
+
+            BackupRegistryKey(@"HKCU\Software\Policies\Microsoft\Windows\WindowsCopilot", "policy-copilot-user", log);
+            BackupRegistryKey(@"HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsCopilot", "policy-copilot-machine", log);
+            BackupRegistryKey(@"HKCU\Software\Policies\Microsoft\Windows\WindowsAI", "policy-windowsai-user", log);
+            BackupRegistryKey(@"HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsAI", "policy-windowsai-machine", log);
+            BackupRegistryKey(@"HKLM\SOFTWARE\Policies\Microsoft\Edge", "policy-edge-ai", log);
+            BackupRegistryKey(@"HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced", "explorer-copilot-button", log);
+
+            TrySetDword(Registry.CurrentUser, @"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced", "ShowCopilotButton", 0, "Botao do Copilot na barra de tarefas desativado.", log);
+            TrySetDword(Registry.CurrentUser, @"Software\Policies\Microsoft\Windows\WindowsCopilot", "TurnOffWindowsCopilot", 1, "Copilot desativado na politica do usuario.", log);
+            TrySetDword(Registry.LocalMachine, @"SOFTWARE\Policies\Microsoft\Windows\WindowsCopilot", "TurnOffWindowsCopilot", 1, "Copilot desativado na politica da maquina.", log);
+            TrySetDword(Registry.CurrentUser, @"Software\Policies\Microsoft\Windows\WindowsAI", "DisableAIDataAnalysis", 1, "Analise de dados por IA desativada no usuario.", log);
+            TrySetDword(Registry.LocalMachine, @"SOFTWARE\Policies\Microsoft\Windows\WindowsAI", "DisableAIDataAnalysis", 1, "Analise de dados por IA desativada na maquina.", log);
+            TrySetDword(Registry.LocalMachine, @"SOFTWARE\Policies\Microsoft\Windows\WindowsAI", "AllowRecallEnablement", 0, "Windows Recall impedido de ser habilitado.", log);
+            TrySetDword(Registry.LocalMachine, @"SOFTWARE\Policies\Microsoft\Windows\WindowsAI", "TurnOffSavingSnapshots", 1, "Salvamento de snapshots de tela por IA desativado.", log);
+            TrySetDword(Registry.LocalMachine, EdgePoliciesPath, "HubsSidebarEnabled", 0, "Barra lateral e hubs do Edge desativados.", log);
+            TrySetDword(Registry.LocalMachine, EdgePoliciesPath, "CopilotPageContext", 0, "Envio de contexto de navegacao para Copilot desativado.", log);
+
+            log.Add("Copilot, Windows Recall e analise de dados por IA desativados no sistema.");
+            return log;
+        });
+    }
+
+    public IReadOnlyList<string> ApplyAppxBloatwareRemoval(bool dryRun = false)
+    {
+        return RunMutationPipeline("Debloat UWP", () =>
+        {
+            var debloatService = new AppxDebloatService(commandRunner);
+            return debloatService.RemoveSafeBloatware(dryRun);
         });
     }
 
@@ -935,6 +1010,8 @@ internal sealed class TweakService
         TrySetString(Registry.CurrentUser, WindowMetricsPath, "MinAnimate", "0", "MinAnimate=0: animaÃ§Ãµes de minimizar/maximizar desativadas.", log);
         TrySetDword(Registry.CurrentUser, @"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced", "TaskbarAnimations", 0, "TaskbarAnimations=0: barra de tarefas com menos transiÃ§Ãµes.", log);
         TrySetDword(Registry.CurrentUser, ThemesPersonalizePath, "EnableTransparency", 0, "EnableTransparency=0: transparÃªncia desligada para reduzir ruÃ­do visual e composiÃ§Ã£o.", log);
+        TrySetDword(Registry.CurrentUser, @"Software\Microsoft\Windows\CurrentVersion\PushNotifications", "ToastEnabled", 0, "ToastEnabled=0: notificacoes push do sistema desativadas.", log);
+        TrySetDword(Registry.CurrentUser, @"Software\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects", "VisualFXSetting", 2, "VisualFXSetting=2: melhor desempenho visual aplicado.", log);
 
         if (BroadcastUserPreferenceChanges())
         {
@@ -946,6 +1023,30 @@ internal sealed class TweakService
         }
 
         return log;
+    }
+
+    private static int CalculateSvcHostSplitThresholdInKb()
+    {
+        try
+        {
+            var memBytes = GC.GetGCMemoryInfo().TotalAvailableMemoryBytes;
+            if (memBytes > 0)
+            {
+                var gb = (int)(memBytes / (1024L * 1024L * 1024L));
+                if (gb <= 4) return 0x00400000;
+                if (gb <= 8) return 0x00800000;
+                if (gb <= 12) return 0x00C00000;
+                if (gb <= 16) return 0x01000000;
+                if (gb <= 24) return 0x01800000;
+                if (gb <= 32) return 0x02000000;
+                return 0x04000000;
+            }
+        }
+        catch
+        {
+            // fallback
+        }
+        return 67108864; // 0x04000000 default
     }
 
     private IReadOnlyList<string> ApplyEdgeNoiseReduction()

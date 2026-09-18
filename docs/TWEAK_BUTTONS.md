@@ -30,6 +30,9 @@ Backup automatico e criado antes de qualquer otimizacao iniciada pela UI. Nao ha
 | GPU Windows | `ApplyGpuWindowsProfile()` |
 | GPU regedit | `ApplyGpuDriverRegistryProfile()` |
 | Background | `ApplyBackgroundTweaks()` |
+| Win11 Shell | `ApplyWindows11ShellTweaks()` |
+| IA e Copilot | `ApplyAiAndCopilotDisableTweaks()` |
+| Debloat UWP | `ApplyAppxBloatwareRemoval()` |
 | UI noise | `ApplyUiNoiseTweaks()` |
 | Memory | `ApplyMemoryTweaks()` |
 | Rede avancada | `ApplyAdvancedNetworkTweaks()` |

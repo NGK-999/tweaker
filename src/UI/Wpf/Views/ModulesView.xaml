@@ -160,16 +160,125 @@
 
 
 
-                <TextBlock Margin="0,16,0,10"
+                <TextBlock Margin="0,18,0,2"
                            Style="{StaticResource MacSectionTitle}"
-                           Text="Mercado (modo A)" />
-                <WrapPanel x:Name="MarketButtonsPanel">
-                    <Button Style="{StaticResource MacModuleButton}" Tag="UI noise" Content="UI noise" Click="ModuleButton_OnClick" />
-                    <Button Style="{StaticResource MacModuleButton}" Tag="Memory" Content="Memory" Click="ModuleButton_OnClick" />
-                    <Button Style="{StaticResource MacModuleButton}" Tag="Rede avancada" Content="Rede avancada" Click="ModuleButton_OnClick" />
-                    <Button Style="{StaticResource MacModuleButton}" Tag="Debloat" Content="Debloat" Click="ModuleButton_OnClick" />
-                    <Button Style="{StaticResource MacModuleButton}" Tag="Timer resolution" Content="Timer resolution" Click="ModuleButton_OnClick" />
-                </WrapPanel>
+                           Text="Windows 11 Shell e usabilidade" />
+                <TextBlock Margin="0,0,0,10"
+                           Style="{StaticResource MacBodyText}"
+                           FontSize="12"
+                           Text="Ajustes de produtividade, menu de contexto e interface do Windows 11." />
+                <StackPanel x:Name="ShellButtonsPanel">
+                    <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="176" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Margin="0" Style="{StaticResource MacModuleButton}" Tag="Win11 Shell" Content="Win11 Shell" Click="ModuleButton_OnClick" />
+                        <TextBlock Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center" Style="{StaticResource MacBodyText}" FontSize="12" Text="Menu de contexto cl&#x00E1;ssico (Win10), Finalizar Tarefa na barra e extens&#x00F5;es vis&#x00ED;veis." />
+                        <controls:RiskBadge Grid.Column="2" Margin="8,0,0,0" Level="Safe" />
+                    </Grid>
+                </StackPanel>
+
+                <TextBlock Margin="0,18,0,2"
+                           Style="{StaticResource MacSectionTitle}"
+                           Text="IA e telemetria" />
+                <TextBlock Margin="0,0,0,10"
+                           Style="{StaticResource MacBodyText}"
+                           FontSize="12"
+                           Text="Privacidade, desativa&#x00E7;&#x00E3;o do Copilot e captura cont&#x00ED;nua por IA." />
+                <StackPanel x:Name="AiButtonsPanel">
+                    <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="176" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Margin="0" Style="{StaticResource MacModuleButton}" Tag="IA e Copilot" Content="IA e Copilot" Click="ModuleButton_OnClick" />
+                        <TextBlock Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center" Style="{StaticResource MacBodyText}" FontSize="12" Text="Desativa Copilot na barra/sistema, Windows Recall e Edge AI." />
+                        <controls:RiskBadge Grid.Column="2" Margin="8,0,0,0" Level="Safe" />
+                    </Grid>
+                </StackPanel>
+
+                <TextBlock Margin="0,18,0,2"
+                           Style="{StaticResource MacSectionTitle}"
+                           Text="Debloat de aplicativos" />
+                <TextBlock Margin="0,0,0,10"
+                           Style="{StaticResource MacBodyText}"
+                           FontSize="12"
+                           Text="Remo&#x00E7;&#x00E3;o de pacotes redundantes UWP/AppX e servi&#x00E7;os opcionais." />
+                <StackPanel x:Name="DebloatButtonsPanel">
+                    <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="176" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Margin="0" Style="{StaticResource MacModuleButton}" Tag="Debloat UWP" Content="Debloat UWP" Click="ModuleButton_OnClick" />
+                        <TextBlock Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center" Style="{StaticResource MacBodyText}" FontSize="12" Text="Remove bloatware seguro pr&#x00E9;-instalado (3D Builder, Bing, Clima, etc.)." />
+                        <controls:RiskBadge Grid.Column="2" Margin="8,0,0,0" Level="Safe" />
+                    </Grid>
+                    <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="176" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Margin="0" Style="{StaticResource MacModuleButton}" Tag="Debloat" Content="Debloat Servi&#x00E7;os" Click="ModuleButton_OnClick" />
+                        <TextBlock Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center" Style="{StaticResource MacBodyText}" FontSize="12" Text="Desativa servi&#x00E7;os opcionais (Spooler, Xbox) conforme uso." />
+                        <controls:RiskBadge Grid.Column="2" Margin="8,0,0,0" Level="Safe" />
+                    </Grid>
+                </StackPanel>
+
+                <TextBlock Margin="0,18,0,2"
+                           Style="{StaticResource MacSectionTitle}"
+                           Text="Mercado e avan&#x00E7;ados" />
+                <TextBlock Margin="0,0,0,10"
+                           Style="{StaticResource MacBodyText}"
+                           FontSize="12"
+                           Text="Ajustes de mem&#x00F3;ria, ru&#x00ED;do e rede do ecossistema de otimiza&#x00E7;&#x00E3;o." />
+                <StackPanel x:Name="MarketButtonsPanel">
+                    <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="176" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Margin="0" Style="{StaticResource MacModuleButton}" Tag="UI noise" Content="UI noise" Click="ModuleButton_OnClick" />
+                        <TextBlock Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center" Style="{StaticResource MacBodyText}" FontSize="12" Text="Reduz anima&#x00E7;&#x00F5;es, atrasos de menus e ru&#x00ED;do de interface." />
+                        <controls:RiskBadge Grid.Column="2" Margin="8,0,0,0" Level="Safe" />
+                    </Grid>
+                    <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="176" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Margin="0" Style="{StaticResource MacModuleButton}" Tag="Memory" Content="Memory" Click="ModuleButton_OnClick" />
+                        <TextBlock Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center" Style="{StaticResource MacBodyText}" FontSize="12" Text="DisablePagingExecutive e SvcHost split din&#x00E2;mico por RAM." />
+                        <controls:RiskBadge Grid.Column="2" Margin="8,0,0,0" Level="Safe" />
+                    </Grid>
+                    <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="176" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Margin="0" Style="{StaticResource MacModuleButton}" Tag="Rede avancada" Content="Rede avan&#x00E7;ada" Click="ModuleButton_OnClick" />
+                        <TextBlock Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center" Style="{StaticResource MacBodyText}" FontSize="12" Text="RSS habilitado, ECN desabilitado e guia Bufferbloat." />
+                        <controls:RiskBadge Grid.Column="2" Margin="8,0,0,0" Level="Safe" />
+                    </Grid>
+                    <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="176" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Margin="0" Style="{StaticResource MacModuleButton}" Tag="Timer resolution" Content="Timer resolution" Click="ModuleButton_OnClick" />
+                        <TextBlock Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center" Style="{StaticResource MacBodyText}" FontSize="12" Text="Ajuste do BCD de useplatformclock (exige rein&#x00ED;cio)." />
+                        <controls:RiskBadge Grid.Column="2" Margin="8,0,0,0" Level="Advanced" />
+                    </Grid>
+                </StackPanel>
             </StackPanel>
     </ScrollViewer>
 </UserControl>

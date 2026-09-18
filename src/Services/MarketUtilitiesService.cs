@@ -24,11 +24,24 @@ internal sealed class MarketUtilitiesService
     public IReadOnlyList<string> CleanTemporaryFiles(bool execute)
     {
         var log = new List<string> { execute ? "Limpeza: removendo temporarios seguros." : "Limpeza (dry-run): inventariando temporarios." };
-        var targets = new[]
+        var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        var targets = new List<string>
         {
             Path.GetTempPath(),
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "Temp")
         };
+
+        if (!string.IsNullOrWhiteSpace(localAppData))
+        {
+            targets.Add(Path.Combine(localAppData, "Temp"));
+            targets.Add(Path.Combine(localAppData, "Microsoft", "Windows", "WER", "ReportArchive"));
+            targets.Add(Path.Combine(localAppData, "Microsoft", "Windows", "WER", "ReportQueue"));
+            targets.Add(Path.Combine(localAppData, "Microsoft", "Windows", "INetCache"));
+            targets.Add(Path.Combine(localAppData, "Google", "Chrome", "User Data", "Default", "Cache"));
+            targets.Add(Path.Combine(localAppData, "Microsoft", "Edge", "User Data", "Default", "Cache"));
+            targets.Add(Path.Combine(localAppData, "BraveSoftware", "Brave-Browser", "User Data", "Default", "Cache"));
+            targets.Add(Path.Combine(localAppData, "Microsoft", "Terminal Server Client", "Cache"));
+        }
 
         long bytes = 0;
         var fileCount = 0;

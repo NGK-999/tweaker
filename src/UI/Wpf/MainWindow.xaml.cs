@@ -735,6 +735,15 @@ public partial class MainWindow : Window
             case "Debloat":
                 await RunTweakAsync("Debloat condicional", () => tweakService.ApplyConditionalDebloat(WindowsUsageProfile.Unknown));
                 break;
+            case "Debloat UWP":
+                await RunTweakAsync("Debloat UWP", () => tweakService.ApplyAppxBloatwareRemoval());
+                break;
+            case "Win11 Shell":
+                await RunTweakAsync("Win11 Shell", () => tweakService.ApplyWindows11ShellTweaks());
+                break;
+            case "IA e Copilot":
+                await RunTweakAsync("IA e Copilot", () => tweakService.ApplyAiAndCopilotDisableTweaks());
+                break;
             case "Timer resolution":
                 if (System.Windows.MessageBox.Show(
                         "Timer resolution altera BCD e exige reinicio. Continuar?",
@@ -1256,6 +1265,9 @@ public partial class MainWindow : Window
             new CommandPaletteItem("Memory", "Tweak mercado: memoria", () => HandleModuleRequestedAsync("Memory")),
             new CommandPaletteItem("Rede avancada", "Tweak mercado: rede avancada", () => HandleModuleRequestedAsync("Rede avancada")),
             new CommandPaletteItem("Debloat", "Tweak mercado: debloat condicional", () => HandleModuleRequestedAsync("Debloat")),
+            new CommandPaletteItem("Debloat UWP", "Tweak mercado: remover bloatware seguro (AppX)", () => HandleModuleRequestedAsync("Debloat UWP")),
+            new CommandPaletteItem("Win11 Shell", "Tweak mercado: menu classico, End Task e extensoes", () => HandleModuleRequestedAsync("Win11 Shell")),
+            new CommandPaletteItem("IA e Copilot", "Tweak mercado: desativar Copilot, Recall e analise IA", () => HandleModuleRequestedAsync("IA e Copilot")),
             new CommandPaletteItem("Timer resolution", "Tweak avancado: BCD timer (reinicio)", () => HandleModuleRequestedAsync("Timer resolution"))
         ]);
     }

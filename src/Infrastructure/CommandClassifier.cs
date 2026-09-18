@@ -42,8 +42,8 @@ internal static class CommandClassifier
         "pwsh", "pwsh.exe"
     };
 
-    private static readonly string[] PowerCfgReadTokens = ["/list", "/query", "/aliases", "/getactivescheme"];
-    private static readonly string[] PowerCfgMutationPrefixes = ["/set", "/change", "/hibernate", "/energy"];
+    private static readonly string[] PowerCfgReadTokens = ["/list", "-list", "/query", "-query", "/aliases", "-aliases", "/getactivescheme", "-getactivescheme"];
+    private static readonly string[] PowerCfgMutationPrefixes = ["/set", "-set", "/change", "-change", "/hibernate", "-hibernate", "/energy", "-energy", "/duplicatescheme", "-duplicatescheme", "/d", "-d"];
 
     private static readonly string[] BcdReadTokens = ["/enum"];
     private static readonly string[] BcdMutationTokens = ["/set", "/delete", "/deletevalue", "/create", "/import", "/export"];
