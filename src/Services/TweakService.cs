@@ -4,13 +4,14 @@ using System.IO;
 using System.Text.RegularExpressions;
 using System.Runtime.InteropServices;
 using ApexTweaker.Core.Pipeline;
+using ApexTweaker.Contracts.Services;
 using Microsoft.Win32;
 using ApexTweaker.Infrastructure;
 using ApexTweaker.Models;
 
 namespace ApexTweaker.Services;
 
-internal sealed class TweakService
+internal sealed class TweakService : ITweakService
 {
     private const string AppCompatLayersPath = @"Software\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\Layers";
     private const string DisableFullscreenOptimizationFlag = "DISABLEDXMAXIMIZEDWINDOWEDMODE";
@@ -64,8 +65,25 @@ internal sealed class TweakService
         mutationExecutor = new MutationExecutor(backupService);
     }
 
+    /// <summary>
+    /// Outcome legado do último pipeline executado. A propriedade mantém a
+    /// compatibilidade com a UI atual; consumidores novos usam
+    /// <see cref="LastContractOutcome"/> ou ITweakService.LastOutcome.
+    /// </summary>
+    public OperationOutcome? LastMutationOutcome { get; private set; }
+
+    /// <summary>Projeção tipada compartilhada do último pipeline.</summary>
+    public ApexTweaker.Contracts.OperationOutcome? LastContractOutcome =>
+        LastMutationOutcome?.ToContractOutcome();
+
+    ApexTweaker.Contracts.OperationOutcome? ITweakService.LastOutcome => LastContractOutcome;
+
+    IReadOnlyList<string> ITweakService.ApplyAutonomousOptimization(string? valorantExePath) =>
+        ApplyAutonomousOptimization(valorantExePath, hardware: null);
+
     public IReadOnlyList<string> CreateRestorePoint()
     {
+        LastMutationOutcome = null;
         return SystemRestoreService.CreatePreOptimizationRestorePoint();
     }
 
@@ -991,7 +1009,9 @@ internal sealed class TweakService
 
     private IReadOnlyList<string> RunMutationPipeline(string operationName, Func<IReadOnlyList<string>> action)
     {
-        return mutationExecutor.Run(operationName, action);
+        var lines = mutationExecutor.Run(operationName, action);
+        LastMutationOutcome = mutationExecutor.LastOutcome;
+        return lines;
     }
 
     private bool ExecuteCommand(ISystemMutationCommand command, List<string> log)
@@ -1631,4 +1651,3 @@ internal sealed class TweakService
             log);
     }
 }
-

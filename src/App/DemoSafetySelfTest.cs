@@ -5,6 +5,8 @@ using System.Linq;
 using System.Security;
 using System.Threading;
 using System.Threading.Tasks;
+using ApexTweaker.Contracts.Optimizations;
+using ApexTweaker.Contracts.Services;
 using ApexTweaker.Infrastructure;
 using ApexTweaker.Models;
 using ApexTweaker.Services;
@@ -122,6 +124,30 @@ internal static class DemoSafetySelfTest
                                         line.Contains("[BLOQUEADO]", StringComparison.OrdinalIgnoreCase)),
             "bloqueio retorna MutationBlocked/Blocked");
 
+        var contractTweakService = new TweakService();
+        Check(contractTweakService is ITweakService, "TweakService implementa ITweakService");
+        Check(new BackupService() is IBackupService, "BackupService implementa IBackupService");
+        Check(new OptimizationEngine() is IOptimizationEngine, "OptimizationEngine implementa IOptimizationEngine");
+
+        var contractOptimization = (IOptimizationEngine)new OptimizationEngine();
+        var contractRecommendation = contractOptimization.Analyze(
+            new OptimizationHardwareSnapshot(
+                "CPU de self-test",
+                PhysicalCoreCount: 8,
+                LogicalCoreCount: 16,
+                TotalMemoryGb: 32,
+                IsHeterogeneousArchitecture: false));
+        Check(contractRecommendation.RecommendedPreset == OptimizationPreset.Competitive,
+            "IOptimizationEngine preserva a recomendacao do motor legado");
+
+        var diagnosticsReport = new SystemDiagnosticsService().BuildDiagnosticReport();
+        Check(diagnosticsReport.Any(line => line.StartsWith("Secure Boot:", StringComparison.OrdinalIgnoreCase)),
+            "inventario de Demo coleta Secure Boot por API tipada");
+        Check(diagnosticsReport.Any(line => line.StartsWith("TPM:", StringComparison.OrdinalIgnoreCase)),
+            "inventario de Demo coleta TPM por API tipada");
+        Check(!diagnosticsReport.Any(line => line.Contains("powershell", StringComparison.OrdinalIgnoreCase)),
+            "inventario de Demo nao expõe caminho PowerShell");
+
         RuntimeModeContext.ResetForTests();
         var unknownLog = new TweakService().ApplyCompetitiveCaptureQuiet();
         Check(unknownLog.Any(line => line.Contains("RuntimeMode incerto", StringComparison.OrdinalIgnoreCase)),
@@ -140,6 +166,11 @@ internal static class DemoSafetySelfTest
             .GetAwaiter().GetResult();
         Check(shared.LastOutcome?.Kind == OperationOutcomeKind.Failed, "segunda operacao FAILED na mesma instancia");
         Check(shared.LastOutcome?.OperationName == "second-fail", "LastOutcome representa somente a segunda operacao");
+        var contractExecutor = (IMutationExecutor)shared;
+        Check(contractExecutor.LastOutcome?.Kind.ToString() == "Failed",
+            "IMutationExecutor propaga OperationOutcome tipado");
+        Check(contractTweakService.LastMutationOutcome is null,
+            "ITweakService inicia sem outcome pendente");
 
         var completed = RunOutcomeScenario("completed", (_, log) =>
         {

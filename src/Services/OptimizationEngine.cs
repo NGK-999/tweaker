@@ -3,11 +3,13 @@ using System.Globalization;
 using System.Management;
 using System.Text.RegularExpressions;
 using Microsoft.Win32;
+using ApexTweaker.Contracts.Optimizations;
+using ApexTweaker.Contracts.Services;
 using ApexTweaker.Models;
 
 namespace ApexTweaker.Services;
 
-internal sealed class OptimizationEngine
+internal sealed class OptimizationEngine : IOptimizationEngine
 {
     private const string GameBarPath = @"Software\Microsoft\GameBar";
     private const string GameDvrPath = @"Software\Microsoft\Windows\CurrentVersion\GameDVR";
@@ -85,6 +87,76 @@ internal sealed class OptimizationEngine
                allowAutoGameMode == 1 &&
                appCaptureEnabled == 0 &&
                prioritySeparation == 38;
+    }
+
+    OptimizationRecommendation IOptimizationEngine.Analyze(OptimizationHardwareSnapshot hardware)
+    {
+        ArgumentNullException.ThrowIfNull(hardware);
+
+        var recommendation = Analyze(ToLegacyHardwareInfo(hardware));
+        return new OptimizationRecommendation(
+            ToContractTier(recommendation.Tier),
+            ToContractPreset(recommendation.RecommendedPreset),
+            recommendation.Title,
+            recommendation.Reason,
+            recommendation.Notes);
+    }
+
+    bool IOptimizationEngine.CanApplyPreset(
+        OptimizationHardwareSnapshot hardware,
+        OptimizationPreset preset)
+    {
+        ArgumentNullException.ThrowIfNull(hardware);
+        return CanApplyPreset(ToLegacyHardwareInfo(hardware), ToLegacyPreset(preset));
+    }
+
+    bool IOptimizationEngine.CanApplyExtremeLatency(OptimizationHardwareSnapshot hardware)
+    {
+        ArgumentNullException.ThrowIfNull(hardware);
+        return CanApplyExtremeLatency(ToLegacyHardwareInfo(hardware));
+    }
+
+    private static HardwareInfo ToLegacyHardwareInfo(OptimizationHardwareSnapshot hardware)
+    {
+        return new HardwareInfo(
+            hardware.ProcessorName,
+            hardware.PhysicalCoreCount,
+            hardware.LogicalCoreCount,
+            hardware.TotalMemoryGb,
+            hardware.IsHeterogeneousArchitecture);
+    }
+
+    private static PresetKind ToLegacyPreset(OptimizationPreset preset)
+    {
+        return preset switch
+        {
+            OptimizationPreset.Safe => PresetKind.Safe,
+            OptimizationPreset.Competitive => PresetKind.Competitive,
+            OptimizationPreset.Extreme => PresetKind.Extreme,
+            _ => throw new ArgumentOutOfRangeException(nameof(preset), preset, "Preset desconhecido.")
+        };
+    }
+
+    private static OptimizationPreset ToContractPreset(PresetKind preset)
+    {
+        return preset switch
+        {
+            PresetKind.Safe => OptimizationPreset.Safe,
+            PresetKind.Competitive => OptimizationPreset.Competitive,
+            PresetKind.Extreme => OptimizationPreset.Extreme,
+            _ => throw new ArgumentOutOfRangeException(nameof(preset), preset, "Preset desconhecido.")
+        };
+    }
+
+    private static OptimizationHardwareTier ToContractTier(HardwareTier tier)
+    {
+        return tier switch
+        {
+            HardwareTier.LowEnd => OptimizationHardwareTier.LowEnd,
+            HardwareTier.MidRange => OptimizationHardwareTier.MidRange,
+            HardwareTier.HighEnd => OptimizationHardwareTier.HighEnd,
+            _ => throw new ArgumentOutOfRangeException(nameof(tier), tier, "Tier desconhecido.")
+        };
     }
 
     public ProcessorBoostDecision BuildProcessorBoostDecision(Action<string>? addLog = null)

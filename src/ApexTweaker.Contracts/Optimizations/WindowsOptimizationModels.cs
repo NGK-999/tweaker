@@ -21,6 +21,7 @@ internal enum WindowsOptimizationRisk
 internal enum WindowsOptimizationPurpose
 {
     Fps,
+    Performance,
     FrameTime,
     Latency,
     Network,

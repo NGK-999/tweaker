@@ -9,12 +9,13 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading;
 using Microsoft.Win32;
+using ApexTweaker.Contracts.Services;
 using ApexTweaker.Infrastructure;
 using ApexTweaker.Models;
 
 namespace ApexTweaker.Services;
 
-internal sealed class BackupService
+internal sealed class BackupService : IBackupService
 {
     private const string PendingLedgerStatus = "Pending";
     private const string RestoredLedgerStatus = "Restored";
