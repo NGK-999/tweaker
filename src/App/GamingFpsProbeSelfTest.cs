@@ -42,6 +42,12 @@ internal static class GamingFpsProbeSelfTest
             "diagnostic report mentions HVCI");
         Check(report.Any(line => line.Contains("Resizable BAR:", StringComparison.OrdinalIgnoreCase)),
             "diagnostic report mentions ReBAR");
+        Check(report.Any(line => line.StartsWith("Secure Boot:", StringComparison.OrdinalIgnoreCase)),
+            "diagnostic report includes typed Secure Boot inventory");
+        Check(report.Any(line => line.StartsWith("TPM:", StringComparison.OrdinalIgnoreCase)),
+            "diagnostic report includes typed TPM inventory");
+        Check(!report.Any(line => line.Contains("powershell", StringComparison.OrdinalIgnoreCase)),
+            "diagnostic inventory does not expose a PowerShell path");
 
         var rules = WindowsOptimizationCatalog.Rules;
         Check(rules.Any(rule => rule.Id == "fps.vbs-hvci" && !rule.MayApplyAutomatically && rule.RequiresRestart),

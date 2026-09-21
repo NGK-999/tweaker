@@ -41,12 +41,7 @@ public partial class ModulesView : WpfUserControl
 
     private WpfButton[] EnumerateModuleButtons()
     {
-        return FindButtons(CoreButtonsPanel)
-            .Concat(FindButtons(PeripheralButtonsPanel))
-            .Concat(FindButtons(GpuButtonsPanel))
-            .Concat(FindButtons(GamesButtonsPanel))
-            .Concat(FindButtons(MarketButtonsPanel))
-            .ToArray();
+        return FindButtons(this).ToArray();
     }
 
     private static IEnumerable<WpfButton> FindButtons(DependencyObject root)

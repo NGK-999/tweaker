@@ -1,8 +1,7 @@
-﻿using System;
+using System;
 using System.Linq;
 using System.Windows;
 using ApexTweaker.Infrastructure;
-using ApexTweaker.Minecraft;
 using ApexTweaker.UI.Wpf;
 using ApexTweaker.UI.Wpf.Testing;
 using ApexTweaker.UI.Wpf.Windows;
@@ -40,14 +39,6 @@ internal static class Program
         if (args.Any(a => string.Equals(a, "--catalog-feedback-self-test", StringComparison.OrdinalIgnoreCase)))
         {
             Environment.ExitCode = CatalogFeedbackSelfTest.Run();
-            return;
-        }
-
-        _ = ApplicationPaths.MigrateLegacyMinecraftData();
-
-        if (MinecraftCommandLine.TryRun(args, out var exitCode))
-        {
-            Environment.ExitCode = exitCode;
             return;
         }
 

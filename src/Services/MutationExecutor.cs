@@ -4,12 +4,13 @@ using System.Linq;
 using System.Security;
 using System.Threading;
 using System.Threading.Tasks;
+using ApexTweaker.Contracts.Services;
 using ApexTweaker.Infrastructure;
 using ApexTweaker.Models;
 
 namespace ApexTweaker.Services;
 
-internal sealed class MutationExecutor
+internal sealed class MutationExecutor : IMutationExecutor
 {
     private const string DefaultAccessDeniedMessage =
         "[ERRO] Acesso negado pelo Windows. O estado anterior foi preservado no ledger antes da tentativa de mutacao.";
@@ -18,6 +19,9 @@ internal sealed class MutationExecutor
     private readonly AsyncLocal<MutationPipelineScope?> activeScope = new();
 
     public OperationOutcome? LastOutcome { get; private set; }
+
+    ApexTweaker.Contracts.OperationOutcome? IMutationExecutor.LastOutcome =>
+        LastOutcome?.ToContractOutcome();
 
     public MutationExecutor(BackupService backupService)
     {

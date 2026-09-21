@@ -28,13 +28,3 @@
 | [coordination/](coordination/) | Ownership, routing, handoffs |
 | [research/market-coverage-matrix.md](research/market-coverage-matrix.md) | Cobertura vs mercado (modo A) |
 
-## Minecraft / Cobblemon
-
-| Doc | Conteúdo |
-|-----|----------|
-| [MINECRAFT_GENERAL_AND_SESSION_HOOKS.md](MINECRAFT_GENERAL_AND_SESSION_HOOKS.md) | Fluxo geral + hooks |
-| [COBBLEMON_LOW_END.md](COBBLEMON_LOW_END.md) | Perfil low-end |
-| [COBBLEMON_COMPATIBILITY_1.21.1.md](COBBLEMON_COMPATIBILITY_1.21.1.md) | Compatibilidade |
-| [HOMOLOGACAO_OPERACIONAL_COBBLEMON.md](HOMOLOGACAO_OPERACIONAL_COBBLEMON.md) | Homologação |
-| [SCIENTIFIC_ENGINE.md](SCIENTIFIC_ENGINE.md) | Motor científico / CLI |
-| [FIRST_REAL_TEST_4GB.md](FIRST_REAL_TEST_4GB.md) | Checklist teste 4 GB |

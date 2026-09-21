@@ -9,12 +9,13 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading;
 using Microsoft.Win32;
+using ApexTweaker.Contracts.Services;
 using ApexTweaker.Infrastructure;
 using ApexTweaker.Models;
 
 namespace ApexTweaker.Services;
 
-internal sealed class BackupService
+internal sealed class BackupService : IBackupService
 {
     private const string PendingLedgerStatus = "Pending";
     private const string RestoredLedgerStatus = "Restored";
@@ -68,7 +69,26 @@ internal sealed class BackupService
         (Registry.LocalMachine, "HKLM", @"SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management", "IoPageLimit"),
         (Registry.LocalMachine, "HKLM", @"SOFTWARE\Microsoft\Windows\Dwm", "RealTimeGamingResolution"),
         (Registry.LocalMachine, "HKLM", @"SOFTWARE\Microsoft\Windows\Dwm", "CompositionPolicy"),
-        (Registry.LocalMachine, "HKLM", @"SOFTWARE\Microsoft\Windows\CurrentVersion\DeliveryOptimization\Config", "DODownloadMode")
+        (Registry.LocalMachine, "HKLM", @"SOFTWARE\Microsoft\Windows\CurrentVersion\DeliveryOptimization\Config", "DODownloadMode"),
+        (Registry.CurrentUser, "HKCU", @"Control Panel\Mouse", "MouseSensitivity"),
+        (Registry.LocalMachine, "HKLM", @"SYSTEM\CurrentControlSet\Services\mouclass\Parameters", "MouseDataQueueSize"),
+        (Registry.LocalMachine, "HKLM", @"SYSTEM\CurrentControlSet\Services\kbdclass\Parameters", "KeyboardDataQueueSize"),
+        (Registry.LocalMachine, "HKLM", @"SYSTEM\CurrentControlSet\Services\i8042prt\Parameters", "KeyboardDataQueueSize"),
+        (Registry.LocalMachine, "HKLM", @"SYSTEM\CurrentControlSet\Control\Power", "PowerThrottlingOff"),
+        (Registry.LocalMachine, "HKLM", @"SYSTEM\CurrentControlSet\Control\Power", "CsEnabled"),
+        (Registry.LocalMachine, "HKLM", @"SYSTEM\CurrentControlSet\Control\Power", "HibernateEnabled"),
+        (Registry.CurrentUser, "HKCU", @"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced\TaskbarDeveloperSettings", "TaskbarEndTask"),
+        (Registry.CurrentUser, "HKCU", @"Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InprocServer32", ""),
+        (Registry.CurrentUser, "HKCU", @"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced", "HideFileExt"),
+        (Registry.CurrentUser, "HKCU", @"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced", "Hidden"),
+        (Registry.CurrentUser, "HKCU", @"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced", "ShowCopilotButton"),
+        (Registry.CurrentUser, "HKCU", @"Software\Policies\Microsoft\Windows\WindowsCopilot", "TurnOffWindowsCopilot"),
+        (Registry.LocalMachine, "HKLM", @"SOFTWARE\Policies\Microsoft\Windows\WindowsCopilot", "TurnOffWindowsCopilot"),
+        (Registry.CurrentUser, "HKCU", @"Software\Policies\Microsoft\Windows\WindowsAI", "DisableAIDataAnalysis"),
+        (Registry.LocalMachine, "HKLM", @"SOFTWARE\Policies\Microsoft\Windows\WindowsAI", "DisableAIDataAnalysis"),
+        (Registry.LocalMachine, "HKLM", @"SOFTWARE\Policies\Microsoft\Windows\WindowsAI", "AllowRecallEnablement"),
+        (Registry.LocalMachine, "HKLM", @"SOFTWARE\Policies\Microsoft\Windows\WindowsAI", "TurnOffSavingSnapshots"),
+        (Registry.CurrentUser, "HKCU", @"Software\Microsoft\Windows\CurrentVersion\PushNotifications", "ToastEnabled")
     ];
 
     private static readonly string[] BcdValueNames =

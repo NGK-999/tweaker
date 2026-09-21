@@ -14,7 +14,7 @@
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <Product>ApexTweaker</Product>
     <Title>ApexTweaker</Title>
-    <Description>Windows and Minecraft optimization utility focused on safe diagnostics, low latency, and reversible changes.</Description>
+    <Description>Windows optimization utility focused on safe diagnostics, low latency, and reversible changes.</Description>
     <Company>Igor Silva</Company>
     <Authors>Igor Silva</Authors>
     <Copyright>Copyright 2026 Igor Silva</Copyright>

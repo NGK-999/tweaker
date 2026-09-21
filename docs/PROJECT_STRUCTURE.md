@@ -22,14 +22,6 @@ Shell WPF ativa (unica UI do app):
 - `Views/DashboardView` — Auto-Tuning e restore point.
 - `Views/ModulesView` — modulos individuais de otimizacao.
 - `Views/TelemetryView` — teste A/B, grafico, metricas e console.
-- `Views/MinecraftView` - diagnostico cientifico, experimentos, auditoria,
-  host da experiencia facil e do laboratorio avancado.
-- `Views/CobblemonEasyView` - nome interno legado; hospeda o fluxo Minecraft
-  geral com seis acoes, hooks de sessao, restauracao e diagnostico.
-- `ViewModels/CobblemonEasyViewModel.cs` - nome interno legado preservado para
-  reduzir risco de quebra XAML; estados e mensagens sao Minecraft gerais.
-- `ViewModels/MinecraftWizardViewModel.cs` - estado, navegacao, progresso,
-  cancelamento e estados visuais via CommunityToolkit.Mvvm.
 - `Controls/LightweightBenchmarkChart.cs` - grafico WPF sem SkiaSharp.
 - `Views/UtilitiesView` — revert, desinstalar, sobre, suporte Riot.
 - `Windows/StartupDisclaimerWindow` — aviso legal inicial.
@@ -66,45 +58,6 @@ Regras e acoes do backend:
 
 Comandos estruturados em `ExtremeMutationCommands.cs` e `MemoryCompressionTweakCommand.cs`.
 
-### `src/Minecraft`
-
-Modulo isolado para Minecraft/Cobblemon:
-
-- `Models/MinecraftAuditModels.cs` - contratos de auditoria, perfil, quarentena, benchmark e homologacao.
-- `Models/MinecraftScientificModels.cs` - contratos de evidencia, gargalo,
-  hipotese, medicao, comparacao, decisao e experimento persistente.
-- `Services/ModJarScanner.cs` - metadados Fabric/Forge/NeoForge e JARs aninhados.
-- `Services/MinecraftAuditService.cs` - classificacao, dependencias e conflitos.
-- `Services/MinecraftEnvironmentService.cs` - hardware, Java, pagefile e launchers.
-- `Services/MinecraftInstanceService.cs` - deteccao de launchers e raiz real da instancia.
-- `Services/MinecraftProfileService.cs` - dry-run, configs, memoria, backup e rollback.
-- `Services/MinecraftExtremeExperimentCatalog.cs` - Potato e hipoteses
-  fechadas de resolucao, FPS, chunks, entidades, resource packs e heap.
-- `Services/MinecraftQuarantineService.cs` - movimentacao reversivel de JARs com SHA-256.
-- `Services/MinecraftSurvivalPlanService.cs` - veredito e plano manual para 4 GB.
-- `Services/MinecraftBenchmarkService.cs` - ambiente, processo, configs, logs e crashes.
-- `Services/MinecraftOperationalHomologationService.cs` - checklist e avaliacao da rodada real.
-- `Services/MinecraftReportService.cs` - JSON, Markdown e TXT.
-- `Services/MinecraftInstanceEvidenceService.cs` - hashes de configs/mods,
-  opcoes vanilla e resource packs ativos.
-- `Services/MinecraftBottleneckDiagnosticService.cs` - regras de diagnostico
-  rastreaveis e nivel de confianca.
-- `Services/MinecraftModConfigContractCatalog.cs` - contratos de configuracao
-  suportados, manuais ou sem necessidade de escrita.
-- `Services/MinecraftScientificMetricsService.cs` - consolida telemetria,
-  observacao guiada, logs e resultados detalhados.
-- `Services/MinecraftScientificComparisonService.cs` - limiares, pesos,
-  regressao critica e decisao `KEEP`/`REVERT`/`RETEST`.
-- `Services/MinecraftScientificAutoOptimizeService.cs` - plano conservador por
-  gargalo; nunca movimenta mods automaticamente.
-- `Services/MinecraftScientificExperimentStore.cs` - armazenamento JSON atomico
-  e validacao de identificadores.
-- `Services/MinecraftScientificExperimentService.cs` - maquina de estados do
-  baseline ate a finalizacao e rollback pelo backup exato.
-- `Services/MinecraftScientificReportService.cs` - relatorios cientificos JSON,
-  Markdown e TXT.
-- `MinecraftCommandLine.cs` - automacao headless.
-- `MinecraftSelfTest.cs` - teste integrado sem pacotes externos.
 
 ### `src/Core/Pipeline`
 
@@ -166,11 +119,9 @@ Orquestrado por `MutationExecutor` com ledger em `BackupService`. Nenhuma mutaca
 
 | Caminho | Conteudo |
 |---------|----------|
-| `C:\ProgramData\ApexTweaker\Backups` | Backups granulares, ledger de mutacoes, sessoes de telemetria |
-| `%LOCALAPPDATA%\ApexTweaker\MinecraftBackups` | Backups de perfis de instancia Minecraft |
-| `%LOCALAPPDATA%\ApexTweaker\MinecraftQuarantineBackups` | Backups e manifestos de JARs em quarentena |
-| `%LOCALAPPDATA%\ApexTweaker\MinecraftReports` | Auditorias e benchmarks Minecraft |
-| `%LOCALAPPDATA%\ApexTweaker\MinecraftExperiments` | Estado e relatorios dos experimentos cientificos |
+| `C:\ProgramData\ApexTweaker\Backups` | Backups granulares, ledger de mutacoes |
+| `%LOCALAPPDATA%\ApexTweaker\Backups` | Backups locais e snapshots |
+| `%LOCALAPPDATA%\ApexTweaker\Reports` | Relatorios de sistema |
 | `%LOCALAPPDATA%\ApexTweaker\Telemetry` | Sessoes de telemetria sem administrador |
 
 ## Pastas geradas pelo .NET

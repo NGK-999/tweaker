@@ -5,7 +5,6 @@ using System.Management;
 using System.Runtime.InteropServices;
 using System.Security.Principal;
 using System.Text.RegularExpressions;
-using ApexTweaker.Infrastructure;
 using ApexTweaker.Models;
 using ApexTweaker.Windows.Inventory;
 using Microsoft.Win32;
@@ -23,8 +22,8 @@ internal sealed class SystemDiagnosticsService
     private const string ThemesPersonalizePath = @"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize";
     private const int EnumCurrentSettings = -1;
 
-    private readonly CommandRunner commandRunner = new();
     private readonly OptimizationEngine optimizationEngine = new();
+    private readonly SystemSecurityInventoryService securityInventory = new();
 
     public IReadOnlyList<string> BuildDiagnosticReport()
     {
@@ -61,8 +60,8 @@ internal sealed class SystemDiagnosticsService
             $"VBS configurado: {FormatFeatureState(gamingProbe.VbsState)}",
             $"Memory Integrity / HVCI: {FormatFeatureState(gamingProbe.MemoryIntegrityState)}",
             $"Resizable BAR: {gamingProbe.ResizableBar.Summary}",
-            $"Secure Boot: {RunPowerShellScalar("Confirm-SecureBootUEFI")}",
-            $"TPM: {RunPowerShellScalar("(Get-Tpm).TpmPresent")}"
+            $"Secure Boot: {FormatSecurityState(securityInventory.ReadSecureBootEnabled())}",
+            $"TPM: {FormatSecurityState(securityInventory.ReadTpmPresent())}"
         ];
     }
 
@@ -223,13 +222,6 @@ internal sealed class SystemDiagnosticsService
         return $"{productName} {displayVersion} build {fullBuild}";
     }
 
-    private string RunPowerShellScalar(string command)
-    {
-        var result = commandRunner.Run("powershell.exe", $"-NoProfile -ExecutionPolicy Bypass -Command \"{command}\"");
-        var output = result.Output.Trim();
-        return string.IsNullOrWhiteSpace(output) ? "indisponivel" : output;
-    }
-
     private static int ConvertToInt(object? value)
     {
         return value is null ? 0 : Convert.ToInt32(value, CultureInfo.InvariantCulture);
@@ -305,6 +297,16 @@ internal sealed class SystemDiagnosticsService
         {
             FeatureState.Enabled => "ativado",
             FeatureState.Disabled => "desativado",
+            _ => "indisponivel"
+        };
+    }
+
+    private static string FormatSecurityState(bool? state)
+    {
+        return state switch
+        {
+            true => "True",
+            false => "False",
             _ => "indisponivel"
         };
     }
